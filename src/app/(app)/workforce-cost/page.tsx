@@ -12,12 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { Wallet, TimerReset, TrendingDown, Clock3 } from "lucide-react";
 
 export default async function WorkforceCostPage() {
-  const db = getDb();
+  const db = await getDb();
   const t = await getT();
   const locale = await getLocale();
-  const monthly = getMonthlyKpis(2026, 8);
-  const byDept = getWorkforceCostByDepartment(2026, 8).map((d) => ({ ...d, department: translateLabel(d.department, locale) }));
-  const topLate = getTopLateEmployees(5, 30);
+  const monthly = await getMonthlyKpis(2026, 8);
+  const byDept = (await getWorkforceCostByDepartment(2026, 8)).map((d) => ({ ...d, department: translateLabel(d.department, locale) }));
+  const topLate = await getTopLateEmployees(5, 30);
 
   const totalCost = monthly.totalPayroll + monthly.overtimeTotal;
 

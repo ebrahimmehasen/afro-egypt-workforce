@@ -82,18 +82,18 @@
 - [x] `tsc` + `npm test` (20/20) + `npm run build` + `npm run lint` — كلها نضيفة. الـ seed اتجرّب dry-run: كل الحسابات اشتغلت، وقف بس عند الاتصال بـ MySQL (متوقّع)
 - [ ] **متبقّي (يحتاج MySQL):** `prisma migrate dev --name init` + `npm run db:seed` + اختبار قراءة/كتابة فعلي
 
-### المرحلة 5 — الباك اند (تحويل الـ server actions)
-- [ ] استبدال كل `getDb()` / `db.X` بـ استعلامات Prisma في:
-      `actions/{employees,departments,shifts,attendance,leaves,overtime,deductions,allowances,payroll,settings}.ts`
-- [ ] تحويل `selectors.ts` + `attendance-service.ts` لاستعلامات DB
-- [ ] `addAuditLog` → جدول حقيقي داخل معاملة (transaction) مع الحدث نفسه
-- [ ] معاملات Prisma حوالين: حساب الرواتب، اعتماد الإجازة/الإضافي، تصحيح الحضور
-- [ ] إصلاح ثغرة التوقيت عبر منتصف الليل (استخدام Date كامل مش نص)
-- [ ] **فتح فترة رواتب جديدة:** action + UI (اختيار شهر/سنة → `PayrollPeriod` جديد draft، منع تكرار) + قائمة اختيار الفترة فوق صفحة الرواتب + أرشيف الفترات المقفولة
-- [ ] **الحذف الناعم:** كل الاستعلامات تفلتر `deletedAt = null`؛ زرار الحذف يبقى "تعطيل/أرشفة"
-- [ ] **`POST /api/punch`:** endpoint يستقبل بصمات ZKTeco (header `X-Punch-Key`)، يطابق `deviceUserId` بموظف، يكتب `AttendanceLog` + يعيد حساب `DailyAttendance`
-- [ ] **تصدير xlsx حقيقي:** استبدال `exportExcel` (HTML) بمكتبة SheetJS
-- [ ] فحص متصفح كامل لسيناريو §55 بعد التحويل
+### المرحلة 5 — الباك اند (تحويل الـ server actions) ✅ (اكتملت — فرع `feat/prisma-backend`)
+- [x] **الكتابة:** كل الـ13 ملف actions بقت Prisma حقيقي (create/update/upsert/delete) — `getDb()`/`db.X.push` اختفت
+- [x] **القراءة:** `getDb()` بقت async — بتحمّل snapshot كامل من الـ DB بشكل `Store` (mappers في `serialize.ts` بترجّع التواريخ كـ ISO strings). الصفحات والـ selectors محتفظة بمنطقها زي ما هو، بس `await getDb()`. (تفاصيل في memory: [[getdb-snapshot-hydrator]])
+- [x] `selectors.ts` + `attendance-service.ts` → async Prisma
+- [x] `addAuditLog` → جدول `AuditLogEntry` حقيقي · `calculatePayroll` كله جوّا `prisma.$transaction`
+- [x] **إصلاح ثغرة منتصف الليل:** `recalculateDailyAttendance` بيجمع البصمات بنافذة الوردية الفعلية (±6 ساعات) مش بمطابقة نص التاريخ
+- [x] **فتح فترة رواتب جديدة:** `openPayrollPeriod` action (شهر/سنة → `PayrollPeriod` draft، `@@unique([year,month])` يمنع التكرار) + `PayrollPeriodBar` (قائمة اختيار الفترة عبر `?period=` + ديالوج فتح شهر) فوق صفحة الرواتب
+- [x] **الحذف الناعم:** `deleteEmployee` / `deleteDepartment` / `updateShift` تفلتر وتضبط `deletedAt`؛ `getDb()` بيستبعد المحذوف
+- [x] **`POST /api/punch`:** `src/app/api/punch/route.ts` — header `X-Punch-Key`، zod validation، مطابقة `deviceUserId`→موظف، استنتاج in/out، كتابة `AttendanceLog` (source=biometric + rawPayload) + إعادة حساب `DailyAttendance`
+- [x] **تصدير xlsx حقيقي:** `exportExcel` بقت SheetJS (`xlsx`) → ملف `.xlsx` صحيح بأعمدة مضبوطة
+- [x] `tsc` + `npm run lint` + `npm run build` (0 أخطاء prisma بعد `force-dynamic`) — كلها نضيفة. `demo-flow.test.ts` بقى integration test بيتخطّى تلقائيًا بدون DB. اختبارات المحرّك 14/14 ✓
+- [ ] **متبقّي (يحتاج MySQL):** `prisma migrate dev` + `db:seed` + فحص متصفح كامل لسيناريو §55 + اختبار `/api/punch` بـ curl
 
 ### المرحلة 6 — المصادقة الحقيقية
 - [ ] جدول `User` (email, passwordHash, role, employeeId?, departmentId?, active)

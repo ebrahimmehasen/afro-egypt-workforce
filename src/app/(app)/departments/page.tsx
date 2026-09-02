@@ -13,12 +13,12 @@ import { DeleteDepartmentButton } from "@/components/departments/delete-departme
 import { Building2, Users, Wallet, Percent } from "lucide-react";
 
 export default async function DepartmentsPage() {
-  const db = getDb();
+  const db = await getDb();
   const user = (await getSession())!;
   const t = await getT();
   const locale = await getLocale();
   const canEdit = canCorrectAttendance(user.role);
-  const rates = getAttendanceByDepartment();
+  const rates = await getAttendanceByDepartment();
 
   const rows = db.departments.map((dept) => {
     const employees = db.employees.filter((e) => e.departmentId === dept.id);

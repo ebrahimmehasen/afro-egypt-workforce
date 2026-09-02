@@ -12,7 +12,7 @@ export default async function SettingsPage() {
   const user = (await getSession())!;
   if (!canManageSettings(user.role)) redirect("/dashboard");
 
-  const db = getDb();
+  const db = await getDb();
   const t = await getT();
 
   return (

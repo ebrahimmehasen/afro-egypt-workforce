@@ -12,6 +12,9 @@ export const DEMO_DATE = "2026-08-21"; // fixed demo "today"
 export const DEMO_EMPLOYEE_ID = "EMP-1001";
 export const DEMO_PERIOD_ID = "PP-2026-08";
 
+/** Seeded biometric device id (see prisma/seed.ts). */
+export const DEVICE_ID = "ZK-DEMO-01";
+
 export const DEPARTMENT_NAMES = [
   "الإنتاج",
   "المخازن",

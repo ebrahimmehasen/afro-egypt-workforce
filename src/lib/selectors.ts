@@ -3,14 +3,14 @@ import { DEMO_DATE } from "@/lib/constants";
 import { AttendanceStatus, DailyAttendance } from "@/lib/types";
 import { ATTENDANCE_STATUS_GROUPS } from "@/lib/attendance-engine";
 
-export function getTodayAttendance(date: string = DEMO_DATE): DailyAttendance[] {
-  const db = getDb();
+export async function getTodayAttendance(date: string = DEMO_DATE): Promise<DailyAttendance[]> {
+  const db = await getDb();
   return db.dailyAttendance.filter((a) => a.date === date);
 }
 
-export function getTodayKpis(date: string = DEMO_DATE) {
-  const db = getDb();
-  const today = getTodayAttendance(date);
+export async function getTodayKpis(date: string = DEMO_DATE) {
+  const db = await getDb();
+  const today = db.dailyAttendance.filter((a) => a.date === date);
   const totalEmployees = db.employees.filter((e) => e.status === "active").length;
 
   const count = (status: AttendanceStatus) => today.filter((a) => a.status === status).length;
@@ -26,8 +26,8 @@ export function getTodayKpis(date: string = DEMO_DATE) {
   };
 }
 
-export function getMonthlyKpis(year: number, month: number) {
-  const db = getDb();
+export async function getMonthlyKpis(year: number, month: number) {
+  const db = await getDb();
   const prefix = `${year}-${String(month).padStart(2, "0")}`;
   const monthAttendance = db.dailyAttendance.filter((a) => a.date.startsWith(prefix));
 
@@ -69,8 +69,8 @@ export function getMonthlyKpis(year: number, month: number) {
   };
 }
 
-export function getAttendanceTrend(days = 14, endDate: string = DEMO_DATE) {
-  const db = getDb();
+export async function getAttendanceTrend(days = 14, endDate: string = DEMO_DATE) {
+  const db = await getDb();
   const end = new Date(`${endDate}T00:00:00`);
   const trend: { date: string; present: number; late: number; absent: number }[] = [];
 
@@ -90,9 +90,9 @@ export function getAttendanceTrend(days = 14, endDate: string = DEMO_DATE) {
   return trend;
 }
 
-export function getAttendanceByDepartment(date: string = DEMO_DATE) {
-  const db = getDb();
-  const today = getTodayAttendance(date);
+export async function getAttendanceByDepartment(date: string = DEMO_DATE) {
+  const db = await getDb();
+  const today = db.dailyAttendance.filter((a) => a.date === date);
   return db.departments.map((dept) => {
     const deptEmployeeIds = db.employees.filter((e) => e.departmentId === dept.id).map((e) => e.id);
     const records = today.filter((a) => deptEmployeeIds.includes(a.employeeId));
@@ -106,8 +106,8 @@ export function getAttendanceByDepartment(date: string = DEMO_DATE) {
   });
 }
 
-export function getTopLateEmployees(limit = 5, days = 30, endDate: string = DEMO_DATE) {
-  const db = getDb();
+export async function getTopLateEmployees(limit = 5, days = 30, endDate: string = DEMO_DATE) {
+  const db = await getDb();
   const end = new Date(`${endDate}T00:00:00`);
   const start = new Date(end);
   start.setDate(start.getDate() - days);
@@ -133,8 +133,8 @@ export function getTopLateEmployees(limit = 5, days = 30, endDate: string = DEMO
     .slice(0, limit);
 }
 
-export function getWorkforceCostByDepartment(year: number, month: number) {
-  const db = getDb();
+export async function getWorkforceCostByDepartment(year: number, month: number) {
+  const db = await getDb();
   const records = db.payrollRecords.filter((r) => {
     const period = db.payrollPeriods.find((p) => p.id === r.periodId);
     return period && period.year === year && period.month === month;

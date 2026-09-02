@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PeriodActions } from "@/components/payroll/period-actions";
+import { PayrollPeriodBar } from "@/components/payroll/payroll-period-bar";
 import { BreakdownDialog } from "@/components/payroll/breakdown-dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -24,15 +25,20 @@ const STATUS_VARIANT: Record<string, "secondary" | "warning" | "success" | "outl
   closed: "outline",
 };
 
-export default async function PayrollPage() {
-  const db = getDb();
+export default async function PayrollPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
+  const db = await getDb();
   const user = (await getSession())!;
   const t = await getT();
   const locale = await getLocale();
   const canEdit = canEditPayroll(user.role);
 
-  let period = db.payrollPeriods.find((p) => p.id === "PP-2026-08");
-  if (!period) period = db.payrollPeriods[0];
+  const { period: periodParam } = await searchParams;
+  let period = periodParam ? db.payrollPeriods.find((p) => p.id === periodParam) : undefined;
+  if (!period) period = db.payrollPeriods.find((p) => p.id === "PP-2026-08") ?? db.payrollPeriods[0];
 
   let records = period
     ? db.payrollRecords
@@ -50,7 +56,16 @@ export default async function PayrollPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={t.payroll.title} description={t.payroll.description} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PageHeader title={t.payroll.title} description={t.payroll.description} />
+        {canEdit && (
+          <PayrollPeriodBar
+            periods={db.payrollPeriods}
+            currentId={period?.id ?? ""}
+            canEdit={canEdit}
+          />
+        )}
+      </div>
 
       {period ? (
         <Card>

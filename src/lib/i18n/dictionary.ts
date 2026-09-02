@@ -369,6 +369,12 @@ export interface Dictionary {
     totalLabel: string;
     netSalary: string;
     openPayslip: string;
+    openPeriod: string;
+    openPeriodTitle: string;
+    periodOpened: string;
+    selectPeriod: string;
+    year: string;
+    month: string;
   };
   payslip: {
     back: string;
@@ -597,6 +603,7 @@ export interface Dictionary {
     payrollNotCalculatedFirst: string;
     payrollApprovedFirst: string;
     noAttendanceRecordForDay: string;
+    periodExists: string;
   };
   auditActions: {
     addEmployee: string;
@@ -612,6 +619,7 @@ export interface Dictionary {
     calculatePayroll: string;
     approvePayroll: string;
     closePayrollPeriod: string;
+    openPayrollPeriod: string;
     editAttendanceSettings: string;
     editPayrollSettings: string;
     system: string;

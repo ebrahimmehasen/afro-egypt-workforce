@@ -17,7 +17,7 @@ export function ExportButtons({
   const t = useT();
   return (
     <div className="flex flex-wrap items-center gap-2 no-print">
-      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => exportExcel(filename, headers, rows)}>
+      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void exportExcel(filename, headers, rows)}>
         <FileSpreadsheet className="h-4 w-4" />
         {t.common.exportExcel}
       </Button>

@@ -7,7 +7,7 @@ import { LeaveFormDialog } from "@/components/leaves/leave-form-dialog";
 import { LeavesTable } from "@/components/leaves/leaves-table";
 
 export default async function LeavesPage() {
-  const db = getDb();
+  const db = await getDb();
   const user = (await getSession())!;
   const t = await getT();
 

@@ -1,6 +1,6 @@
 export type ExportRow = (string | number)[];
 
-function downloadBlob(filename: string, content: string, mime: string) {
+function downloadBlob(filename: string, content: BlobPart, mime: string) {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -26,14 +26,18 @@ export function exportCSV(filename: string, headers: string[], rows: ExportRow[]
   downloadBlob(`${filename}.csv`, csv, "text/csv;charset=utf-8;");
 }
 
-export function exportExcel(filename: string, headers: string[], rows: ExportRow[]) {
-  const table = `
-    <table dir="rtl">
-      <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
-      <tbody>
-        ${rows.map((row) => `<tr>${row.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}
-      </tbody>
-    </table>`;
-  const html = `<html><head><meta charset="utf-8"></head><body>${table}</body></html>`;
-  downloadBlob(`${filename}.xls`, html, "application/vnd.ms-excel;charset=utf-8;");
+export async function exportExcel(filename: string, headers: string[], rows: ExportRow[]) {
+  const XLSX = await import("xlsx");
+  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  worksheet["!cols"] = headers.map((h, i) => ({
+    wch: Math.max(h.length, ...rows.map((r) => String(r[i] ?? "").length)) + 2,
+  }));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+  const buffer: ArrayBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  downloadBlob(
+    `${filename}.xlsx`,
+    buffer,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
 }

@@ -371,6 +371,12 @@ export const ar: Dictionary = {
     totalLabel: "الإجمالي",
     netSalary: "صافي المرتب",
     openPayslip: "فتح كشف المرتب للطباعة",
+    openPeriod: "فتح فترة رواتب جديدة",
+    openPeriodTitle: "فتح فترة رواتب جديدة",
+    periodOpened: "تم فتح فترة الرواتب",
+    selectPeriod: "اختر الفترة",
+    year: "السنة",
+    month: "الشهر",
   },
   payslip: {
     back: "الرجوع",
@@ -599,6 +605,7 @@ export const ar: Dictionary = {
     payrollNotCalculatedFirst: "يجب حساب الرواتب أولًا",
     payrollApprovedFirst: "يجب اعتماد الرواتب أولًا",
     noAttendanceRecordForDay: "لا يوجد سجل حضور لهذا اليوم",
+    periodExists: "فترة رواتب هذا الشهر مفتوحة بالفعل",
   },
   auditActions: {
     addEmployee: "إضافة موظف",
@@ -614,6 +621,7 @@ export const ar: Dictionary = {
     calculatePayroll: "حساب الرواتب",
     approvePayroll: "اعتماد الرواتب",
     closePayrollPeriod: "إغلاق فترة الرواتب",
+    openPayrollPeriod: "فتح فترة رواتب",
     editAttendanceSettings: "تعديل إعدادات الحضور",
     editPayrollSettings: "تعديل إعدادات الرواتب",
     system: "النظام",

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getDb } from "@/lib/data";
+import { prisma } from "@/lib/prisma";
 import { addAuditLog } from "@/lib/store";
 import { getSession } from "@/lib/auth";
 import { nextId } from "@/lib/id";
@@ -21,17 +21,17 @@ export async function createOvertime(_prev: ActionState, formData: FormData): Pr
   const t = await getT();
   const parsed = overtimeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  const db = getDb();
-  db.overtime.push({
-    id: nextId("OT"),
-    employeeId: parsed.data.employeeId,
-    date: parsed.data.date,
-    hours: parsed.data.hours,
-    hourlyRate: parsed.data.hourlyRate,
-    amount: Math.round(parsed.data.hours * parsed.data.hourlyRate),
-    notes: parsed.data.notes,
-    status: "pending",
-    createdAt: new Date().toISOString(),
+  await prisma.overtime.create({
+    data: {
+      id: nextId("OT"),
+      employeeId: parsed.data.employeeId,
+      date: new Date(`${parsed.data.date}T00:00:00.000Z`),
+      hours: parsed.data.hours,
+      hourlyRate: Math.round(parsed.data.hourlyRate),
+      amount: Math.round(parsed.data.hours * parsed.data.hourlyRate),
+      notes: parsed.data.notes,
+      status: "pending",
+    },
   });
   revalidatePath("/overtime");
   return { success: true, message: t.overtime.submitted };
@@ -39,15 +39,16 @@ export async function createOvertime(_prev: ActionState, formData: FormData): Pr
 
 export async function decideOvertime(id: string, decision: "approved" | "rejected") {
   const t = await getT();
-  const db = getDb();
   const user = await getSession();
-  const overtime = db.overtime.find((o) => o.id === id);
+  const overtime = await prisma.overtime.findUnique({ where: { id } });
   if (!overtime) return { error: t.validation.requestNotFound };
 
-  overtime.status = decision;
-  overtime.approvedBy = user?.name ?? t.auditActions.system;
+  await prisma.overtime.update({
+    where: { id },
+    data: { status: decision, approvedBy: user?.name ?? t.auditActions.system },
+  });
 
-  addAuditLog({
+  await addAuditLog({
     userName: user?.name ?? t.auditActions.system,
     action: decision === "approved" ? t.auditActions.approveOvertime : t.auditActions.rejectOvertime,
     module: t.nav.overtime,

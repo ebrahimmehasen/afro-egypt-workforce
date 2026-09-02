@@ -14,7 +14,7 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<{ tab?: string; from?: string; to?: string; status?: string }>;
 }) {
-  const db = getDb();
+  const db = await getDb();
   const t = await getT();
   const locale = await getLocale();
   const period = db.payrollPeriods.find((p) => p.id === "PP-2026-08") ?? db.payrollPeriods[0];

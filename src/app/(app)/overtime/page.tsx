@@ -12,7 +12,7 @@ export default async function OvertimePage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const initialStatus = (await searchParams).status ?? "all";
-  const db = getDb();
+  const db = await getDb();
   const user = (await getSession())!;
   const t = await getT();
 

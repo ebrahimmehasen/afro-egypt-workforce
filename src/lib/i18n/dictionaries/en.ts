@@ -371,6 +371,12 @@ export const en: Dictionary = {
     totalLabel: "Total",
     netSalary: "Net Salary",
     openPayslip: "Open Printable Payslip",
+    openPeriod: "Open New Payroll Period",
+    openPeriodTitle: "Open New Payroll Period",
+    periodOpened: "Payroll period opened",
+    selectPeriod: "Select period",
+    year: "Year",
+    month: "Month",
   },
   payslip: {
     back: "Back",
@@ -599,6 +605,7 @@ export const en: Dictionary = {
     payrollNotCalculatedFirst: "Payroll must be calculated first",
     payrollApprovedFirst: "Payroll must be approved first",
     noAttendanceRecordForDay: "No attendance record for this day",
+    periodExists: "A payroll period for this month is already open",
   },
   auditActions: {
     addEmployee: "Add Employee",
@@ -614,6 +621,7 @@ export const en: Dictionary = {
     calculatePayroll: "Calculate Payroll",
     approvePayroll: "Approve Payroll",
     closePayrollPeriod: "Close Payroll Period",
+    openPayrollPeriod: "Open Payroll Period",
     editAttendanceSettings: "Edit Attendance Settings",
     editPayrollSettings: "Edit Payroll Settings",
     system: "System",

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getDb } from "@/lib/data";
+import { prisma } from "@/lib/prisma";
 import { addAuditLog } from "@/lib/store";
 import { getSession } from "@/lib/auth";
 import { nextId } from "@/lib/id";
@@ -23,15 +23,20 @@ export async function createDeduction(_prev: ActionState, formData: FormData): P
   const t = await getT();
   const parsed = deductionSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  const db = getDb();
   const user = await getSession();
-  db.deductions.push({
-    id: nextId("DED"),
-    ...parsed.data,
-    createdAt: new Date().toISOString(),
+  await prisma.deduction.create({
+    data: {
+      id: nextId("DED"),
+      employeeId: parsed.data.employeeId,
+      type: parsed.data.type,
+      amount: Math.round(parsed.data.amount),
+      date: new Date(`${parsed.data.date}T00:00:00.000Z`),
+      reason: parsed.data.reason,
+      notes: parsed.data.notes,
+    },
   });
 
-  addAuditLog({
+  await addAuditLog({
     userName: user?.name ?? t.auditActions.system,
     action: t.auditActions.addDeduction,
     module: t.nav.deductions,
@@ -47,10 +52,9 @@ export async function createDeduction(_prev: ActionState, formData: FormData): P
 
 export async function deleteDeduction(id: string) {
   const t = await getT();
-  const db = getDb();
-  const idx = db.deductions.findIndex((d) => d.id === id);
-  if (idx === -1) return { error: t.validation.notFound };
-  db.deductions.splice(idx, 1);
+  const existing = await prisma.deduction.findUnique({ where: { id } });
+  if (!existing) return { error: t.validation.notFound };
+  await prisma.deduction.delete({ where: { id } });
   revalidatePath("/deductions");
   return { success: true };
 }

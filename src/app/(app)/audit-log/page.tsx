@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { AuditLogTable } from "@/components/audit/audit-log-table";
 
 export default async function AuditLogPage() {
-  const db = getDb();
+  const db = await getDb();
   const t = await getT();
   const entries = [...db.auditLog].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
 

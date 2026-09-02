@@ -34,11 +34,11 @@ export default async function DashboardPage() {
     return <EmployeeDashboard employeeId={user.employeeId} userName={displayUserName(user, t)} />;
   }
 
-  const today = getTodayKpis();
-  const monthly = getMonthlyKpis(2026, 8);
-  const trend = getAttendanceTrend(14);
-  const byDept = getAttendanceByDepartment().map((d) => ({ ...d, department: translateLabel(d.department, locale) }));
-  const topLate = getTopLateEmployees(5);
+  const today = await getTodayKpis();
+  const monthly = await getMonthlyKpis(2026, 8);
+  const trend = await getAttendanceTrend(14);
+  const byDept = (await getAttendanceByDepartment()).map((d) => ({ ...d, department: translateLabel(d.department, locale) }));
+  const topLate = await getTopLateEmployees(5);
 
   return (
     <div className="flex flex-col gap-6">
@@ -183,7 +183,7 @@ export default async function DashboardPage() {
 }
 
 async function EmployeeDashboard({ employeeId, userName }: { employeeId: string; userName: string }) {
-  const db = getDb();
+  const db = await getDb();
   const t = await getT();
   const locale = await getLocale();
   const employee = db.employees.find((e) => e.id === employeeId);

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getDb } from "@/lib/data";
+import { prisma } from "@/lib/prisma";
 import { addAuditLog } from "@/lib/store";
 import { getSession } from "@/lib/auth";
 import { ActionState } from "@/hooks/use-action-feedback";
@@ -20,9 +20,9 @@ const employeeSchema = z.object({
   status: z.enum(["active", "on_leave", "suspended", "terminated"]),
 });
 
-function nextEmployeeId() {
-  const db = getDb();
-  const max = db.employees.reduce((m, e) => {
+async function nextEmployeeId() {
+  const rows = await prisma.employee.findMany({ select: { id: true } });
+  const max = rows.reduce((m, e) => {
     const n = Number(e.id.replace("EMP-", ""));
     return Number.isFinite(n) ? Math.max(m, n) : m;
   }, 1000);
@@ -33,12 +33,20 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
   const t = await getT();
   const parsed = employeeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  const db = getDb();
   const user = await getSession();
-  const id = nextEmployeeId();
-  db.employees.push({ id, ...parsed.data });
+  const id = await nextEmployeeId();
+  const { allowances, hireDate, ...rest } = parsed.data;
 
-  addAuditLog({
+  await prisma.employee.create({
+    data: {
+      id,
+      ...rest,
+      hireDate: new Date(`${hireDate}T00:00:00.000Z`),
+      allowancesTotal: allowances,
+    },
+  });
+
+  await addAuditLog({
     userName: user?.name ?? t.auditActions.system,
     action: t.auditActions.addEmployee,
     module: t.nav.employees,
@@ -55,15 +63,22 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
   const id = String(formData.get("id") ?? "");
   const parsed = employeeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  const db = getDb();
   const user = await getSession();
-  const idx = db.employees.findIndex((e) => e.id === id);
-  if (idx === -1) return { error: t.validation.employeeNotFound };
 
-  const before = db.employees[idx];
-  db.employees[idx] = { ...before, ...parsed.data };
+  const before = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
+  if (!before) return { error: t.validation.employeeNotFound };
 
-  addAuditLog({
+  const { allowances, hireDate, ...rest } = parsed.data;
+  await prisma.employee.update({
+    where: { id },
+    data: {
+      ...rest,
+      hireDate: new Date(`${hireDate}T00:00:00.000Z`),
+      allowancesTotal: allowances,
+    },
+  });
+
+  await addAuditLog({
     userName: user?.name ?? t.auditActions.system,
     action: t.auditActions.editEmployee,
     module: t.nav.employees,
@@ -76,15 +91,19 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
   return { success: true, message: t.employees.savedEdits };
 }
 
+/** Soft delete — the employee is archived (deletedAt set), not physically removed. */
 export async function deleteEmployee(id: string) {
   const t = await getT();
-  const db = getDb();
   const user = await getSession();
-  const idx = db.employees.findIndex((e) => e.id === id);
-  if (idx === -1) return { error: t.validation.employeeNotFound };
-  const [removed] = db.employees.splice(idx, 1);
+  const removed = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
+  if (!removed) return { error: t.validation.employeeNotFound };
 
-  addAuditLog({
+  await prisma.employee.update({
+    where: { id },
+    data: { deletedAt: new Date(), status: "terminated" },
+  });
+
+  await addAuditLog({
     userName: user?.name ?? t.auditActions.system,
     action: t.auditActions.deleteEmployee,
     module: t.nav.employees,

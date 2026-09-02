@@ -2,11 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getDb } from "@/lib/data";
+import { prisma } from "@/lib/prisma";
 import { addAuditLog } from "@/lib/store";
 import { getSession } from "@/lib/auth";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
+
+const SINGLETON = "singleton";
 
 const companySchema = z.object({
   companyName: z.string().min(2),
@@ -18,8 +20,11 @@ export async function updateCompanySettings(_prev: ActionState, formData: FormDa
   const t = await getT();
   const parsed = companySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  const db = getDb();
-  Object.assign(db.companySettings, parsed.data);
+  await prisma.companySettings.upsert({
+    where: { id: SINGLETON },
+    update: parsed.data,
+    create: { id: SINGLETON, logoUrl: "/brand/afro-egypt-logo.jpg", ...parsed.data },
+  });
   revalidatePath("/settings");
   return { success: true, message: t.settings.savedCompany };
 }
@@ -35,10 +40,13 @@ export async function updateAttendanceSettings(_prev: ActionState, formData: For
   const t = await getT();
   const parsed = attendanceSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  const db = getDb();
   const user = await getSession();
-  Object.assign(db.attendanceSettings, parsed.data);
-  addAuditLog({
+  await prisma.attendanceSettings.upsert({
+    where: { id: SINGLETON },
+    update: parsed.data,
+    create: { id: SINGLETON, ...parsed.data },
+  });
+  await addAuditLog({
     userName: user?.name ?? t.auditActions.system,
     action: t.auditActions.editAttendanceSettings,
     module: t.nav.settings,
@@ -59,10 +67,13 @@ export async function updatePayrollSettings(_prev: ActionState, formData: FormDa
   const t = await getT();
   const parsed = payrollSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  const db = getDb();
   const user = await getSession();
-  Object.assign(db.payrollSettings, parsed.data);
-  addAuditLog({
+  await prisma.payrollSettings.upsert({
+    where: { id: SINGLETON },
+    update: parsed.data,
+    create: { id: SINGLETON, ...parsed.data },
+  });
+  await addAuditLog({
     userName: user?.name ?? t.auditActions.system,
     action: t.auditActions.editPayrollSettings,
     module: t.nav.settings,

@@ -16,7 +16,7 @@ export default async function DeductionsPage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
-  const db = getDb();
+  const db = await getDb();
   const user = (await getSession())!;
   const t = await getT();
   const locale = await getLocale();

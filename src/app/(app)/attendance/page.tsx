@@ -21,7 +21,7 @@ export default async function AttendancePage({
   const { date: dateParam, status: statusParam } = await searchParams;
   const date = dateParam ?? DEMO_DATE;
   const initialStatus = statusParam ?? "all";
-  const db = getDb();
+  const db = await getDb();
   const user = (await getSession())!;
   const t = await getT();
   const canCorrect = canCorrectAttendance(user.role);

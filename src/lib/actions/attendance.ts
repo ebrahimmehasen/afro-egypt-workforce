@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getDb } from "@/lib/data";
+import { prisma } from "@/lib/prisma";
 import { addAuditLog } from "@/lib/store";
 import { getSession } from "@/lib/auth";
 import { recalculateDailyAttendance } from "@/lib/attendance-service";
@@ -25,20 +25,22 @@ export async function simulatePunch(_prev: ActionState, formData: FormData): Pro
   if (!parsed.success) return { error: t.validation.invalidData };
 
   const { employeeId, punchType, date, time, deviceId } = parsed.data;
-  const db = getDb();
-  const employee = db.employees.find((e) => e.id === employeeId);
+  const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });
   if (!employee) return { error: t.validation.employeeNotFound };
 
-  db.attendanceLogs.push({
-    id: `LOG-${db.attendanceLogs.length + 1}`,
-    employeeId,
-    deviceId,
-    timestamp: `${date}T${time}:00`,
-    punchType,
-    source: "simulated",
+  const device = await prisma.device.findUnique({ where: { id: deviceId } });
+
+  await prisma.attendanceLog.create({
+    data: {
+      employeeId,
+      deviceId: device ? deviceId : null,
+      timestamp: new Date(`${date}T${time}:00`),
+      punchType,
+      source: "simulated",
+    },
   });
 
-  recalculateDailyAttendance(employeeId, date);
+  await recalculateDailyAttendance(employeeId, date);
   revalidatePath("/attendance");
   revalidatePath("/dashboard");
   revalidatePath(`/employees/${employeeId}`);
@@ -61,46 +63,62 @@ export async function correctAttendance(_prev: ActionState, formData: FormData):
   if (!parsed.success) return { error: t.validation.invalidData };
 
   const { employeeId, date, correctedIn, correctedOut, reason } = parsed.data;
-  const db = getDb();
   const user = await getSession();
-  const employee = db.employees.find((e) => e.id === employeeId);
-  const shift = db.shifts.find((s) => s.id === employee?.shiftId);
+  const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });
+  const shift = employee ? await prisma.shift.findUnique({ where: { id: employee.shiftId } }) : null;
   if (!employee || !shift) return { error: t.validation.invalidData };
 
-  const idx = db.dailyAttendance.findIndex((a) => a.employeeId === employeeId && a.date === date);
-  if (idx === -1) return { error: t.validation.noAttendanceRecordForDay };
+  const dateOnly = new Date(`${date}T00:00:00.000Z`);
+  const before = await prisma.dailyAttendance.findUnique({
+    where: { employeeId_date: { employeeId, date: dateOnly } },
+  });
+  if (!before) return { error: t.validation.noAttendanceRecordForDay };
 
-  const before = db.dailyAttendance[idx];
-  const scheduledStart = new Date(before.scheduledStart);
-  const scheduledEnd = new Date(before.scheduledEnd);
-  const newIn = correctedIn ? new Date(`${date}T${correctedIn}:00`) : before.actualIn ? new Date(before.actualIn) : null;
-  const newOut = correctedOut ? new Date(`${date}T${correctedOut}:00`) : before.actualOut ? new Date(before.actualOut) : null;
-
-  const computed = computeFromActuals(scheduledStart, scheduledEnd, shift, newIn, newOut);
-
-  db.dailyAttendance[idx] = {
-    ...before,
-    actualIn: computed.actualIn?.toISOString() ?? null,
-    actualOut: computed.actualOut?.toISOString() ?? null,
-    lateMinutes: computed.lateMinutes,
-    deductibleLateMinutes: computed.deductibleLateMinutes,
-    earlyLeaveMinutes: computed.earlyLeaveMinutes,
-    workedMinutes: computed.workedMinutes,
-    overtimeMinutes: computed.overtimeMinutes,
-    status: computed.status,
-    correctionReason: reason,
-    correctedBy: user?.name ?? t.auditActions.system,
-    correctedAt: new Date().toISOString(),
+  const shiftForEngine = {
+    id: shift.id,
+    name: shift.name,
+    startTime: shift.startTime,
+    endTime: shift.endTime,
+    gracePeriodMinutes: shift.gracePeriodMinutes,
+    workDays: (shift.workDays as number[]) ?? [],
+    allowOvertime: shift.allowOvertime,
   };
+  const newIn = correctedIn ? new Date(`${date}T${correctedIn}:00`) : before.actualIn;
+  const newOut = correctedOut ? new Date(`${date}T${correctedOut}:00`) : before.actualOut;
+
+  const computed = computeFromActuals(
+    before.scheduledStart,
+    before.scheduledEnd,
+    shiftForEngine,
+    newIn,
+    newOut,
+  );
+
+  await prisma.dailyAttendance.update({
+    where: { employeeId_date: { employeeId, date: dateOnly } },
+    data: {
+      actualIn: computed.actualIn,
+      actualOut: computed.actualOut,
+      lateMinutes: computed.lateMinutes,
+      deductibleLateMinutes: computed.deductibleLateMinutes,
+      earlyLeaveMinutes: computed.earlyLeaveMinutes,
+      workedMinutes: computed.workedMinutes,
+      overtimeMinutes: computed.overtimeMinutes,
+      status: computed.status,
+      correctionReason: reason,
+      correctedBy: user?.name ?? t.auditActions.system,
+      correctedAt: new Date(),
+    },
+  });
 
   const timeFmt = (d: Date | null) =>
     d ? d.toLocaleTimeString(locale === "ar" ? "ar-EG" : "en-US", { hour: "2-digit", minute: "2-digit" }) : "—";
 
-  addAuditLog({
+  await addAuditLog({
     userName: user?.name ?? t.auditActions.system,
     action: t.auditActions.correctAttendance,
     module: t.nav.attendance,
-    oldValue: `${t.attendance.colOut}: ${timeFmt(before.actualOut ? new Date(before.actualOut) : null)}`,
+    oldValue: `${t.attendance.colOut}: ${timeFmt(before.actualOut)}`,
     newValue: `${t.attendance.colOut}: ${timeFmt(computed.actualOut)}`,
     reason,
   });

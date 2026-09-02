@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Employee } from "@/lib/types";
 import { DEMO_DATE } from "@/lib/constants";
-import { DEVICE_ID } from "@/lib/seed";
+import { DEVICE_ID } from "@/lib/constants";
 
 function SubmitButton() {
   const { pending } = useFormStatus();

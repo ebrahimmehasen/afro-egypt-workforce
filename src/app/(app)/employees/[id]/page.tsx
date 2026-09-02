@@ -18,7 +18,7 @@ import {
 import { AttendanceStatusBadge } from "@/components/shared/status-badge";
 
 export default async function EmployeeProfilePage({ params }: { params: Promise<{ id: string }> }) {
-  const db = getDb();
+  const db = await getDb();
   const t = await getT();
   const locale = await getLocale();
   const { id } = await params;

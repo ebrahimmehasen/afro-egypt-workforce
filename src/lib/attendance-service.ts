@@ -1,59 +1,98 @@
-import { computeDailyAttendance } from "@/lib/attendance-engine";
-import { getDb } from "@/lib/data";
+import { computeDailyAttendance, getShiftWindow } from "@/lib/attendance-engine";
+import { prisma } from "@/lib/prisma";
+import { toDailyAttendance } from "@/lib/serialize";
 import { DailyAttendance } from "@/lib/types";
+import type { Shift } from "@/lib/types";
 
-/** Recomputes and upserts the DailyAttendance row for one employee/date from current raw logs + leaves. */
-export function recalculateDailyAttendance(employeeId: string, date: string): DailyAttendance | null {
-  const db = getDb();
-  const employee = db.employees.find((e) => e.id === employeeId);
+/**
+ * Recomputes and upserts the DailyAttendance row for one employee/date from the
+ * current raw logs + approved leave. Raw logs are gathered by the shift's actual
+ * scheduled window (which may cross midnight), not by calendar-day string match.
+ */
+export async function recalculateDailyAttendance(
+  employeeId: string,
+  date: string,
+): Promise<DailyAttendance | null> {
+  const employee = await prisma.employee.findUnique({ where: { id: employeeId } });
   if (!employee) return null;
-  const shift = db.shifts.find((s) => s.id === employee.shiftId);
-  if (!shift) return null;
+  const shiftRow = await prisma.shift.findUnique({ where: { id: employee.shiftId } });
+  if (!shiftRow) return null;
 
-  const logs = db.attendanceLogs.filter((l) => l.employeeId === employeeId && l.timestamp.startsWith(date));
+  const shift: Shift = {
+    id: shiftRow.id,
+    name: shiftRow.name,
+    startTime: shiftRow.startTime,
+    endTime: shiftRow.endTime,
+    gracePeriodMinutes: shiftRow.gracePeriodMinutes,
+    workDays: (shiftRow.workDays as number[]) ?? [],
+    allowOvertime: shiftRow.allowOvertime,
+  };
 
-  const leave = db.leaves.find(
-    (l) => l.employeeId === employeeId && l.status === "approved" && l.from <= date && date <= l.to,
-  );
+  const { scheduledStart, scheduledEnd } = getShiftWindow(date, shift);
+  // widen the window a little so early / very-late punches are still attributed to this shift
+  const windowStart = new Date(scheduledStart.getTime() - 6 * 60 * 60 * 1000);
+  const windowEnd = new Date(scheduledEnd.getTime() + 6 * 60 * 60 * 1000);
+
+  const rawLogs = await prisma.attendanceLog.findMany({
+    where: { employeeId, timestamp: { gte: windowStart, lte: windowEnd } },
+    orderBy: { timestamp: "asc" },
+  });
+
+  const dateOnly = new Date(`${date}T00:00:00.000Z`);
+  const leave = await prisma.leave.findFirst({
+    where: {
+      employeeId,
+      status: "approved",
+      from: { lte: dateOnly },
+      to: { gte: dateOnly },
+    },
+  });
 
   const computed = computeDailyAttendance({
     employeeId,
     date,
     shift,
-    logs,
+    logs: rawLogs.map((l) => ({
+      id: l.id,
+      employeeId: l.employeeId,
+      deviceId: l.deviceId ?? "",
+      timestamp: l.timestamp.toISOString(),
+      punchType: l.punchType,
+      source: l.source === "biometric" ? "simulated" : l.source,
+    })),
     isOnApprovedLeave: Boolean(leave),
     leaveType:
-      leave?.type === "mission" ? "mission" : leave?.type === "excused_absence" ? "excused_absence" : "leave",
+      leave?.type === "mission"
+        ? "mission"
+        : leave?.type === "excused_absence"
+          ? "excused_absence"
+          : "leave",
   });
 
-  const existingIdx = db.dailyAttendance.findIndex((a) => a.employeeId === employeeId && a.date === date);
+  const existing = await prisma.dailyAttendance.findUnique({
+    where: { employeeId_date: { employeeId, date: dateOnly } },
+  });
 
-  const record: DailyAttendance = {
-    id: existingIdx >= 0 ? db.dailyAttendance[existingIdx].id : `DA-${db.dailyAttendance.length + 1}`,
-    employeeId,
-    date,
+  const data = {
     shiftId: shift.id,
-    scheduledStart: computed.scheduledStart.toISOString(),
-    scheduledEnd: computed.scheduledEnd.toISOString(),
-    actualIn: computed.actualIn?.toISOString() ?? null,
-    actualOut: computed.actualOut?.toISOString() ?? null,
+    scheduledStart: computed.scheduledStart,
+    scheduledEnd: computed.scheduledEnd,
+    actualIn: computed.actualIn,
+    actualOut: computed.actualOut,
     lateMinutes: computed.lateMinutes,
     deductibleLateMinutes: computed.deductibleLateMinutes,
     earlyLeaveMinutes: computed.earlyLeaveMinutes,
     workedMinutes: computed.workedMinutes,
     overtimeMinutes: computed.overtimeMinutes,
     status: computed.status,
-    ...(existingIdx >= 0 && db.dailyAttendance[existingIdx].correctionReason
-      ? {
-          correctionReason: db.dailyAttendance[existingIdx].correctionReason,
-          correctedBy: db.dailyAttendance[existingIdx].correctedBy,
-          correctedAt: db.dailyAttendance[existingIdx].correctedAt,
-        }
-      : {}),
   };
 
-  if (existingIdx >= 0) db.dailyAttendance[existingIdx] = record;
-  else db.dailyAttendance.push(record);
+  const row = await prisma.dailyAttendance.upsert({
+    where: { employeeId_date: { employeeId, date: dateOnly } },
+    create: { employeeId, date: dateOnly, ...data },
+    // a manual HR correction wins over an automatic recompute — keep its fields
+    update: existing?.correctionReason ? {} : data,
+  });
 
-  return record;
+  return toDailyAttendance(row);
 }

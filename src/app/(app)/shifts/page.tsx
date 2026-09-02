@@ -11,7 +11,7 @@ import { ShiftFormDialog } from "@/components/shifts/shift-form-dialog";
 import { Clock } from "lucide-react";
 
 export default async function ShiftsPage() {
-  const db = getDb();
+  const db = await getDb();
   const user = (await getSession())!;
   const t = await getT();
   const locale = await getLocale();

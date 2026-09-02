@@ -16,7 +16,7 @@ export default async function PayslipPage({ params }: { params: Promise<{ record
   const user = await getSession();
   if (!user) redirect("/login");
 
-  const db = getDb();
+  const db = await getDb();
   const t = await getT();
   const locale = await getLocale();
   const { recordId } = await params;

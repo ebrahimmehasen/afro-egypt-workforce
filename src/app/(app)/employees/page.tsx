@@ -7,7 +7,7 @@ import { EmployeesTable } from "@/components/employees/employees-table";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
 
 export default async function EmployeesPage() {
-  const db = getDb();
+  const db = await getDb();
   const user = (await getSession())!;
   const t = await getT();
   const canEdit = canCorrectAttendance(user.role); // admin/hr can manage employee records

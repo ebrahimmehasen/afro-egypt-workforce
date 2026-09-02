@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getDb } from "@/lib/data";
+import { prisma } from "@/lib/prisma";
 import { nextId } from "@/lib/id";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
@@ -18,11 +18,15 @@ export async function createAllowance(_prev: ActionState, formData: FormData): P
   const t = await getT();
   const parsed = allowanceSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  const db = getDb();
-  db.allowances.push({
-    id: nextId("ALW"),
-    ...parsed.data,
-    monthly: true,
+  await prisma.allowance.create({
+    data: {
+      id: nextId("ALW"),
+      employeeId: parsed.data.employeeId,
+      type: parsed.data.type,
+      amount: Math.round(parsed.data.amount),
+      notes: parsed.data.notes,
+      monthly: true,
+    },
   });
   revalidatePath("/deductions");
   revalidatePath("/dashboard");
@@ -31,10 +35,9 @@ export async function createAllowance(_prev: ActionState, formData: FormData): P
 
 export async function deleteAllowance(id: string) {
   const t = await getT();
-  const db = getDb();
-  const idx = db.allowances.findIndex((a) => a.id === id);
-  if (idx === -1) return { error: t.validation.notFound };
-  db.allowances.splice(idx, 1);
+  const existing = await prisma.allowance.findUnique({ where: { id } });
+  if (!existing) return { error: t.validation.notFound };
+  await prisma.allowance.delete({ where: { id } });
   revalidatePath("/deductions");
   return { success: true };
 }
