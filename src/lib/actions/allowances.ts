@@ -15,7 +15,7 @@ const allowanceSchema = z.object({
 });
 
 export async function createAllowance(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const parsed = allowanceSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const db = getDb();
@@ -30,7 +30,7 @@ export async function createAllowance(_prev: ActionState, formData: FormData): P
 }
 
 export async function deleteAllowance(id: string) {
-  const t = getT();
+  const t = await getT();
   const db = getDb();
   const idx = db.allowances.findIndex((a) => a.id === id);
   if (idx === -1) return { error: t.validation.notFound };

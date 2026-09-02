@@ -20,7 +20,7 @@ const punchSchema = z.object({
 });
 
 export async function simulatePunch(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const parsed = punchSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
 
@@ -55,14 +55,14 @@ const correctionSchema = z.object({
 });
 
 export async function correctAttendance(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
-  const locale = getLocale();
+  const t = await getT();
+  const locale = await getLocale();
   const parsed = correctionSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
 
   const { employeeId, date, correctedIn, correctedOut, reason } = parsed.data;
   const db = getDb();
-  const user = getSession();
+  const user = await getSession();
   const employee = db.employees.find((e) => e.id === employeeId);
   const shift = db.shifts.find((s) => s.id === employee?.shiftId);
   if (!employee || !shift) return { error: t.validation.invalidData };

@@ -6,15 +6,15 @@ import { PageHeader } from "@/components/shared/page-header";
 import { OvertimeFormDialog } from "@/components/overtime/overtime-form-dialog";
 import { OvertimeTable } from "@/components/overtime/overtime-table";
 
-export default function OvertimePage({
+export default async function OvertimePage({
   searchParams,
 }: {
-  searchParams: { status?: string };
+  searchParams: Promise<{ status?: string }>;
 }) {
-  const initialStatus = searchParams.status ?? "all";
+  const initialStatus = (await searchParams).status ?? "all";
   const db = getDb();
-  const user = getSession()!;
-  const t = getT();
+  const user = (await getSession())!;
+  const t = await getT();
 
   let employees = db.employees;
   let records = db.overtime;

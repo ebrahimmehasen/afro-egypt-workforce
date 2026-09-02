@@ -19,7 +19,7 @@ const shiftSchema = z.object({
 });
 
 export async function createShift(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const raw = Object.fromEntries(formData);
   const parsed = shiftSchema.safeParse({ ...raw, allowOvertime: formData.get("allowOvertime") === "on" });
   if (!parsed.success) return { error: t.validation.invalidData };
@@ -30,7 +30,7 @@ export async function createShift(_prev: ActionState, formData: FormData): Promi
 }
 
 export async function updateShift(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const id = String(formData.get("id") ?? "");
   const raw = Object.fromEntries(formData);
   const parsed = shiftSchema.safeParse({ ...raw, allowOvertime: formData.get("allowOvertime") === "on" });

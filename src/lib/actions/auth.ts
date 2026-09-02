@@ -16,11 +16,11 @@ export async function loginAction(_prevState: LoginState, formData: FormData): P
     return { error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" };
   }
 
-  setSessionCookie(credential.user);
+  await setSessionCookie(credential.user);
   redirect("/dashboard");
 }
 
 export async function logoutAction() {
-  clearSessionCookie();
+  await clearSessionCookie();
   redirect("/login");
 }

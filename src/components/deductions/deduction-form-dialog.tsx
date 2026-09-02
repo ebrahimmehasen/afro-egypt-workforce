@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState, useState } from "react";
 import { Plus } from "lucide-react";
 import { createDeduction } from "@/lib/actions/deductions";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
@@ -30,7 +30,7 @@ const DEDUCTION_TYPES: DeductionType[] = ["late", "absence", "early_leave", "pen
 export function DeductionFormDialog({ employees }: { employees: Employee[] }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useFormState(createDeduction, {});
+  const [state, formAction] = useActionState(createDeduction, {});
   useActionFeedback(state, () => setOpen(false));
 
   const typeLabels: Record<DeductionType, string> = {

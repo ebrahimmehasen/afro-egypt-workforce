@@ -6,10 +6,10 @@ import { PageHeader } from "@/components/shared/page-header";
 import { EmployeesTable } from "@/components/employees/employees-table";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
 
-export default function EmployeesPage() {
+export default async function EmployeesPage() {
   const db = getDb();
-  const user = getSession()!;
-  const t = getT();
+  const user = (await getSession())!;
+  const t = await getT();
   const canEdit = canCorrectAttendance(user.role); // admin/hr can manage employee records
 
   let employees = db.employees;

@@ -18,10 +18,10 @@ export const metadata: Metadata = {
   icons: { icon: "/brand/afro-egypt-logo.jpg" },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const locale = getLocale();
+  const locale = await getLocale();
   const dictionary = getDictionary(locale);
 
   return (

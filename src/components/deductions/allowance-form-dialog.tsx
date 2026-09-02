@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState, useState } from "react";
 import { Plus } from "lucide-react";
 import { createAllowance } from "@/lib/actions/allowances";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
@@ -29,7 +29,7 @@ const ALLOWANCE_TYPES: AllowanceType[] = ["transport", "meal", "fixed", "incenti
 export function AllowanceFormDialog({ employees }: { employees: Employee[] }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useFormState(createAllowance, {});
+  const [state, formAction] = useActionState(createAllowance, {});
   useActionFeedback(state, () => setOpen(false));
 
   const typeLabels: Record<AllowanceType, string> = {

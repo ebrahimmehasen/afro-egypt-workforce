@@ -10,8 +10,8 @@ export function getDictionary(locale: Locale): Dictionary {
 }
 
 /** Server-only convenience: reads the locale cookie and returns its dictionary in one call. */
-export function getT(): Dictionary {
-  return getDictionary(getLocale());
+export async function getT(): Promise<Dictionary> {
+  return getDictionary(await getLocale());
 }
 
 export { format } from "@/lib/i18n/format";

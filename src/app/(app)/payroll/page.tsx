@@ -24,11 +24,11 @@ const STATUS_VARIANT: Record<string, "secondary" | "warning" | "success" | "outl
   closed: "outline",
 };
 
-export default function PayrollPage() {
+export default async function PayrollPage() {
   const db = getDb();
-  const user = getSession()!;
-  const t = getT();
-  const locale = getLocale();
+  const user = (await getSession())!;
+  const t = await getT();
+  const locale = await getLocale();
   const canEdit = canEditPayroll(user.role);
 
   let period = db.payrollPeriods.find((p) => p.id === "PP-2026-08");

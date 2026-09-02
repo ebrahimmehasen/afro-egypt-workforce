@@ -30,11 +30,11 @@ function nextEmployeeId() {
 }
 
 export async function createEmployee(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const parsed = employeeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const db = getDb();
-  const user = getSession();
+  const user = await getSession();
   const id = nextEmployeeId();
   db.employees.push({ id, ...parsed.data });
 
@@ -51,12 +51,12 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
 }
 
 export async function updateEmployee(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const id = String(formData.get("id") ?? "");
   const parsed = employeeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const db = getDb();
-  const user = getSession();
+  const user = await getSession();
   const idx = db.employees.findIndex((e) => e.id === id);
   if (idx === -1) return { error: t.validation.employeeNotFound };
 
@@ -77,9 +77,9 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
 }
 
 export async function deleteEmployee(id: string) {
-  const t = getT();
+  const t = await getT();
   const db = getDb();
-  const user = getSession();
+  const user = await getSession();
   const idx = db.employees.findIndex((e) => e.id === id);
   if (idx === -1) return { error: t.validation.employeeNotFound };
   const [removed] = db.employees.splice(idx, 1);

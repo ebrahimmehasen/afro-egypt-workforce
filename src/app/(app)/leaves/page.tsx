@@ -6,10 +6,10 @@ import { PageHeader } from "@/components/shared/page-header";
 import { LeaveFormDialog } from "@/components/leaves/leave-form-dialog";
 import { LeavesTable } from "@/components/leaves/leaves-table";
 
-export default function LeavesPage() {
+export default async function LeavesPage() {
   const db = getDb();
-  const user = getSession()!;
-  const t = getT();
+  const user = (await getSession())!;
+  const t = await getT();
 
   let employees = db.employees;
   let leaves = db.leaves;

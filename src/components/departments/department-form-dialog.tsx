@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState, useState } from "react";
 import { Plus, Pencil } from "lucide-react";
 import { createDepartment, updateDepartment } from "@/lib/actions/departments";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
@@ -24,7 +24,7 @@ export function DepartmentFormDialog({ department }: { department?: Department }
   const t = useT();
   const [open, setOpen] = useState(false);
   const action = department ? updateDepartment : createDepartment;
-  const [state, formAction] = useFormState(action, {});
+  const [state, formAction] = useActionState(action, {});
   useActionFeedback(state, () => setOpen(false));
 
   return (

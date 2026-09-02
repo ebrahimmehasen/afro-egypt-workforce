@@ -1,7 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
-import { useState } from "react";
+import { useFormStatus } from "react-dom";
+import { useActionState, useState } from "react";
 import { Plus, Pencil } from "lucide-react";
 import { createEmployee, updateEmployee } from "@/lib/actions/employees";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
@@ -51,7 +51,7 @@ export function EmployeeFormDialog({
   const locale = useLocale();
   const [open, setOpen] = useState(false);
   const action = employee ? updateEmployee : createEmployee;
-  const [state, formAction] = useFormState(action, {});
+  const [state, formAction] = useActionState(action, {});
   useActionFeedback(state, () => setOpen(false));
 
   return (

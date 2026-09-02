@@ -12,14 +12,15 @@ import { payrollBreakdownRows } from "@/lib/i18n/labels";
 import { Separator } from "@/components/ui/separator";
 import { PrintButton } from "@/components/payroll/print-button";
 
-export default function PayslipPage({ params }: { params: { recordId: string } }) {
-  const user = getSession();
+export default async function PayslipPage({ params }: { params: Promise<{ recordId: string }> }) {
+  const user = await getSession();
   if (!user) redirect("/login");
 
   const db = getDb();
-  const t = getT();
-  const locale = getLocale();
-  const record = db.payrollRecords.find((r) => r.id === params.recordId);
+  const t = await getT();
+  const locale = await getLocale();
+  const { recordId } = await params;
+  const record = db.payrollRecords.find((r) => r.id === recordId);
   if (!record) notFound();
 
   const employee = db.employees.find((e) => e.id === record.employeeId);

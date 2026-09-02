@@ -18,7 +18,7 @@ const overtimeSchema = z.object({
 });
 
 export async function createOvertime(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const parsed = overtimeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const db = getDb();
@@ -38,9 +38,9 @@ export async function createOvertime(_prev: ActionState, formData: FormData): Pr
 }
 
 export async function decideOvertime(id: string, decision: "approved" | "rejected") {
-  const t = getT();
+  const t = await getT();
   const db = getDb();
-  const user = getSession();
+  const user = await getSession();
   const overtime = db.overtime.find((o) => o.id === id);
   if (!overtime) return { error: t.validation.requestNotFound };
 

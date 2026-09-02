@@ -13,16 +13,17 @@ import { attendanceSummary } from "@/lib/attendance-engine";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { UserCheck, UserX, Clock3, Fingerprint, CalendarClock } from "lucide-react";
 
-export default function AttendancePage({
+export default async function AttendancePage({
   searchParams,
 }: {
-  searchParams: { date?: string; status?: string };
+  searchParams: Promise<{ date?: string; status?: string }>;
 }) {
-  const date = searchParams.date ?? DEMO_DATE;
-  const initialStatus = searchParams.status ?? "all";
+  const { date: dateParam, status: statusParam } = await searchParams;
+  const date = dateParam ?? DEMO_DATE;
+  const initialStatus = statusParam ?? "all";
   const db = getDb();
-  const user = getSession()!;
-  const t = getT();
+  const user = (await getSession())!;
+  const t = await getT();
   const canCorrect = canCorrectAttendance(user.role);
 
   let employees = db.employees.filter((e) => e.status === "active");

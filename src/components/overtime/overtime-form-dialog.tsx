@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState, useState } from "react";
 import { Plus } from "lucide-react";
 import { createOvertime } from "@/lib/actions/overtime";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
@@ -31,7 +31,7 @@ export function OvertimeFormDialog({ employees }: { employees: Employee[] }) {
   const [employeeId, setEmployeeId] = useState(employees[0]?.id);
   const employee = employees.find((e) => e.id === employeeId);
   const defaultRate = employee ? Math.round((employee.basicSalary / 26 / 8) * 1.5) : 0;
-  const [state, formAction] = useFormState(createOvertime, {});
+  const [state, formAction] = useActionState(createOvertime, {});
   useActionFeedback(state, () => setOpen(false));
 
   return (

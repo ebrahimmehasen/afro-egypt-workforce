@@ -11,18 +11,18 @@ import { AllowanceFormDialog } from "@/components/deductions/allowance-form-dial
 import { DeductionsTable } from "@/components/deductions/deductions-table";
 import { AllowancesTable } from "@/components/deductions/allowances-table";
 
-export default function DeductionsPage({
+export default async function DeductionsPage({
   searchParams,
 }: {
-  searchParams: { month?: string };
+  searchParams: Promise<{ month?: string }>;
 }) {
   const db = getDb();
-  const user = getSession()!;
-  const t = getT();
-  const locale = getLocale();
+  const user = (await getSession())!;
+  const t = await getT();
+  const locale = await getLocale();
   const canManage = canEditPayroll(user.role);
 
-  const initialMonth = searchParams.month ?? null;
+  const initialMonth = (await searchParams).month ?? null;
   const monthPeriod = initialMonth
     ? db.payrollPeriods.find((p) => `${p.year}-${String(p.month).padStart(2, "0")}` === initialMonth)
     : undefined;

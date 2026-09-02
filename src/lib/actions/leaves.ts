@@ -20,7 +20,7 @@ const leaveSchema = z.object({
 });
 
 export async function createLeave(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const parsed = leaveSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const db = getDb();
@@ -46,9 +46,9 @@ function datesBetween(from: string, to: string) {
 }
 
 export async function decideLeave(id: string, decision: "approved" | "rejected") {
-  const t = getT();
+  const t = await getT();
   const db = getDb();
-  const user = getSession();
+  const user = await getSession();
   const leave = db.leaves.find((l) => l.id === id);
   if (!leave) return { error: t.validation.requestNotFound };
 

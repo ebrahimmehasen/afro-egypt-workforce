@@ -10,11 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { ShiftFormDialog } from "@/components/shifts/shift-form-dialog";
 import { Clock } from "lucide-react";
 
-export default function ShiftsPage() {
+export default async function ShiftsPage() {
   const db = getDb();
-  const user = getSession()!;
-  const t = getT();
-  const locale = getLocale();
+  const user = (await getSession())!;
+  const t = await getT();
+  const locale = await getLocale();
   const canEdit = canManageSettings(user.role) || user.role === "hr";
 
   return (

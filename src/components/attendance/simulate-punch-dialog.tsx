@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState, useState } from "react";
 import { Fingerprint } from "lucide-react";
 import { simulatePunch } from "@/lib/actions/attendance";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
@@ -33,7 +33,7 @@ function SubmitButton() {
 export function SimulatePunchDialog({ employees }: { employees: Employee[] }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useFormState(simulatePunch, {});
+  const [state, formAction] = useActionState(simulatePunch, {});
   useActionFeedback(state, () => setOpen(false));
 
   return (

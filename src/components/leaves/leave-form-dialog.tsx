@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState, useState } from "react";
 import { Plus } from "lucide-react";
 import { createLeave } from "@/lib/actions/leaves";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
@@ -30,7 +30,7 @@ const LEAVE_TYPES: LeaveType[] = ["annual", "casual", "sick", "unpaid", "mission
 export function LeaveFormDialog({ employees }: { employees: Employee[] }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useFormState(createLeave, {});
+  const [state, formAction] = useActionState(createLeave, {});
   useActionFeedback(state, () => setOpen(false));
 
   const leaveTypeLabels: Record<LeaveType, string> = {

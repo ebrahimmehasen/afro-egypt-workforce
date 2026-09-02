@@ -3,9 +3,9 @@ import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
 import { AuditLogTable } from "@/components/audit/audit-log-table";
 
-export default function AuditLogPage() {
+export default async function AuditLogPage() {
   const db = getDb();
-  const t = getT();
+  const t = await getT();
   const entries = [...db.auditLog].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
 
   return (

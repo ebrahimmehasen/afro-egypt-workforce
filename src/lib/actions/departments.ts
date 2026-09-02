@@ -15,11 +15,11 @@ const departmentSchema = z.object({
 });
 
 export async function createDepartment(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const parsed = departmentSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const db = getDb();
-  const user = getSession();
+  const user = await getSession();
   const id = nextId("DEP");
   db.departments.push({ id, ...parsed.data });
   addAuditLog({
@@ -34,7 +34,7 @@ export async function createDepartment(_prev: ActionState, formData: FormData): 
 }
 
 export async function updateDepartment(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const id = String(formData.get("id") ?? "");
   const parsed = departmentSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
@@ -47,7 +47,7 @@ export async function updateDepartment(_prev: ActionState, formData: FormData): 
 }
 
 export async function deleteDepartment(id: string) {
-  const t = getT();
+  const t = await getT();
   const db = getDb();
   const inUse = db.employees.some((e) => e.departmentId === id);
   if (inUse) return { error: t.validation.departmentInUse };

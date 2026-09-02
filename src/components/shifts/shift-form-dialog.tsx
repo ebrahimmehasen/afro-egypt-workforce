@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState, useState } from "react";
 import { Plus, Pencil } from "lucide-react";
 import { createShift, updateShift } from "@/lib/actions/shifts";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
@@ -26,7 +26,7 @@ export function ShiftFormDialog({ shift }: { shift?: Shift }) {
   const [open, setOpen] = useState(false);
   const [allowOvertime, setAllowOvertime] = useState(shift?.allowOvertime ?? true);
   const action = shift ? updateShift : createShift;
-  const [state, formAction] = useFormState(action, {});
+  const [state, formAction] = useActionState(action, {});
   useActionFeedback(state, () => setOpen(false));
 
   return (

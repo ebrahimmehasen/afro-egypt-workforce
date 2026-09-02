@@ -50,8 +50,8 @@ export function findCredential(email: string, password: string): DemoCredential 
   );
 }
 
-export function getSession(): User | null {
-  const raw = cookies().get(SESSION_COOKIE)?.value;
+export async function getSession(): Promise<User | null> {
+  const raw = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!raw) return null;
   try {
     return JSON.parse(raw) as User;
@@ -60,8 +60,8 @@ export function getSession(): User | null {
   }
 }
 
-export function setSessionCookie(user: User) {
-  cookies().set(SESSION_COOKIE, JSON.stringify(user), {
+export async function setSessionCookie(user: User) {
+  (await cookies()).set(SESSION_COOKIE, JSON.stringify(user), {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
@@ -69,8 +69,8 @@ export function setSessionCookie(user: User) {
   });
 }
 
-export function clearSessionCookie() {
-  cookies().delete(SESSION_COOKIE);
+export async function clearSessionCookie() {
+  (await cookies()).delete(SESSION_COOKIE);
 }
 
 export const SESSION_COOKIE_NAME = SESSION_COOKIE;

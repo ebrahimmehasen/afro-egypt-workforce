@@ -25,10 +25,10 @@ import { AttendanceTrendChart, DepartmentAttendanceChart } from "@/components/da
 import { Badge } from "@/components/ui/badge";
 import { AttendanceStatusBadge } from "@/components/shared/status-badge";
 
-export default function DashboardPage() {
-  const user = getSession()!;
-  const t = getT();
-  const locale = getLocale();
+export default async function DashboardPage() {
+  const user = (await getSession())!;
+  const t = await getT();
+  const locale = await getLocale();
 
   if (user.role === "employee" && user.employeeId) {
     return <EmployeeDashboard employeeId={user.employeeId} userName={displayUserName(user, t)} />;
@@ -182,10 +182,10 @@ export default function DashboardPage() {
   );
 }
 
-function EmployeeDashboard({ employeeId, userName }: { employeeId: string; userName: string }) {
+async function EmployeeDashboard({ employeeId, userName }: { employeeId: string; userName: string }) {
   const db = getDb();
-  const t = getT();
-  const locale = getLocale();
+  const t = await getT();
+  const locale = await getLocale();
   const employee = db.employees.find((e) => e.id === employeeId);
   const today = db.dailyAttendance.find((a) => a.employeeId === employeeId && a.date === DEMO_DATE);
   const period = db.payrollPeriods.find((p) => p.id === "PP-2026-08");

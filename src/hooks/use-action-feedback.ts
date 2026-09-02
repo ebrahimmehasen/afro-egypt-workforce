@@ -9,7 +9,7 @@ export interface ActionState {
   message?: string;
 }
 
-/** Watches a useFormState result and fires a toast + optional callback exactly once per change. */
+/** Watches a useActionState result and fires a toast + optional callback exactly once per change. */
 export function useActionFeedback(state: ActionState, onSuccess?: () => void) {
   const prev = useRef<ActionState>({});
   useEffect(() => {

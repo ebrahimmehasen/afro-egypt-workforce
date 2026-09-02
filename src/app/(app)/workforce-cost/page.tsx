@@ -11,10 +11,10 @@ import { CostByDepartmentChart } from "@/components/dashboard/charts";
 import { Badge } from "@/components/ui/badge";
 import { Wallet, TimerReset, TrendingDown, Clock3 } from "lucide-react";
 
-export default function WorkforceCostPage() {
+export default async function WorkforceCostPage() {
   const db = getDb();
-  const t = getT();
-  const locale = getLocale();
+  const t = await getT();
+  const locale = await getLocale();
   const monthly = getMonthlyKpis(2026, 8);
   const byDept = getWorkforceCostByDepartment(2026, 8).map((d) => ({ ...d, department: translateLabel(d.department, locale) }));
   const topLate = getTopLateEmployees(5, 30);

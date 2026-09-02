@@ -15,7 +15,7 @@ const companySchema = z.object({
 });
 
 export async function updateCompanySettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const parsed = companySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const db = getDb();
@@ -32,11 +32,11 @@ const attendanceSchema = z.object({
 });
 
 export async function updateAttendanceSettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const parsed = attendanceSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const db = getDb();
-  const user = getSession();
+  const user = await getSession();
   Object.assign(db.attendanceSettings, parsed.data);
   addAuditLog({
     userName: user?.name ?? t.auditActions.system,
@@ -56,11 +56,11 @@ const payrollSchema = z.object({
 });
 
 export async function updatePayrollSettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const parsed = payrollSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const db = getDb();
-  const user = getSession();
+  const user = await getSession();
   Object.assign(db.payrollSettings, parsed.data);
   addAuditLog({
     userName: user?.name ?? t.auditActions.system,

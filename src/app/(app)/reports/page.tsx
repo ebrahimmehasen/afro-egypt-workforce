@@ -9,17 +9,18 @@ import { OvertimeReport } from "@/components/reports/overtime-report";
 import { DeductionsReport } from "@/components/reports/deductions-report";
 import { PayrollReport } from "@/components/reports/payroll-report";
 
-export default function ReportsPage({
+export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: { tab?: string; from?: string; to?: string; status?: string };
+  searchParams: Promise<{ tab?: string; from?: string; to?: string; status?: string }>;
 }) {
   const db = getDb();
-  const t = getT();
-  const locale = getLocale();
+  const t = await getT();
+  const locale = await getLocale();
   const period = db.payrollPeriods.find((p) => p.id === "PP-2026-08") ?? db.payrollPeriods[0];
   const payrollRecords = period ? db.payrollRecords.filter((r) => r.periodId === period.id) : [];
-  const initialTab = searchParams.tab ?? "attendance";
+  const sp = await searchParams;
+  const initialTab = sp.tab ?? "attendance";
 
   return (
     <div className="flex flex-col gap-6">
@@ -35,13 +36,13 @@ export default function ReportsPage({
 
         <TabsContent value="attendance">
           <AttendanceReport
-            key={`${searchParams.from ?? ""}:${searchParams.to ?? ""}:${searchParams.status ?? ""}`}
+            key={`${sp.from ?? ""}:${sp.to ?? ""}:${sp.status ?? ""}`}
             records={db.dailyAttendance}
             employees={db.employees}
             departments={db.departments}
-            initialFrom={searchParams.from}
-            initialTo={searchParams.to}
-            initialStatus={searchParams.status}
+            initialFrom={sp.from}
+            initialTo={sp.to}
+            initialStatus={sp.status}
           />
         </TabsContent>
         <TabsContent value="overtime">

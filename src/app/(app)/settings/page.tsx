@@ -8,12 +8,12 @@ import { PageHeader } from "@/components/shared/page-header";
 import { CompanySettingsForm, AttendanceSettingsForm, PayrollSettingsForm } from "@/components/settings/settings-forms";
 import { Card, CardContent } from "@/components/ui/card";
 
-export default function SettingsPage() {
-  const user = getSession()!;
+export default async function SettingsPage() {
+  const user = (await getSession())!;
   if (!canManageSettings(user.role)) redirect("/dashboard");
 
   const db = getDb();
-  const t = getT();
+  const t = await getT();
 
   return (
     <div className="flex flex-col gap-6">

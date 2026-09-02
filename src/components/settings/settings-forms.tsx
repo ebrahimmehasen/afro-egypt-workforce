@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 import { updateAttendanceSettings, updateCompanySettings, updatePayrollSettings } from "@/lib/actions/settings";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
 import { useT } from "@/components/providers/locale-provider";
@@ -18,7 +19,7 @@ function SaveButton() {
 
 export function CompanySettingsForm({ settings }: { settings: CompanySettings }) {
   const t = useT();
-  const [state, formAction] = useFormState(updateCompanySettings, {});
+  const [state, formAction] = useActionState(updateCompanySettings, {});
   useActionFeedback(state);
 
   return (
@@ -52,7 +53,7 @@ export function CompanySettingsForm({ settings }: { settings: CompanySettings })
 
 export function AttendanceSettingsForm({ settings }: { settings: AttendanceSettings }) {
   const t = useT();
-  const [state, formAction] = useFormState(updateAttendanceSettings, {});
+  const [state, formAction] = useActionState(updateAttendanceSettings, {});
   useActionFeedback(state);
 
   return (
@@ -90,7 +91,7 @@ export function AttendanceSettingsForm({ settings }: { settings: AttendanceSetti
 
 export function PayrollSettingsForm({ settings }: { settings: PayrollSettings }) {
   const t = useT();
-  const [state, formAction] = useFormState(updatePayrollSettings, {});
+  const [state, formAction] = useActionState(updatePayrollSettings, {});
   useActionFeedback(state);
 
   return (

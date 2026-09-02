@@ -9,9 +9,9 @@ import { nextId } from "@/lib/id";
 import { getT } from "@/lib/i18n";
 
 export async function calculatePayroll(periodId: string) {
-  const t = getT();
+  const t = await getT();
   const db = getDb();
-  const user = getSession();
+  const user = await getSession();
   const period = db.payrollPeriods.find((p) => p.id === periodId);
   if (!period) return { error: t.validation.periodNotFound };
   if (period.status === "closed") return { error: t.validation.periodClosed };
@@ -88,9 +88,9 @@ export async function calculatePayroll(periodId: string) {
 }
 
 export async function approvePayrollPeriod(periodId: string) {
-  const t = getT();
+  const t = await getT();
   const db = getDb();
-  const user = getSession();
+  const user = await getSession();
   const period = db.payrollPeriods.find((p) => p.id === periodId);
   if (!period) return { error: t.validation.periodNotFound };
   if (period.status !== "calculated") return { error: t.validation.payrollNotCalculatedFirst };
@@ -113,9 +113,9 @@ export async function approvePayrollPeriod(periodId: string) {
 }
 
 export async function closePayrollPeriod(periodId: string) {
-  const t = getT();
+  const t = await getT();
   const db = getDb();
-  const user = getSession();
+  const user = await getSession();
   const period = db.payrollPeriods.find((p) => p.id === periodId);
   if (!period) return { error: t.validation.periodNotFound };
   if (period.status !== "approved") return { error: t.validation.payrollApprovedFirst };

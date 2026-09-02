@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 
 export default async function DemoPage() {
   const snapshot = await getDemoSnapshot();
-  const t = getT();
+  const t = await getT();
 
   return (
     <div className="flex flex-col gap-6">

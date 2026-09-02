@@ -12,11 +12,11 @@ import { DepartmentFormDialog } from "@/components/departments/department-form-d
 import { DeleteDepartmentButton } from "@/components/departments/delete-department-button";
 import { Building2, Users, Wallet, Percent } from "lucide-react";
 
-export default function DepartmentsPage() {
+export default async function DepartmentsPage() {
   const db = getDb();
-  const user = getSession()!;
-  const t = getT();
-  const locale = getLocale();
+  const user = (await getSession())!;
+  const t = await getT();
+  const locale = await getLocale();
   const canEdit = canCorrectAttendance(user.role);
   const rates = getAttendanceByDepartment();
 

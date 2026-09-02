@@ -17,11 +17,12 @@ import {
 } from "@/components/ui/table";
 import { AttendanceStatusBadge } from "@/components/shared/status-badge";
 
-export default function EmployeeProfilePage({ params }: { params: { id: string } }) {
+export default async function EmployeeProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const db = getDb();
-  const t = getT();
-  const locale = getLocale();
-  const employee = db.employees.find((e) => e.id === params.id);
+  const t = await getT();
+  const locale = await getLocale();
+  const { id } = await params;
+  const employee = db.employees.find((e) => e.id === id);
   if (!employee) notFound();
 
   const department = db.departments.find((d) => d.id === employee.departmentId);

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState, useState } from "react";
 import { PencilLine } from "lucide-react";
 import { correctAttendance } from "@/lib/actions/attendance";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
@@ -29,7 +29,7 @@ function timeValue(iso: string | null) {
 export function CorrectAttendanceDialog({ record, employeeName }: { record: DailyAttendance; employeeName: string }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useFormState(correctAttendance, {});
+  const [state, formAction] = useActionState(correctAttendance, {});
   useActionFeedback(state, () => setOpen(false));
 
   return (

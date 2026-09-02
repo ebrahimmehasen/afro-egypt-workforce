@@ -53,11 +53,17 @@
 - [x] فحص يدوي في المتصفح: build + login + dashboard + attendance + modal البصمة ✓
 - [x] توثيق الثغرات الصغيرة (انظر أعلاه) — ثغرة التوقيت عبر منتصف الليل مؤكّدة، تُصلَح في المرحلة 5 مع الـ DB
 
-### المرحلة 3 — ترقية Next 15 + حل الثغرات
-- [ ] ترقية `next` / `eslint-config-next` لـ 15
-- [ ] معالجة تغييرات الكسر (async `cookies()`/`headers()`, caching الافتراضي)
-- [ ] `npm audit` = 0 high
-- [ ] كل الاختبارات تعدّي + جولة متصفح كاملة
+### المرحلة 3 — ترقية Next 15 + حل الثغرات ✅ (اكتملت — فرع `feat/next-15-security`)
+- [x] ترقية `next` 14.2.35 → **15.5.25** + `eslint-config-next` 15 + `postcss` 8.5.26 + `vitest` 3
+- [x] **الثغرات الـ5 الأصلية (Next.js) اتحلّت بالكامل** — `npm audit` نضيف من ثغرات Next
+- [x] معالجة تغييرات الكسر:
+      - `cookies()` بقت async → `getSession` / `getLocale` / `getT` / `setSessionCookie` / `setLocaleCookie` كلها async + كل نقاط الاستدعاء (~40 ملف) بقت `await`
+      - `params` / `searchParams` في الصفحات بقت `Promise` → `await` (6 صفحات)
+      - `useFormState` (react-dom) → `useActionState` (react) في 11 ملف
+      - مكوّنات الصفحات + الـ layouts بقت `async`
+- [x] `npm test` = 20/20 أخضر · `npm run lint` نضيف · `npm run build` نضيف
+- [x] جولة متصفح: login → dashboard → تبديل اللغة (ar/en) → reports → **حساب رواتب كامل لـ50 موظف** (صافي 564,607 ج.م) — بدون أخطاء console
+- [ ] **متبقّي (بسيط، مؤجّل):** نسخة postcss 8.4.31 مدمجة **جوّا** حزمة Next 15 نفسها (استخدام وقت البناء فقط، مخاطر عملية شبه معدومة) — تتحل بالكامل لما ننتقل لـ Next 16 لاحقًا
 
 ### المرحلة 4 — قاعدة البيانات (Prisma + SQLite)
 - [ ] `prisma init` + `schema.prisma` بالكيانات الـ15 (§45): `User, Employee, Department, Shift, AttendanceLog, DailyAttendance, Leave, Overtime, Deduction, Allowance, PayrollPeriod, PayrollRecord, AuditLog, CompanySettings` + إعدادات

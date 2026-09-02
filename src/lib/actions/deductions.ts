@@ -20,11 +20,11 @@ const deductionSchema = z.object({
 });
 
 export async function createDeduction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = getT();
+  const t = await getT();
   const parsed = deductionSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const db = getDb();
-  const user = getSession();
+  const user = await getSession();
   db.deductions.push({
     id: nextId("DED"),
     ...parsed.data,
@@ -46,7 +46,7 @@ export async function createDeduction(_prev: ActionState, formData: FormData): P
 }
 
 export async function deleteDeduction(id: string) {
-  const t = getT();
+  const t = await getT();
   const db = getDb();
   const idx = db.deductions.findIndex((d) => d.id === id);
   if (idx === -1) return { error: t.validation.notFound };
