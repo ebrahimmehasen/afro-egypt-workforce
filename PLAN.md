@@ -38,11 +38,11 @@
 
 ## 2. المراحل
 
-### المرحلة 1 — تأمين نقطة البداية ✅ (جارية)
-- [ ] `git init` + `.gitignore` (موجود)
-- [ ] أول commit: `chore: baseline working MVP (in-memory demo)`
-- [ ] إنشاء repo عام `afro-egypt-workforce` على GitHub وربطه + push
-- [ ] فرع `main` محمي منطقيًا — الشغل على فروع `feat/*`
+### المرحلة 1 — تأمين نقطة البداية ✅ (اكتملت)
+- [x] `git init` + `.gitignore` (موجود)
+- [x] أول commit: `chore: baseline working MVP (in-memory demo)` (`be2890f`)
+- [x] إنشاء repo عام `afro-egypt-workforce` وربطه + push → https://github.com/ebrahimmehasen/afro-egypt-workforce
+- [ ] الشغل من هنا على فروع `feat/*` + PR لكل مرحلة
 
 ### المرحلة 2 — اختبار شامل قبل أي تعديل
 هدف: نثبّت "خط الأساس شغّال" مكتوبًا قبل ما نغيّر أي حاجة.
