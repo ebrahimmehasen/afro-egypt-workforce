@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 349 24% 9%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 349 24% 9%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 349 24% 9%;
+
+  --primary: 5 68% 45%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 210 20% 96%;
+  --secondary-foreground: 349 24% 9%;
+
+  --muted: 210 20% 96%;
+  --muted-foreground: 220 9% 42%;
+
+  --accent: 41 78% 50%;
+  --accent-foreground: 349 24% 9%;
+
+  --destructive: 0 72% 45%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 220 16% 89%;
+  --input: 220 16% 89%;
+  --ring: 5 68% 45%;
+
+  --radius: 0.625rem;
+
+  --chart-1: 5 68% 45%;
+  --chart-2: 41 78% 50%;
+  --chart-3: 200 60% 42%;
+  --chart-4: 150 45% 38%;
+  --chart-5: 260 40% 55%;
+}
+
+* {
+  @apply border-border;
+}
+
+body {
+  @apply bg-background text-foreground;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+html[dir="rtl"] {
+  direction: rtl;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

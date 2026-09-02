@@ -1,0 +1,17 @@
+import { getDb } from "@/lib/data";
+import { getT } from "@/lib/i18n";
+import { PageHeader } from "@/components/shared/page-header";
+import { AuditLogTable } from "@/components/audit/audit-log-table";
+
+export default function AuditLogPage() {
+  const db = getDb();
+  const t = getT();
+  const entries = [...db.auditLog].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title={t.auditLog.title} description={t.auditLog.description} />
+      <AuditLogTable entries={entries} />
+    </div>
+  );
+}
