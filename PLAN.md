@@ -77,10 +77,10 @@
 - [x] `AttendanceLog` = append-only (مفيش `updatedAt`، تعليق صريح في السكيمة)
 - [x] Prisma Client singleton (`src/lib/prisma.ts`)
 - [x] `prisma/seed.ts` — نفس بيانات الـ demo بالظبط (6 أقسام، 3 ورديات، 50 موظف، 13 يوم تاريخ، سيناريوهات 21 أغسطس، فترة أغسطس 2026) + الـ4 حسابات التجريبية بكلمات مرور **bcrypt** + جهاز `ZK-DEMO-01`. idempotent (بيمسح ويعيد)
-- [x] `docker-compose.yml` (MySQL 8.4) + `.env.example` + سكربتات `db:migrate` / `db:seed` / `db:deploy` / `db:studio`
+- [x] `.env.example` + سكربتات `db:migrate` / `db:seed` / `db:deploy` / `db:studio` (اتشال `docker-compose.yml` بطلب المستخدم — MySQL بيتنصّب مباشرة على الجهاز/السيرفر)
 - [x] المحرّكات النقية **ما اتلمستش**
-- [x] `tsc` + `npm test` (20/20) + `npm run build` + `npm run lint` — كلها نضيفة. الـ seed اتجرّب dry-run: كل الحسابات اشتغلت، وقف بس عند الاتصال بـ MySQL (متوقّع)
-- [ ] **متبقّي (يحتاج MySQL):** `prisma migrate dev --name init` + `npm run db:seed` + اختبار قراءة/كتابة فعلي
+- [x] `tsc` + `npm test` + `npm run build` + `npm run lint` — كلها نضيفة
+- [x] **MySQL 8.4 اتنصب محليًا** (portable zip) · `prisma migrate dev --name init` ✅ (`prisma/migrations/20260902195742_init/`) · `npm run db:seed` ✅ (50 موظف، 599 حضور يومي، 1088 بصمة، 4 مستخدمين)
 
 ### المرحلة 5 — الباك اند (تحويل الـ server actions) ✅ (اكتملت — فرع `feat/prisma-backend`)
 - [x] **الكتابة:** كل الـ13 ملف actions بقت Prisma حقيقي (create/update/upsert/delete) — `getDb()`/`db.X.push` اختفت
@@ -92,8 +92,9 @@
 - [x] **الحذف الناعم:** `deleteEmployee` / `deleteDepartment` / `updateShift` تفلتر وتضبط `deletedAt`؛ `getDb()` بيستبعد المحذوف
 - [x] **`POST /api/punch`:** `src/app/api/punch/route.ts` — header `X-Punch-Key`، zod validation، مطابقة `deviceUserId`→موظف، استنتاج in/out، كتابة `AttendanceLog` (source=biometric + rawPayload) + إعادة حساب `DailyAttendance`
 - [x] **تصدير xlsx حقيقي:** `exportExcel` بقت SheetJS (`xlsx`) → ملف `.xlsx` صحيح بأعمدة مضبوطة
-- [x] `tsc` + `npm run lint` + `npm run build` (0 أخطاء prisma بعد `force-dynamic`) — كلها نضيفة. `demo-flow.test.ts` بقى integration test بيتخطّى تلقائيًا بدون DB. اختبارات المحرّك 14/14 ✓
-- [ ] **متبقّي (يحتاج MySQL):** `prisma migrate dev` + `db:seed` + فحص متصفح كامل لسيناريو §55 + اختبار `/api/punch` بـ curl
+- [x] `tsc` + `npm run lint` + `npm run build` (0 أخطاء prisma بعد `force-dynamic`) — كلها نضيفة
+- [x] **اختبار فعلي على MySQL:** كل الاختبارات 18/18 (بما فيها الـ integration ضد DB حقيقي) · فحص متصفح: login → dashboard → **حساب رواتب 50 موظف (563,532 ج.م) عبر `$transaction`** → فتح فترة سبتمبر → تبديل الفترة → **حذف ناعم مؤكّد في الـ DB** (الصف باقٍ، `deletedAt` متسجّل، مستبعد من الـ UI) → سجل التدقيق بيكتب فعليًا
+- [x] **`/api/punch` مختبر بـ curl:** بصمة دخول → `missing_punch` · مفتاح غلط → 401 · بصمة خروج → `late` (استنتاج in/out شغّال)
 
 ### المرحلة 6 — المصادقة الحقيقية
 - [ ] جدول `User` (email, passwordHash, role, employeeId?, departmentId?, active)
