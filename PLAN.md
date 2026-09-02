@@ -65,12 +65,22 @@
 - [x] جولة متصفح: login → dashboard → تبديل اللغة (ar/en) → reports → **حساب رواتب كامل لـ50 موظف** (صافي 564,607 ج.م) — بدون أخطاء console
 - [ ] **متبقّي (بسيط، مؤجّل):** نسخة postcss 8.4.31 مدمجة **جوّا** حزمة Next 15 نفسها (استخدام وقت البناء فقط، مخاطر عملية شبه معدومة) — تتحل بالكامل لما ننتقل لـ Next 16 لاحقًا
 
-### المرحلة 4 — قاعدة البيانات (Prisma + SQLite)
-- [ ] `prisma init` + `schema.prisma` بالكيانات الـ15 (§45): `User, Employee, Department, Shift, AttendanceLog, DailyAttendance, Leave, Overtime, Deduction, Allowance, PayrollPeriod, PayrollRecord, AuditLog, CompanySettings` + إعدادات
-- [ ] `AttendanceLog` = جدول للإلحاق فقط (append-only) — لا update/delete في الكود
-- [ ] Prisma Client singleton (`src/lib/prisma.ts`)
-- [ ] تحويل `seed.ts` لـ `prisma/seed.ts` — نفس البيانات، تشتغل مرة واحدة عبر flag `--seed` أو جدول فاضي
-- [ ] الاحتفاظ بالمحرّكات النقية كما هي (لا تلمس `attendance-engine` / `payroll-engine`)
+### المرحلة 4 — قاعدة البيانات (Prisma + **MySQL**) ✅ (اكتملت — فرع `feat/db-prisma`)
+> القرار اتغيّر: **MySQL** بدل SQLite (طلب المستخدم — سيرفره فيه MySQL). الـ migration اتأجّل لحد ما يبقى فيه MySQL شغّال.
+- [x] `schema.prisma` (provider = mysql) — كل الكيانات + الـ enums الأصلية + إضافات:
+      - **حذف ناعم:** `deletedAt` على `Employee` / `Department` / `Shift`
+      - **بصمات ZKTeco:** موديل `Device` + `AttendanceLog` فيه `deviceUserId` / `rawPayload` / `receivedAt` + قيمة `biometric` في `PunchSource`
+      - **موديل `User`** كامل (للمرحلة 6): email, passwordHash, role, employeeId?, departmentId?, active, lastLoginAt
+      - `DailyAttendance` عليه `@@unique([employeeId, date])` — يدعم الترحيل اليومي التلقائي (upsert)
+      - `PayrollPeriod` عليه `@@unique([year, month])` — يدعم "فتح شهر جديد"
+      - الفلوس كلها `Int` (جنيه صحيح) — مطابق للمحرّكات النقية
+- [x] `AttendanceLog` = append-only (مفيش `updatedAt`، تعليق صريح في السكيمة)
+- [x] Prisma Client singleton (`src/lib/prisma.ts`)
+- [x] `prisma/seed.ts` — نفس بيانات الـ demo بالظبط (6 أقسام، 3 ورديات، 50 موظف، 13 يوم تاريخ، سيناريوهات 21 أغسطس، فترة أغسطس 2026) + الـ4 حسابات التجريبية بكلمات مرور **bcrypt** + جهاز `ZK-DEMO-01`. idempotent (بيمسح ويعيد)
+- [x] `docker-compose.yml` (MySQL 8.4) + `.env.example` + سكربتات `db:migrate` / `db:seed` / `db:deploy` / `db:studio`
+- [x] المحرّكات النقية **ما اتلمستش**
+- [x] `tsc` + `npm test` (20/20) + `npm run build` + `npm run lint` — كلها نضيفة. الـ seed اتجرّب dry-run: كل الحسابات اشتغلت، وقف بس عند الاتصال بـ MySQL (متوقّع)
+- [ ] **متبقّي (يحتاج MySQL):** `prisma migrate dev --name init` + `npm run db:seed` + اختبار قراءة/كتابة فعلي
 
 ### المرحلة 5 — الباك اند (تحويل الـ server actions)
 - [ ] استبدال كل `getDb()` / `db.X` بـ استعلامات Prisma في:
@@ -79,6 +89,11 @@
 - [ ] `addAuditLog` → جدول حقيقي داخل معاملة (transaction) مع الحدث نفسه
 - [ ] معاملات Prisma حوالين: حساب الرواتب، اعتماد الإجازة/الإضافي، تصحيح الحضور
 - [ ] إصلاح ثغرة التوقيت عبر منتصف الليل (استخدام Date كامل مش نص)
+- [ ] **فتح فترة رواتب جديدة:** action + UI (اختيار شهر/سنة → `PayrollPeriod` جديد draft، منع تكرار) + قائمة اختيار الفترة فوق صفحة الرواتب + أرشيف الفترات المقفولة
+- [ ] **الحذف الناعم:** كل الاستعلامات تفلتر `deletedAt = null`؛ زرار الحذف يبقى "تعطيل/أرشفة"
+- [ ] **`POST /api/punch`:** endpoint يستقبل بصمات ZKTeco (header `X-Punch-Key`)، يطابق `deviceUserId` بموظف، يكتب `AttendanceLog` + يعيد حساب `DailyAttendance`
+- [ ] **تصدير xlsx حقيقي:** استبدال `exportExcel` (HTML) بمكتبة SheetJS
+- [ ] فحص متصفح كامل لسيناريو §55 بعد التحويل
 
 ### المرحلة 6 — المصادقة الحقيقية
 - [ ] جدول `User` (email, passwordHash, role, employeeId?, departmentId?, active)

@@ -1,0 +1,404 @@
+// Afro Egypt — Factory Workforce
+// Prisma schema — MySQL. Mirrors src/lib/types.ts plus production additions:
+//   - soft delete (deletedAt) on Employee / Department / Shift
+//   - Device + biometric-punch fields on AttendanceLog (ZKTeco ingestion)
+//   - User table for real authentication (Phase 6)
+// Money is stored as whole EGP (Int) to match the pure calculation engines,
+// which always round to the nearest pound.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  admin
+  hr
+  supervisor
+  employee
+}
+
+enum EmployeeStatus {
+  active
+  on_leave
+  suspended
+  terminated
+}
+
+enum PunchType {
+  in
+  out
+}
+
+enum PunchSource {
+  simulated
+  manual_correction
+  biometric
+}
+
+enum AttendanceStatus {
+  present
+  late
+  absent
+  leave
+  mission
+  excused_absence
+  early_leave
+  missing_punch
+}
+
+enum LeaveType {
+  annual
+  casual
+  sick
+  unpaid
+  mission
+  permission
+  excused_absence
+}
+
+enum RequestStatus {
+  pending
+  approved
+  rejected
+}
+
+enum DeductionType {
+  late
+  absence
+  early_leave
+  penalty
+  advance
+  admin_deduction
+  other
+}
+
+enum AllowanceType {
+  transport
+  meal
+  fixed
+  incentive
+  bonus
+}
+
+enum PayrollPeriodStatus {
+  draft
+  calculated
+  approved
+  closed
+}
+
+// ---------------------------------------------------------------------------
+// Identity & access
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String      @id @default(cuid())
+  name         String
+  email        String      @unique
+  passwordHash String
+  role         Role
+  active       Boolean     @default(true)
+  employeeId   String?
+  employee     Employee?   @relation(fields: [employeeId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  lastLoginAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([employeeId])
+  @@index([departmentId])
+}
+
+// ---------------------------------------------------------------------------
+// Org structure
+// ---------------------------------------------------------------------------
+
+model Department {
+  id          String    @id @default(cuid())
+  name        String
+  managerName String
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  employees Employee[]
+  users     User[]
+}
+
+model Shift {
+  id                 String    @id @default(cuid())
+  name               String
+  startTime          String // "08:00"
+  endTime            String // "16:00" (may cross midnight)
+  gracePeriodMinutes Int       @default(10)
+  workDays           Json // number[] 0=Sunday..6=Saturday
+  allowOvertime      Boolean   @default(true)
+  deletedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  employees       Employee[]
+  dailyAttendance DailyAttendance[]
+}
+
+model Employee {
+  id                    String         @id @default(cuid())
+  name                  String
+  departmentId          String
+  department            Department     @relation(fields: [departmentId], references: [id])
+  jobTitle              String
+  hireDate              DateTime       @db.Date
+  shiftId               String
+  shift                 Shift          @relation(fields: [shiftId], references: [id])
+  basicSalary           Int
+  allowancesTotal       Int            @default(0) // quick-display fixed monthly allowances; itemised in Allowance[]
+  biometricDeviceUserId String
+  status                EmployeeStatus @default(active)
+  phone                 String?
+  avatarColor           String?
+  deletedAt             DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  attendanceLogs  AttendanceLog[]
+  dailyAttendance DailyAttendance[]
+  leaves          Leave[]
+  overtime        Overtime[]
+  deductions      Deduction[]
+  allowances      Allowance[]
+  payrollRecords  PayrollRecord[]
+  users           User[]
+
+  @@index([departmentId])
+  @@index([shiftId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Biometric devices & raw punches
+// ---------------------------------------------------------------------------
+
+model Device {
+  id         String   @id @default(cuid())
+  name       String
+  location   String?
+  apiKeyHash String? // set for real ZKTeco devices posting to /api/punch
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  logs AttendanceLog[]
+}
+
+/// Immutable raw biometric record. Never edited or deleted (spec §46).
+model AttendanceLog {
+  id           String      @id @default(cuid())
+  employeeId   String
+  employee     Employee    @relation(fields: [employeeId], references: [id])
+  deviceId     String?
+  device       Device?     @relation(fields: [deviceId], references: [id])
+  deviceUserId String? // raw user id reported by the device, before it is mapped to an employee
+  timestamp    DateTime
+  punchType    PunchType
+  source       PunchSource @default(biometric)
+  rawPayload   Json? // verbatim device payload, for audit / re-processing
+  receivedAt   DateTime    @default(now())
+
+  @@index([employeeId, timestamp])
+  @@index([deviceId])
+}
+
+// ---------------------------------------------------------------------------
+// Computed attendance (correctable)
+// ---------------------------------------------------------------------------
+
+model DailyAttendance {
+  id                    String           @id @default(cuid())
+  employeeId            String
+  employee              Employee         @relation(fields: [employeeId], references: [id])
+  date                  DateTime         @db.Date
+  shiftId               String
+  shift                 Shift            @relation(fields: [shiftId], references: [id])
+  scheduledStart        DateTime
+  scheduledEnd          DateTime
+  actualIn              DateTime?
+  actualOut             DateTime?
+  lateMinutes           Int              @default(0)
+  deductibleLateMinutes Int              @default(0)
+  earlyLeaveMinutes     Int              @default(0)
+  workedMinutes         Int              @default(0)
+  overtimeMinutes       Int              @default(0)
+  status                AttendanceStatus
+  correctionReason      String?
+  correctedBy           String?
+  correctedAt           DateTime?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@unique([employeeId, date]) // one computed row per employee per day — supports daily upsert/rollover
+  @@index([date, status])
+}
+
+// ---------------------------------------------------------------------------
+// Requests & adjustments
+// ---------------------------------------------------------------------------
+
+model Leave {
+  id         String        @id @default(cuid())
+  employeeId String
+  employee   Employee      @relation(fields: [employeeId], references: [id])
+  type       LeaveType
+  from       DateTime      @db.Date
+  to         DateTime      @db.Date
+  reason     String        @db.Text
+  status     RequestStatus @default(pending)
+  approvedBy String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+model Overtime {
+  id         String        @id @default(cuid())
+  employeeId String
+  employee   Employee      @relation(fields: [employeeId], references: [id])
+  date       DateTime      @db.Date
+  hours      Float
+  hourlyRate Int
+  amount     Int           @default(0)
+  status     RequestStatus @default(pending)
+  approvedBy String?
+  notes      String?       @db.Text
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+model Deduction {
+  id            String        @id @default(cuid())
+  employeeId    String
+  employee      Employee      @relation(fields: [employeeId], references: [id])
+  type          DeductionType
+  amount        Int
+  date          DateTime      @db.Date
+  reason        String        @db.Text
+  notes         String?       @db.Text
+  autoGenerated Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+
+  @@index([employeeId])
+  @@index([date])
+}
+
+model Allowance {
+  id         String        @id @default(cuid())
+  employeeId String
+  employee   Employee      @relation(fields: [employeeId], references: [id])
+  type       AllowanceType
+  amount     Int
+  monthly    Boolean       @default(true)
+  notes      String?       @db.Text
+  createdAt  DateTime      @default(now())
+
+  @@index([employeeId])
+}
+
+// ---------------------------------------------------------------------------
+// Payroll
+// ---------------------------------------------------------------------------
+
+model PayrollPeriod {
+  id           String              @id @default(cuid())
+  label        String // "أغسطس 2026"
+  year         Int
+  month        Int // 1-12
+  status       PayrollPeriodStatus @default(draft)
+  calculatedAt DateTime?
+  approvedAt   DateTime?
+  closedAt     DateTime?
+  createdAt    DateTime            @default(now())
+
+  records PayrollRecord[]
+
+  @@unique([year, month])
+}
+
+model PayrollRecord {
+  id                  String        @id @default(cuid())
+  periodId            String
+  period              PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  employeeId          String
+  employee            Employee      @relation(fields: [employeeId], references: [id])
+  basicSalary         Int
+  allowances          Int
+  overtimeAmount      Int
+  incentives          Int
+  bonuses             Int
+  grossSalary         Int
+  lateDeduction       Int
+  absenceDeduction    Int
+  earlyLeaveDeduction Int
+  penalties           Int
+  advances            Int
+  otherDeductions     Int
+  totalDeductions     Int
+  netSalary           Int
+  createdAt           DateTime      @default(now())
+
+  @@unique([periodId, employeeId])
+  @@index([employeeId])
+}
+
+// ---------------------------------------------------------------------------
+// Audit & settings
+// ---------------------------------------------------------------------------
+
+model AuditLogEntry {
+  id        String   @id @default(cuid())
+  userName  String
+  action    String
+  module    String
+  oldValue  String   @db.Text
+  newValue  String   @db.Text
+  reason    String?  @db.Text
+  timestamp DateTime @default(now())
+
+  @@index([timestamp])
+}
+
+/// Single-row settings tables (id is always "singleton").
+model CompanySettings {
+  id          String @id @default("singleton")
+  companyName String
+  logoUrl     String
+  address     String
+  phone       String
+}
+
+model AttendanceSettings {
+  id                           String @id @default("singleton")
+  defaultGracePeriodMinutes    Int    @default(10)
+  lateDeductionPerMinute       Int    @default(5)
+  earlyLeaveDeductionPerMinute Int    @default(5)
+  absenceDeductionDays         Int    @default(1)
+}
+
+model PayrollSettings {
+  id                       String @id @default("singleton")
+  overtimeHourlyMultiplier Float  @default(1.5)
+  workingDaysPerMonth      Int    @default(26)
+  workingHoursPerDay       Int    @default(8)
+}
