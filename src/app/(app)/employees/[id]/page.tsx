@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Building2, Clock, IdCard, Calendar } from "lucide-react";
 import { getDb } from "@/lib/data";
-import { requireSession } from "@/lib/auth";
+import { requireAccess } from "@/lib/auth";
 import { canSeeEmployee } from "@/lib/scope";
 import { formatEGP } from "@/lib/constants";
 import { getT } from "@/lib/i18n";
@@ -21,7 +21,7 @@ import { AttendanceStatusBadge } from "@/components/shared/status-badge";
 
 export default async function EmployeeProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const db = await getDb();
-  const user = await requireSession();
+  const user = await requireAccess("/employees");
   const t = await getT();
   const locale = await getLocale();
   const { id } = await params;

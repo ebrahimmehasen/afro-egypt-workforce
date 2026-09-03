@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/data";
+import { requireAccess } from "@/lib/auth";
 import { formatEGP } from "@/lib/constants";
 import { currentYearMonth } from "@/lib/today";
 import { getMonthlyKpis, getTopLateEmployees, getWorkforceCostByDepartment } from "@/lib/selectors";
@@ -14,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Wallet, TimerReset, TrendingDown, Clock3 } from "lucide-react";
 
 export default async function WorkforceCostPage() {
+  await requireAccess("/workforce-cost");
   const db = await getDb();
   const t = await getT();
   const locale = await getLocale();

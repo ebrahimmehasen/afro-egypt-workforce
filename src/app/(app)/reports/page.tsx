@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/data";
-import { requireSession } from "@/lib/auth";
+import { requireAccess } from "@/lib/auth";
 import { scopeByEmployee, scopeEmployees } from "@/lib/scope";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
@@ -18,7 +18,7 @@ export default async function ReportsPage({
   searchParams: Promise<{ tab?: string; from?: string; to?: string; status?: string }>;
 }) {
   const db = await getDb();
-  const user = await requireSession();
+  const user = await requireAccess("/reports");
   const t = await getT();
   const locale = await getLocale();
   const ym = currentYearMonth();

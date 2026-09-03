@@ -1,16 +1,13 @@
 import Image from "next/image";
-import { redirect } from "next/navigation";
 import { getDb } from "@/lib/data";
-import { requireSession } from "@/lib/auth";
-import { canManageSettings } from "@/lib/permissions";
+import { requireAccess } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
 import { CompanySettingsForm, AttendanceSettingsForm, PayrollSettingsForm } from "@/components/settings/settings-forms";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default async function SettingsPage() {
-  const user = await requireSession();
-  if (!canManageSettings(user.role)) redirect("/dashboard");
+  await requireAccess("/settings");
 
   const db = await getDb();
   const t = await getT();

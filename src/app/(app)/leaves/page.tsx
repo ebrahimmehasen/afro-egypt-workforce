@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/data";
-import { requireSession } from "@/lib/auth";
+import { requireAccess } from "@/lib/auth";
 import { scopeByEmployee, scopeEmployees } from "@/lib/scope";
 import { canApprove } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
@@ -9,7 +9,7 @@ import { LeavesTable } from "@/components/leaves/leaves-table";
 
 export default async function LeavesPage() {
   const db = await getDb();
-  const user = await requireSession();
+  const user = await requireAccess("/leaves");
   const t = await getT();
 
   const employees = scopeEmployees(db.employees, user);

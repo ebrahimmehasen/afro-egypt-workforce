@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/data";
-import { requireSession } from "@/lib/auth";
+import { requireAccess } from "@/lib/auth";
 import { scopeEmployees } from "@/lib/scope";
 import { canCorrectAttendance } from "@/lib/permissions";
 import { getT, format } from "@/lib/i18n";
@@ -9,7 +9,7 @@ import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog"
 
 export default async function EmployeesPage() {
   const db = await getDb();
-  const user = await requireSession();
+  const user = await requireAccess("/employees");
   const t = await getT();
   const canEdit = canCorrectAttendance(user.role); // admin/hr can manage employee records
 

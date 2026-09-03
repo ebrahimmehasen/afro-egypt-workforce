@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/data";
-import { requireSession } from "@/lib/auth";
+import { requireAccess } from "@/lib/auth";
 import { scopeEmployees } from "@/lib/scope";
 import { canCorrectAttendance } from "@/lib/permissions";
 import { today } from "@/lib/today";
@@ -23,7 +23,7 @@ export default async function AttendancePage({
   const date = dateParam ?? today();
   const initialStatus = statusParam ?? "all";
   const db = await getDb();
-  const user = await requireSession();
+  const user = await requireAccess("/attendance");
   const t = await getT();
   const canCorrect = canCorrectAttendance(user.role);
 
