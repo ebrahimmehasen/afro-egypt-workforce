@@ -1,8 +1,6 @@
-import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getDb } from "@/lib/data";
-import { requireSession } from "@/lib/auth";
-import { canManageUsers } from "@/lib/permissions";
+import { requireAccess } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
 import { translateLabel } from "@/lib/i18n/data-labels";
@@ -15,8 +13,7 @@ import { UserFormDialog } from "@/components/users/user-form-dialog";
 import { ResetPasswordDialog } from "@/components/users/reset-password-dialog";
 
 export default async function UsersPage() {
-  const authed = await requireSession();
-  if (!canManageUsers(authed.role)) notFound();
+  await requireAccess("/users");
 
   const t = await getT();
   const locale = await getLocale();

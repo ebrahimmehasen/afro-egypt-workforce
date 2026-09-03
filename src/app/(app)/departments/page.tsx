@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/data";
-import { requireSession } from "@/lib/auth";
+import { requireAccess } from "@/lib/auth";
+import { viewerScope } from "@/lib/scope";
 import { canManageSettings, canCorrectAttendance } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
 import { getAttendanceByDepartment } from "@/lib/selectors";
@@ -14,11 +15,11 @@ import { Building2, Users, Wallet, Percent } from "lucide-react";
 
 export default async function DepartmentsPage() {
   const db = await getDb();
-  const user = await requireSession();
+  const user = await requireAccess("/departments");
   const t = await getT();
   const locale = await getLocale();
   const canEdit = canCorrectAttendance(user.role);
-  const rates = await getAttendanceByDepartment();
+  const rates = await getAttendanceByDepartment(viewerScope(user, db.employees));
 
   const rows = db.departments.map((dept) => {
     const employees = db.employees.filter((e) => e.departmentId === dept.id);

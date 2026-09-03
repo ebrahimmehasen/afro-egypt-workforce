@@ -1,37 +1,25 @@
 import { getDb } from "@/lib/data";
-import { Store } from "@/lib/store";
+import { Scope, scopedSnapshot } from "@/lib/scope";
 import { today } from "@/lib/today";
 import { AttendanceStatus, DailyAttendance } from "@/lib/types";
 import { ATTENDANCE_STATUS_GROUPS } from "@/lib/attendance-engine";
 
 /**
- * Optional row-level scope. Pass the ids a user may see (from
- * `visibleEmployeeIds`); omit / null for the full company.
+ * Dashboard / report read models. Each takes the viewer's `Scope` as its first
+ * argument (build it with `viewerScope`) so a company-wide read is always an
+ * explicit choice, never an accidental omission.
  */
-type Scope = string[] | null | undefined;
-
-/** Returns the snapshot with employee-keyed collections narrowed to `scope`. */
-async function scopedDb(scope: Scope): Promise<Store> {
-  const db = await getDb();
-  if (!scope) return db;
-  const set = new Set(scope);
-  return {
-    ...db,
-    employees: db.employees.filter((e) => set.has(e.id)),
-    dailyAttendance: db.dailyAttendance.filter((a) => set.has(a.employeeId)),
-    overtime: db.overtime.filter((o) => set.has(o.employeeId)),
-    deductions: db.deductions.filter((d) => set.has(d.employeeId)),
-    payrollRecords: db.payrollRecords.filter((r) => set.has(r.employeeId)),
-  };
+async function snapshot(scope: Scope) {
+  return scopedSnapshot(scope, await getDb());
 }
 
-export async function getTodayAttendance(date: string = today(), scope?: Scope): Promise<DailyAttendance[]> {
-  const db = await scopedDb(scope);
+export async function getTodayAttendance(scope: Scope, date: string = today()): Promise<DailyAttendance[]> {
+  const db = await snapshot(scope);
   return db.dailyAttendance.filter((a) => a.date === date);
 }
 
-export async function getTodayKpis(date: string = today(), scope?: Scope) {
-  const db = await scopedDb(scope);
+export async function getTodayKpis(scope: Scope, date: string = today()) {
+  const db = await snapshot(scope);
   const dayRecords = db.dailyAttendance.filter((a) => a.date === date);
   const totalEmployees = db.employees.filter((e) => e.status === "active").length;
 
@@ -48,8 +36,8 @@ export async function getTodayKpis(date: string = today(), scope?: Scope) {
   };
 }
 
-export async function getMonthlyKpis(year: number, month: number, scope?: Scope) {
-  const db = await scopedDb(scope);
+export async function getMonthlyKpis(scope: Scope, year: number, month: number) {
+  const db = await snapshot(scope);
   const prefix = `${year}-${String(month).padStart(2, "0")}`;
   const monthAttendance = db.dailyAttendance.filter((a) => a.date.startsWith(prefix));
 
@@ -91,8 +79,8 @@ export async function getMonthlyKpis(year: number, month: number, scope?: Scope)
   };
 }
 
-export async function getAttendanceTrend(days = 14, endDate: string = today(), scope?: Scope) {
-  const db = await scopedDb(scope);
+export async function getAttendanceTrend(scope: Scope, days = 14, endDate: string = today()) {
+  const db = await snapshot(scope);
   const end = new Date(`${endDate}T00:00:00`);
   const trend: { date: string; present: number; late: number; absent: number }[] = [];
 
@@ -112,12 +100,12 @@ export async function getAttendanceTrend(days = 14, endDate: string = today(), s
   return trend;
 }
 
-export async function getAttendanceByDepartment(date: string = today(), scope?: Scope) {
-  const db = await scopedDb(scope);
+export async function getAttendanceByDepartment(scope: Scope, date: string = today()) {
+  const db = await snapshot(scope);
   const dayRecords = db.dailyAttendance.filter((a) => a.date === date);
-  const departments = scope
-    ? db.departments.filter((dept) => db.employees.some((e) => e.departmentId === dept.id))
-    : db.departments;
+  const departments = scope.all
+    ? db.departments
+    : db.departments.filter((dept) => db.employees.some((e) => e.departmentId === dept.id));
   return departments.map((dept) => {
     const deptEmployeeIds = db.employees.filter((e) => e.departmentId === dept.id).map((e) => e.id);
     const records = dayRecords.filter((a) => deptEmployeeIds.includes(a.employeeId));
@@ -131,8 +119,8 @@ export async function getAttendanceByDepartment(date: string = today(), scope?: 
   });
 }
 
-export async function getTopLateEmployees(limit = 5, days = 30, endDate: string = today(), scope?: Scope) {
-  const db = await scopedDb(scope);
+export async function getTopLateEmployees(scope: Scope, limit = 5, days = 30, endDate: string = today()) {
+  const db = await snapshot(scope);
   const end = new Date(`${endDate}T00:00:00`);
   const start = new Date(end);
   start.setDate(start.getDate() - days);
@@ -158,14 +146,18 @@ export async function getTopLateEmployees(limit = 5, days = 30, endDate: string 
     .slice(0, limit);
 }
 
-export async function getWorkforceCostByDepartment(year: number, month: number, scope?: Scope) {
-  const db = await scopedDb(scope);
+export async function getWorkforceCostByDepartment(scope: Scope, year: number, month: number) {
+  const db = await snapshot(scope);
   const records = db.payrollRecords.filter((r) => {
     const period = db.payrollPeriods.find((p) => p.id === r.periodId);
     return period && period.year === year && period.month === month;
   });
 
-  return db.departments.map((dept) => {
+  const departments = scope.all
+    ? db.departments
+    : db.departments.filter((dept) => db.employees.some((e) => e.departmentId === dept.id));
+
+  return departments.map((dept) => {
     const deptEmployeeIds = db.employees.filter((e) => e.departmentId === dept.id).map((e) => e.id);
     const deptRecords = records.filter((r) => deptEmployeeIds.includes(r.employeeId));
     return {

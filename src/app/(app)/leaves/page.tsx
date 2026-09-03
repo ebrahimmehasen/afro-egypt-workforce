@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/data";
-import { requireSession } from "@/lib/auth";
-import { scopeByEmployee, scopeEmployees } from "@/lib/scope";
+import { requireAccess } from "@/lib/auth";
+import { employeesInScope, rowsInScope, viewerScope } from "@/lib/scope";
 import { canApprove } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
@@ -9,11 +9,12 @@ import { LeavesTable } from "@/components/leaves/leaves-table";
 
 export default async function LeavesPage() {
   const db = await getDb();
-  const user = await requireSession();
+  const user = await requireAccess("/leaves");
   const t = await getT();
 
-  const employees = scopeEmployees(db.employees, user);
-  const leaves = scopeByEmployee(db.leaves, user, db.employees);
+  const scope = viewerScope(user, db.employees);
+  const employees = employeesInScope(scope, db.employees);
+  const leaves = rowsInScope(scope, db.leaves);
 
   const sorted = [...leaves].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 

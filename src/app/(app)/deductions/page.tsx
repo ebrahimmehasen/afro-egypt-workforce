@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/data";
-import { requireSession } from "@/lib/auth";
+import { requireAccess } from "@/lib/auth";
 import { canEditPayroll } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
@@ -17,7 +17,7 @@ export default async function DeductionsPage({
   searchParams: Promise<{ month?: string }>;
 }) {
   const db = await getDb();
-  const user = await requireSession();
+  const user = await requireAccess("/deductions");
   const t = await getT();
   const locale = await getLocale();
   const canManage = canEditPayroll(user.role);

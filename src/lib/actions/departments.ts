@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { addAuditLog } from "@/lib/store";
-import { getSession } from "@/lib/auth";
+import { recordChange } from "@/lib/audit";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { nextId } from "@/lib/id";
 import { getT } from "@/lib/i18n";
@@ -18,15 +17,10 @@ export async function createDepartment(_prev: ActionState, formData: FormData): 
   const t = await getT();
   const parsed = departmentSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  const user = await getSession();
-  await prisma.department.create({ data: { id: nextId("DEP"), ...parsed.data } });
-  await addAuditLog({
-    userName: user?.name ?? t.auditActions.system,
-    action: t.auditActions.addDepartment,
-    module: t.nav.departments,
-    oldValue: "-",
-    newValue: parsed.data.name,
-  });
+  await recordChange(
+    { module: t.nav.departments, action: t.auditActions.addDepartment, newValue: parsed.data.name },
+    (tx) => tx.department.create({ data: { id: nextId("DEP"), ...parsed.data } }),
+  );
   revalidatePath("/departments");
   return { success: true, message: t.departments.saved };
 }

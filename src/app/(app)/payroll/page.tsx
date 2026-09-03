@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/data";
-import { requireSession } from "@/lib/auth";
+import { requireAccess } from "@/lib/auth";
 import { canEditPayroll } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
 import { currentYearMonth } from "@/lib/today";
@@ -32,7 +32,7 @@ export default async function PayrollPage({
   searchParams: Promise<{ period?: string }>;
 }) {
   const db = await getDb();
-  const user = await requireSession();
+  const user = await requireAccess("/payroll");
   const t = await getT();
   const locale = await getLocale();
   const canEdit = canEditPayroll(user.role);

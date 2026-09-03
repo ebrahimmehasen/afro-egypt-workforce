@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { addAuditLog } from "@/lib/store";
+import { recordChange } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
 import { canManageUsers } from "@/lib/permissions";
 import { ActionState } from "@/hooks/use-action-feedback";
@@ -50,24 +50,25 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
   const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
   if (existing) return { error: t.users.emailTaken };
 
-  await prisma.user.create({
-    data: {
-      name,
-      email: email.toLowerCase(),
-      passwordHash: await bcrypt.hash(password, 10),
-      role,
-      employeeId: clean(employeeId),
-      departmentId: clean(departmentId),
+  const passwordHash = await bcrypt.hash(password, 10);
+  await recordChange(
+    {
+      module: t.nav.users,
+      action: t.users.auditCreate,
+      newValue: `${name} <${email}> — ${role}`,
     },
-  });
-
-  await addAuditLog({
-    userName: actor.name,
-    action: t.users.auditCreate,
-    module: t.nav.users,
-    oldValue: "-",
-    newValue: `${name} <${email}> — ${role}`,
-  });
+    (tx) =>
+      tx.user.create({
+        data: {
+          name,
+          email: email.toLowerCase(),
+          passwordHash,
+          role,
+          employeeId: clean(employeeId),
+          departmentId: clean(departmentId),
+        },
+      }),
+  );
 
   revalidatePath("/users");
   return { success: true, message: t.users.saved };
@@ -86,18 +87,19 @@ export async function updateUser(_prev: ActionState, formData: FormData): Promis
   if (!before) return { error: t.validation.notFound };
   if (id === actor.id && (!active || role !== "admin")) return { error: t.users.cannotLockSelfOut };
 
-  await prisma.user.update({
-    where: { id },
-    data: { name, role, active, employeeId: clean(employeeId), departmentId: clean(departmentId) },
-  });
-
-  await addAuditLog({
-    userName: actor.name,
-    action: t.users.auditUpdate,
-    module: t.nav.users,
-    oldValue: `${before.name} — ${before.role} — ${before.active ? t.users.active : t.users.inactive}`,
-    newValue: `${name} — ${role} — ${active ? t.users.active : t.users.inactive}`,
-  });
+  await recordChange(
+    {
+      module: t.nav.users,
+      action: t.users.auditUpdate,
+      oldValue: `${before.name} — ${before.role} — ${before.active ? t.users.active : t.users.inactive}`,
+      newValue: `${name} — ${role} — ${active ? t.users.active : t.users.inactive}`,
+    },
+    (tx) =>
+      tx.user.update({
+        where: { id },
+        data: { name, role, active, employeeId: clean(employeeId), departmentId: clean(departmentId) },
+      }),
+  );
 
   revalidatePath("/users");
   return { success: true, message: t.users.saved };
@@ -115,15 +117,15 @@ export async function resetUserPassword(_prev: ActionState, formData: FormData):
   const target = await prisma.user.findUnique({ where: { id } });
   if (!target) return { error: t.validation.notFound };
 
-  await prisma.user.update({ where: { id }, data: { passwordHash: await bcrypt.hash(password, 10) } });
-
-  await addAuditLog({
-    userName: actor.name,
-    action: t.users.auditResetPassword,
-    module: t.nav.users,
-    oldValue: "-",
-    newValue: `${target.name} <${target.email}>`,
-  });
+  const passwordHash = await bcrypt.hash(password, 10);
+  await recordChange(
+    {
+      module: t.nav.users,
+      action: t.users.auditResetPassword,
+      newValue: `${target.name} <${target.email}>`,
+    },
+    (tx) => tx.user.update({ where: { id }, data: { passwordHash } }),
+  );
 
   revalidatePath("/users");
   return { success: true, message: t.users.passwordReset };

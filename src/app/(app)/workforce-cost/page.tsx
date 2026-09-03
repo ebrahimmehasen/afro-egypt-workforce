@@ -1,4 +1,6 @@
 import { getDb } from "@/lib/data";
+import { requireAccess } from "@/lib/auth";
+import { scopedSnapshot, viewerScope } from "@/lib/scope";
 import { formatEGP } from "@/lib/constants";
 import { currentYearMonth } from "@/lib/today";
 import { getMonthlyKpis, getTopLateEmployees, getWorkforceCostByDepartment } from "@/lib/selectors";
@@ -14,14 +16,17 @@ import { Badge } from "@/components/ui/badge";
 import { Wallet, TimerReset, TrendingDown, Clock3 } from "lucide-react";
 
 export default async function WorkforceCostPage() {
-  const db = await getDb();
+  const user = await requireAccess("/workforce-cost");
+  const fullDb = await getDb();
+  const scope = viewerScope(user, fullDb.employees);
+  const db = scopedSnapshot(scope, fullDb);
   const t = await getT();
   const locale = await getLocale();
   const ym = currentYearMonth();
   const monthPrefix = `${ym.year}-${String(ym.month).padStart(2, "0")}`;
-  const monthly = await getMonthlyKpis(ym.year, ym.month);
-  const byDept = (await getWorkforceCostByDepartment(ym.year, ym.month)).map((d) => ({ ...d, department: translateLabel(d.department, locale) }));
-  const topLate = await getTopLateEmployees(5, 30);
+  const monthly = await getMonthlyKpis(scope, ym.year, ym.month);
+  const byDept = (await getWorkforceCostByDepartment(scope, ym.year, ym.month)).map((d) => ({ ...d, department: translateLabel(d.department, locale) }));
+  const topLate = await getTopLateEmployees(scope, 5, 30);
 
   const totalCost = monthly.totalPayroll + monthly.overtimeTotal;
 

@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/data";
-import { requireSession } from "@/lib/auth";
-import { scopeEmployees } from "@/lib/scope";
+import { requireAccess } from "@/lib/auth";
+import { employeesInScope, viewerScope } from "@/lib/scope";
 import { canCorrectAttendance } from "@/lib/permissions";
 import { getT, format } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
@@ -9,11 +9,11 @@ import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog"
 
 export default async function EmployeesPage() {
   const db = await getDb();
-  const user = await requireSession();
+  const user = await requireAccess("/employees");
   const t = await getT();
   const canEdit = canCorrectAttendance(user.role); // admin/hr can manage employee records
 
-  const employees = scopeEmployees(db.employees, user);
+  const employees = employeesInScope(viewerScope(user, db.employees), db.employees);
 
   return (
     <div className="flex flex-col gap-6">

@@ -116,6 +116,14 @@
 - [x] `tsc` + `lint` + `build` + 18/18 test نضيفة · تحقّق بسكربت: admin→الكل، مشرف DEP-1→20/50، موظف→نفسه، منع رؤية قسم آخر · create/update/delete مستخدم بـ bcrypt · تحقّق بالمتصفح: صفحة `/users` بالإنتاج + ديالوج الإضافة
 - [ ] **قرار للمستخدم:** يبدأ بالـ 50 موظف (`db:seed:sample`) ويعدّلهم، ولا `db:seed` ويدخّل موظفينه (استيراد CSV؟)
 
+### مرحلة الريفاكتور المعماري ✅ (اكتملت — فرع `refactor/architecture-pass`)
+> جولة تعميق قبل النشر — بناءً على تقرير `improve-codebase-architecture`. المحرّكات النقية ما اتلمستش.
+- [x] **قناة التدقيق (candidate 3):** `src/lib/audit.ts` — `recordChange(entry, write)` بيكتب التغيير وصفّ التدقيق في `prisma.$transaction` واحدة (يهبطوا سوا أو يترجعوا سوا)؛ `recordChangeAs` النواة بدون جلسة؛ `writeAudit(tx,…)` جوّا transaction قايمة (calculatePayroll). كل الـ~20 action اتحوّلوا. `addAuditLog` اتشال من `store.ts`. اختبار: `tests/audit.test.ts`
+- [x] **موديول إعادة حساب الحضور (candidate 4):** `attendance-service` و`actions/attendance` بيستخدموا `toShift` الموجود بدل بناء الكائن يدوي؛ `recalculateRange(employeeId, from, to)` مشترك (كان loop داخلي في `decideLeave`)
+- [x] **قناة صلاحية الصفحات (candidate 5):** `requireAccess(path)` في `auth.ts` — تتحقق من الجلسة الموقّعة **و** `canAccess(role, path)`. كل صفحات `(app)` المحمية بتستخدمها. `/audit-log` و`/workforce-cost` كانوا بلا حارس صفحة نهائيًا
+- [x] **قراءة مقصورة موحّدة (candidates 1 + 2):** `scope.ts` أعيد تصميمه — `Scope` واحد + `viewerScope` / `inScope` / `employeesInScope` / `rowsInScope` / `scopedSnapshot`. الـ selectors بتاخد `Scope` **أول باراميتر إجباري**. `getDb()` اتشال منه جدولا `attendanceLogs` و`auditLog` (append-only غير محدودين) → `getAttendanceLogsForDate` / `getAuditLog(200)` بقيود DB. **إصلاح تسرّب:** `/workforce-cost` كان بيحسب تكلفة الشركة كاملة بلا scope. اختبار: `tests/scope.test.ts`
+- [x] `tsc` + `lint` + **24/24 test** + `build` نضيفة · تحقّق شامل بالمتصفح (كل الصفحات المتغيّرة، بدون أخطاء console) · تحقّق بجلسة مشرف موقّعة: `/workforce-cost` + `/audit-log` → 307 لـ `/dashboard`؛ `/employees` = 20 (DEP-1) مقابل 50 للأدمن
+
 ### المرحلة 7 — تثبيت وتجهيز النشر
 - [x] `.env.example` (DATABASE_URL, SESSION_SECRET, PUNCH_API_KEY)
 - [x] `prisma migrate deploy` جاهز (ملف الـ migration متعمل commit)

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { getDb } from "@/lib/data";
 import { getSession } from "@/lib/auth";
+import { inScope, viewerScope } from "@/lib/scope";
 import { COMPANY, formatEGP } from "@/lib/constants";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
@@ -22,6 +23,7 @@ export default async function PayslipPage({ params }: { params: Promise<{ record
   const { recordId } = await params;
   const record = db.payrollRecords.find((r) => r.id === recordId);
   if (!record) notFound();
+  if (!inScope(viewerScope(user, db.employees), record.employeeId)) notFound();
 
   const employee = db.employees.find((e) => e.id === record.employeeId);
   const department = db.departments.find((d) => d.id === employee?.departmentId);

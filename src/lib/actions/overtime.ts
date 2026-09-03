@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { addAuditLog } from "@/lib/store";
-import { getSession } from "@/lib/auth";
+import { auditActor, recordChange } from "@/lib/audit";
 import { nextId } from "@/lib/id";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
@@ -39,23 +38,20 @@ export async function createOvertime(_prev: ActionState, formData: FormData): Pr
 
 export async function decideOvertime(id: string, decision: "approved" | "rejected") {
   const t = await getT();
-  const user = await getSession();
+  const actor = await auditActor();
   const overtime = await prisma.overtime.findUnique({ where: { id } });
   if (!overtime) return { error: t.validation.requestNotFound };
 
-  await prisma.overtime.update({
-    where: { id },
-    data: { status: decision, approvedBy: user?.name ?? t.auditActions.system },
-  });
-
-  await addAuditLog({
-    userName: user?.name ?? t.auditActions.system,
-    action: decision === "approved" ? t.auditActions.approveOvertime : t.auditActions.rejectOvertime,
-    module: t.nav.overtime,
-    oldValue: t.statuses.pending,
-    newValue: decision === "approved" ? t.statuses.approved : t.statuses.rejected,
-    reason: `${overtime.employeeId} — ${overtime.hours} ${t.common.hours}`,
-  });
+  await recordChange(
+    {
+      module: t.nav.overtime,
+      action: decision === "approved" ? t.auditActions.approveOvertime : t.auditActions.rejectOvertime,
+      oldValue: t.statuses.pending,
+      newValue: decision === "approved" ? t.statuses.approved : t.statuses.rejected,
+      reason: `${overtime.employeeId} — ${overtime.hours} ${t.common.hours}`,
+    },
+    (tx) => tx.overtime.update({ where: { id }, data: { status: decision, approvedBy: actor } }),
+  );
 
   revalidatePath("/overtime");
   revalidatePath("/dashboard");

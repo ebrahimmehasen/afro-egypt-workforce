@@ -3,10 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { addAuditLog } from "@/lib/store";
-import { getSession } from "@/lib/auth";
+import { auditActor, recordChange } from "@/lib/audit";
 import { nextId } from "@/lib/id";
-import { recalculateDailyAttendance } from "@/lib/attendance-service";
+import { recalculateRange } from "@/lib/attendance-service";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
 import { leaveTypeLabel } from "@/lib/i18n/labels";
@@ -40,41 +39,29 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
   return { success: true, message: t.leaves.submitted };
 }
 
-function datesBetween(from: string, to: string) {
-  const dates: string[] = [];
-  const cur = new Date(`${from}T00:00:00`);
-  const end = new Date(`${to}T00:00:00`);
-  while (cur <= end) {
-    dates.push(cur.toISOString().slice(0, 10));
-    cur.setDate(cur.getDate() + 1);
-  }
-  return dates;
-}
-
 export async function decideLeave(id: string, decision: "approved" | "rejected") {
   const t = await getT();
-  const user = await getSession();
+  const actor = await auditActor();
   const leave = await prisma.leave.findUnique({ where: { id } });
   if (!leave) return { error: t.validation.requestNotFound };
 
-  await prisma.leave.update({
-    where: { id },
-    data: { status: decision, approvedBy: user?.name ?? t.auditActions.system },
-  });
-
-  await addAuditLog({
-    userName: user?.name ?? t.auditActions.system,
-    action: decision === "approved" ? t.auditActions.approveLeave : t.auditActions.rejectLeave,
-    module: t.nav.leaves,
-    oldValue: t.statuses.pending,
-    newValue: decision === "approved" ? t.statuses.approved : t.statuses.rejected,
-    reason: `${leaveTypeLabel(leave.type, t)} — ${leave.employeeId}`,
-  });
+  await recordChange(
+    {
+      module: t.nav.leaves,
+      action: decision === "approved" ? t.auditActions.approveLeave : t.auditActions.rejectLeave,
+      oldValue: t.statuses.pending,
+      newValue: decision === "approved" ? t.statuses.approved : t.statuses.rejected,
+      reason: `${leaveTypeLabel(leave.type, t)} — ${leave.employeeId}`,
+    },
+    (tx) => tx.leave.update({ where: { id }, data: { status: decision, approvedBy: actor } }),
+  );
 
   if (decision === "approved") {
-    for (const date of datesBetween(leave.from.toISOString().slice(0, 10), leave.to.toISOString().slice(0, 10))) {
-      await recalculateDailyAttendance(leave.employeeId, date);
-    }
+    await recalculateRange(
+      leave.employeeId,
+      leave.from.toISOString().slice(0, 10),
+      leave.to.toISOString().slice(0, 10),
+    );
   }
 
   revalidatePath("/leaves");
