@@ -8,7 +8,7 @@ import { recalculateDailyAttendance } from "@/lib/attendance-service";
 import { computeFromActuals } from "@/lib/attendance-engine";
 import { toShift } from "@/lib/serialize";
 import { ActionState } from "@/hooks/use-action-feedback";
-import { getT } from "@/lib/i18n";
+import { getT, intlLocale } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
 
 const punchSchema = z.object({
@@ -87,7 +87,7 @@ export async function correctAttendance(_prev: ActionState, formData: FormData):
   );
 
   const timeFmt = (d: Date | null) =>
-    d ? d.toLocaleTimeString(locale === "ar" ? "ar-EG" : "en-US", { hour: "2-digit", minute: "2-digit" }) : "—";
+    d ? d.toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" }) : "—";
 
   await recordChange(
     {

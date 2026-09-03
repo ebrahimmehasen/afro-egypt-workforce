@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useLocale, useT } from "@/components/providers/locale-provider";
+import { intlLocale } from "@/lib/i18n/format";
 
 export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
   const t = useT();
@@ -74,7 +75,7 @@ export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
                   <TableCell className="max-w-[160px] truncate">{e.newValue}</TableCell>
                   <TableCell className="max-w-[200px] truncate text-muted-foreground">{e.reason ?? "—"}</TableCell>
                   <TableCell dir="ltr" className="tabular-nums text-xs text-muted-foreground">
-                    {new Date(e.timestamp).toLocaleString(locale === "ar" ? "ar-EG" : "en-US")}
+                    {new Date(e.timestamp).toLocaleString(intlLocale(locale))}
                   </TableCell>
                 </TableRow>
               ))}

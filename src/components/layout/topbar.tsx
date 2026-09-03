@@ -4,6 +4,7 @@ import { Bell, LogOut, Menu } from "lucide-react";
 import { User } from "@/lib/types";
 import { today } from "@/lib/today";
 import { roleLabel, displayUserName } from "@/lib/i18n/labels";
+import { intlLocale } from "@/lib/i18n/format";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +22,7 @@ import { logoutAction } from "@/lib/actions/auth";
 
 function formatToday(locale: "ar" | "en") {
   const d = new Date(`${today()}T00:00:00`);
-  return new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en-US", {
+  return new Intl.DateTimeFormat(intlLocale(locale), {
     weekday: "long",
     year: "numeric",
     month: "long",

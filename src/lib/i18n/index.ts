@@ -14,6 +14,6 @@ export async function getT(): Promise<Dictionary> {
   return getDictionary(await getLocale());
 }
 
-export { format } from "@/lib/i18n/format";
+export { format, intlLocale } from "@/lib/i18n/format";
 export * from "@/lib/i18n/locale";
 export * from "@/lib/i18n/dictionary";

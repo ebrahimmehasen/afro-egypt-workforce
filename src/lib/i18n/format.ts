@@ -3,6 +3,16 @@ export function format(template: string, values: Record<string, string | number>
   return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ""));
 }
 
+/**
+ * BCP-47 tag for all `Intl` / `toLocale*` formatting. The Arabic UI keeps
+ * Arabic month names and labels but always renders digits in Latin (Western)
+ * numerals — the app mixes Arabic and English text, so Arabic-Indic digits
+ * (٠١٢٣) next to Latin ones read as inconsistent.
+ */
+export function intlLocale(locale: "ar" | "en"): string {
+  return locale === "ar" ? "ar-EG-u-nu-latn" : "en-US";
+}
+
 const MONTHS: Record<"ar" | "en", string[]> = {
   ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
   en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],

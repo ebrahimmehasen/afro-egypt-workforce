@@ -43,8 +43,9 @@ export const REQUEST_STATUS_VARIANT: Record<
   rejected: "destructive",
 };
 
+// Arabic UI, but Latin (Western) digits — see `intlLocale` in i18n/format.
 const EGP_FORMATTERS: Record<Locale, Intl.NumberFormat> = {
-  ar: new Intl.NumberFormat("ar-EG", { style: "currency", currency: "EGP", maximumFractionDigits: 0 }),
+  ar: new Intl.NumberFormat("ar-EG-u-nu-latn", { style: "currency", currency: "EGP", maximumFractionDigits: 0 }),
   en: new Intl.NumberFormat("en-US", { style: "currency", currency: "EGP", maximumFractionDigits: 0 }),
 };
 

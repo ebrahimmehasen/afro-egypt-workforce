@@ -7,6 +7,7 @@ import { inScope, viewerScope } from "@/lib/scope";
 import { formatEGP } from "@/lib/constants";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
+import { intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { requestStatusLabel, deductionTypeLabel } from "@/lib/i18n/labels";
 import { PageHeader } from "@/components/shared/page-header";
@@ -31,7 +32,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   const department = db.departments.find((d) => d.id === employee.departmentId);
   const shift = db.shifts.find((s) => s.id === employee.shiftId);
   const timeFmt = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleTimeString(locale === "ar" ? "ar-EG" : "en-US", { hour: "2-digit", minute: "2-digit" }) : "—";
+    iso ? new Date(iso).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" }) : "—";
 
   const attendance = db.dailyAttendance
     .filter((a) => a.employeeId === employee.id)

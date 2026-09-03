@@ -15,6 +15,7 @@ import { AttendanceStatusBadge } from "@/components/shared/status-badge";
 import { CorrectAttendanceDialog } from "@/components/attendance/correct-attendance-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useLocale, useT } from "@/components/providers/locale-provider";
+import { intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 
 export function DailyAttendanceTable({
@@ -39,7 +40,7 @@ export function DailyAttendanceTable({
 
   function fmtTime(iso: string | null) {
     if (!iso) return "—";
-    return new Date(iso).toLocaleTimeString(locale === "ar" ? "ar-EG" : "en-US", { hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" });
   }
 
   const empMap = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
