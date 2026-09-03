@@ -3,7 +3,7 @@ import { Role } from "@/lib/types";
 const NAV_BY_ROLE: Record<Role, string[]> = {
   admin: [
     "/dashboard", "/employees", "/departments", "/shifts", "/attendance", "/leaves",
-    "/overtime", "/deductions", "/payroll", "/reports", "/workforce-cost", "/audit-log", "/settings",
+    "/overtime", "/deductions", "/payroll", "/reports", "/workforce-cost", "/audit-log", "/users", "/settings",
   ],
   hr: [
     "/dashboard", "/employees", "/departments", "/shifts", "/attendance", "/leaves",
@@ -32,6 +32,10 @@ export function canEditPayroll(role: Role): boolean {
 }
 
 export function canManageSettings(role: Role): boolean {
+  return role === "admin";
+}
+
+export function canManageUsers(role: Role): boolean {
   return role === "admin";
 }
 

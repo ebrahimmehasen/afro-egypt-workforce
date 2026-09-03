@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/data";
 import { requireSession } from "@/lib/auth";
+import { scopeEmployees } from "@/lib/scope";
 import { canCorrectAttendance } from "@/lib/permissions";
 import { today } from "@/lib/today";
 import { getT } from "@/lib/i18n";
@@ -26,12 +27,7 @@ export default async function AttendancePage({
   const t = await getT();
   const canCorrect = canCorrectAttendance(user.role);
 
-  let employees = db.employees.filter((e) => e.status === "active");
-  if (user.role === "employee" && user.employeeId) {
-    employees = employees.filter((e) => e.id === user.employeeId);
-  } else if (user.role === "supervisor" && user.departmentId) {
-    employees = employees.filter((e) => e.departmentId === user.departmentId);
-  }
+  const employees = scopeEmployees(db.employees, user).filter((e) => e.status === "active");
   const employeeIds = new Set(employees.map((e) => e.id));
   const canSimulate = user.role !== "employee";
 

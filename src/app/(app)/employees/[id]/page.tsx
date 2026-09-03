@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Building2, Clock, IdCard, Calendar } from "lucide-react";
 import { getDb } from "@/lib/data";
+import { requireSession } from "@/lib/auth";
+import { canSeeEmployee } from "@/lib/scope";
 import { formatEGP } from "@/lib/constants";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
@@ -19,11 +21,12 @@ import { AttendanceStatusBadge } from "@/components/shared/status-badge";
 
 export default async function EmployeeProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const db = await getDb();
+  const user = await requireSession();
   const t = await getT();
   const locale = await getLocale();
   const { id } = await params;
   const employee = db.employees.find((e) => e.id === id);
-  if (!employee) notFound();
+  if (!employee || !canSeeEmployee(user, id, db.employees)) notFound();
 
   const department = db.departments.find((d) => d.id === employee.departmentId);
   const shift = db.shifts.find((s) => s.id === employee.shiftId);

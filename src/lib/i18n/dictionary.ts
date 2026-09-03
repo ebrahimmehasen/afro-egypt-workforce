@@ -66,6 +66,7 @@ export interface Dictionary {
     reports: string;
     workforceCost: string;
     auditLog: string;
+    users: string;
     settings: string;
   };
   roles: {
@@ -486,6 +487,32 @@ export interface Dictionary {
     savedCompany: string;
     savedAttendance: string;
     savedPayroll: string;
+  };
+  users: {
+    description: string;
+    addUser: string;
+    editUser: string;
+    name: string;
+    email: string;
+    password: string;
+    newPassword: string;
+    role: string;
+    status: string;
+    active: string;
+    inactive: string;
+    scope: string;
+    lastLogin: string;
+    linkedEmployee: string;
+    linkedDepartment: string;
+    scopingHint: string;
+    resetPassword: string;
+    passwordReset: string;
+    saved: string;
+    emailTaken: string;
+    cannotLockSelfOut: string;
+    auditCreate: string;
+    auditUpdate: string;
+    auditResetPassword: string;
   };
   statuses: {
     present: string;

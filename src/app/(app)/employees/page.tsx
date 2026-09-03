@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/data";
 import { requireSession } from "@/lib/auth";
+import { scopeEmployees } from "@/lib/scope";
 import { canCorrectAttendance } from "@/lib/permissions";
 import { getT, format } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
@@ -12,10 +13,7 @@ export default async function EmployeesPage() {
   const t = await getT();
   const canEdit = canCorrectAttendance(user.role); // admin/hr can manage employee records
 
-  let employees = db.employees;
-  if (user.role === "supervisor" && user.departmentId) {
-    employees = employees.filter((e) => e.departmentId === user.departmentId);
-  }
+  const employees = scopeEmployees(db.employees, user);
 
   return (
     <div className="flex flex-col gap-6">
