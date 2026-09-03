@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { addAuditLog } from "@/lib/store";
-import { getSession } from "@/lib/auth";
+import { recordChange } from "@/lib/audit";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
 
@@ -33,26 +32,25 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
   const t = await getT();
   const parsed = employeeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  const user = await getSession();
   const id = await nextEmployeeId();
   const { allowances, hireDate, ...rest } = parsed.data;
 
-  await prisma.employee.create({
-    data: {
-      id,
-      ...rest,
-      hireDate: new Date(`${hireDate}T00:00:00.000Z`),
-      allowancesTotal: allowances,
+  await recordChange(
+    {
+      module: t.nav.employees,
+      action: t.auditActions.addEmployee,
+      newValue: `${parsed.data.name} (${id})`,
     },
-  });
-
-  await addAuditLog({
-    userName: user?.name ?? t.auditActions.system,
-    action: t.auditActions.addEmployee,
-    module: t.nav.employees,
-    oldValue: "-",
-    newValue: `${parsed.data.name} (${id})`,
-  });
+    (tx) =>
+      tx.employee.create({
+        data: {
+          id,
+          ...rest,
+          hireDate: new Date(`${hireDate}T00:00:00.000Z`),
+          allowancesTotal: allowances,
+        },
+      }),
+  );
 
   revalidatePath("/employees");
   return { success: true, message: t.employees.savedEmployee };
@@ -63,28 +61,28 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
   const id = String(formData.get("id") ?? "");
   const parsed = employeeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  const user = await getSession();
 
   const before = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
   if (!before) return { error: t.validation.employeeNotFound };
 
   const { allowances, hireDate, ...rest } = parsed.data;
-  await prisma.employee.update({
-    where: { id },
-    data: {
-      ...rest,
-      hireDate: new Date(`${hireDate}T00:00:00.000Z`),
-      allowancesTotal: allowances,
+  await recordChange(
+    {
+      module: t.nav.employees,
+      action: t.auditActions.editEmployee,
+      oldValue: `${before.name} — ${before.basicSalary} EGP`,
+      newValue: `${parsed.data.name} — ${parsed.data.basicSalary} EGP`,
     },
-  });
-
-  await addAuditLog({
-    userName: user?.name ?? t.auditActions.system,
-    action: t.auditActions.editEmployee,
-    module: t.nav.employees,
-    oldValue: `${before.name} — ${before.basicSalary} EGP`,
-    newValue: `${parsed.data.name} — ${parsed.data.basicSalary} EGP`,
-  });
+    (tx) =>
+      tx.employee.update({
+        where: { id },
+        data: {
+          ...rest,
+          hireDate: new Date(`${hireDate}T00:00:00.000Z`),
+          allowancesTotal: allowances,
+        },
+      }),
+  );
 
   revalidatePath("/employees");
   revalidatePath(`/employees/${id}`);
@@ -94,22 +92,17 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
 /** Soft delete — the employee is archived (deletedAt set), not physically removed. */
 export async function deleteEmployee(id: string) {
   const t = await getT();
-  const user = await getSession();
   const removed = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
   if (!removed) return { error: t.validation.employeeNotFound };
 
-  await prisma.employee.update({
-    where: { id },
-    data: { deletedAt: new Date(), status: "terminated" },
-  });
-
-  await addAuditLog({
-    userName: user?.name ?? t.auditActions.system,
-    action: t.auditActions.deleteEmployee,
-    module: t.nav.employees,
-    oldValue: `${removed.name} (${removed.id})`,
-    newValue: "-",
-  });
+  await recordChange(
+    {
+      module: t.nav.employees,
+      action: t.auditActions.deleteEmployee,
+      oldValue: `${removed.name} (${removed.id})`,
+    },
+    (tx) => tx.employee.update({ where: { id }, data: { deletedAt: new Date(), status: "terminated" } }),
+  );
 
   revalidatePath("/employees");
   return { success: true };

@@ -1,8 +1,33 @@
 import { computeDailyAttendance, getShiftWindow } from "@/lib/attendance-engine";
 import { prisma } from "@/lib/prisma";
-import { toDailyAttendance } from "@/lib/serialize";
+import { toDailyAttendance, toShift } from "@/lib/serialize";
 import { DailyAttendance } from "@/lib/types";
-import type { Shift } from "@/lib/types";
+
+/** yyyy-MM-dd for each calendar day in [from, to] inclusive. */
+function datesInRange(from: string, to: string): string[] {
+  const out: string[] = [];
+  const cur = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  while (cur <= end) {
+    out.push(cur.toISOString().slice(0, 10));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+
+/**
+ * Recomputes and upserts the DailyAttendance row for every day in [from, to] for
+ * one employee. Shared entry point for leave approval and any future backfill job.
+ */
+export async function recalculateRange(
+  employeeId: string,
+  from: string,
+  to: string,
+): Promise<void> {
+  for (const date of datesInRange(from, to)) {
+    await recalculateDailyAttendance(employeeId, date);
+  }
+}
 
 /**
  * Recomputes and upserts the DailyAttendance row for one employee/date from the
@@ -18,15 +43,7 @@ export async function recalculateDailyAttendance(
   const shiftRow = await prisma.shift.findUnique({ where: { id: employee.shiftId } });
   if (!shiftRow) return null;
 
-  const shift: Shift = {
-    id: shiftRow.id,
-    name: shiftRow.name,
-    startTime: shiftRow.startTime,
-    endTime: shiftRow.endTime,
-    gracePeriodMinutes: shiftRow.gracePeriodMinutes,
-    workDays: (shiftRow.workDays as number[]) ?? [],
-    allowOvertime: shiftRow.allowOvertime,
-  };
+  const shift = toShift(shiftRow);
 
   const { scheduledStart, scheduledEnd } = getShiftWindow(date, shift);
   // widen the window a little so early / very-late punches are still attributed to this shift

@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { addAuditLog } from "@/lib/store";
-import { getSession } from "@/lib/auth";
+import { auditActor, recordChange, writeAudit } from "@/lib/audit";
 import { calculatePayrollRecord } from "@/lib/payroll-engine";
 import { getT } from "@/lib/i18n";
 import { ActionState } from "@/hooks/use-action-feedback";
@@ -35,18 +34,11 @@ export async function openPayrollPeriod(_prev: ActionState, formData: FormData):
   const existing = await prisma.payrollPeriod.findUnique({ where: { year_month: { year, month } } });
   if (existing) return { error: t.validation.periodExists };
 
-  const period = await prisma.payrollPeriod.create({
-    data: { label: `${MONTHS_AR[month - 1]} ${year}`, year, month, status: "draft" },
-  });
-
-  const user = await getSession();
-  await addAuditLog({
-    userName: user?.name ?? t.auditActions.system,
-    action: t.auditActions.openPayrollPeriod,
-    module: t.nav.payroll,
-    oldValue: "-",
-    newValue: period.label,
-  });
+  const label = `${MONTHS_AR[month - 1]} ${year}`;
+  await recordChange(
+    { module: t.nav.payroll, action: t.auditActions.openPayrollPeriod, newValue: label },
+    (tx) => tx.payrollPeriod.create({ data: { label, year, month, status: "draft" } }),
+  );
 
   revalidatePath("/payroll");
   revalidatePath("/audit-log");
@@ -55,7 +47,7 @@ export async function openPayrollPeriod(_prev: ActionState, formData: FormData):
 
 export async function calculatePayroll(periodId: string) {
   const t = await getT();
-  const user = await getSession();
+  const actor = await auditActor();
   const period = await prisma.payrollPeriod.findUnique({ where: { id: periodId } });
   if (!period) return { error: t.validation.periodNotFound };
   if (period.status === "closed") return { error: t.validation.periodClosed };
@@ -140,15 +132,18 @@ export async function calculatePayroll(periodId: string) {
       where: { id: periodId },
       data: { status: "calculated", calculatedAt: new Date() },
     });
-  });
 
-  await addAuditLog({
-    userName: user?.name ?? t.auditActions.system,
-    action: t.auditActions.calculatePayroll,
-    module: t.nav.payroll,
-    oldValue: t.payrollPeriodStatus.draft,
-    newValue: `${t.payrollPeriodStatus.calculated} — ${activeEmployees.length} ${t.common.employee}`,
-    reason: period.label,
+    await writeAudit(
+      tx,
+      {
+        module: t.nav.payroll,
+        action: t.auditActions.calculatePayroll,
+        oldValue: t.payrollPeriodStatus.draft,
+        newValue: `${t.payrollPeriodStatus.calculated} — ${activeEmployees.length} ${t.common.employee}`,
+        reason: period.label,
+      },
+      actor,
+    );
   });
 
   revalidatePath("/payroll");
@@ -160,24 +155,24 @@ export async function calculatePayroll(periodId: string) {
 
 export async function approvePayrollPeriod(periodId: string) {
   const t = await getT();
-  const user = await getSession();
   const period = await prisma.payrollPeriod.findUnique({ where: { id: periodId } });
   if (!period) return { error: t.validation.periodNotFound };
   if (period.status !== "calculated") return { error: t.validation.payrollNotCalculatedFirst };
 
-  await prisma.payrollPeriod.update({
-    where: { id: periodId },
-    data: { status: "approved", approvedAt: new Date() },
-  });
-
-  await addAuditLog({
-    userName: user?.name ?? t.auditActions.system,
-    action: t.auditActions.approvePayroll,
-    module: t.nav.payroll,
-    oldValue: t.payrollPeriodStatus.calculated,
-    newValue: t.payrollPeriodStatus.approved,
-    reason: period.label,
-  });
+  await recordChange(
+    {
+      module: t.nav.payroll,
+      action: t.auditActions.approvePayroll,
+      oldValue: t.payrollPeriodStatus.calculated,
+      newValue: t.payrollPeriodStatus.approved,
+      reason: period.label,
+    },
+    (tx) =>
+      tx.payrollPeriod.update({
+        where: { id: periodId },
+        data: { status: "approved", approvedAt: new Date() },
+      }),
+  );
 
   revalidatePath("/payroll");
   revalidatePath("/audit-log");
@@ -186,24 +181,24 @@ export async function approvePayrollPeriod(periodId: string) {
 
 export async function closePayrollPeriod(periodId: string) {
   const t = await getT();
-  const user = await getSession();
   const period = await prisma.payrollPeriod.findUnique({ where: { id: periodId } });
   if (!period) return { error: t.validation.periodNotFound };
   if (period.status !== "approved") return { error: t.validation.payrollApprovedFirst };
 
-  await prisma.payrollPeriod.update({
-    where: { id: periodId },
-    data: { status: "closed", closedAt: new Date() },
-  });
-
-  await addAuditLog({
-    userName: user?.name ?? t.auditActions.system,
-    action: t.auditActions.closePayrollPeriod,
-    module: t.nav.payroll,
-    oldValue: t.payrollPeriodStatus.approved,
-    newValue: t.payrollPeriodStatus.closed,
-    reason: period.label,
-  });
+  await recordChange(
+    {
+      module: t.nav.payroll,
+      action: t.auditActions.closePayrollPeriod,
+      oldValue: t.payrollPeriodStatus.approved,
+      newValue: t.payrollPeriodStatus.closed,
+      reason: period.label,
+    },
+    (tx) =>
+      tx.payrollPeriod.update({
+        where: { id: periodId },
+        data: { status: "closed", closedAt: new Date() },
+      }),
+  );
 
   revalidatePath("/payroll");
   revalidatePath("/audit-log");

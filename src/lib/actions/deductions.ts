@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { addAuditLog } from "@/lib/store";
-import { getSession } from "@/lib/auth";
+import { recordChange } from "@/lib/audit";
 import { nextId } from "@/lib/id";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
@@ -23,27 +22,26 @@ export async function createDeduction(_prev: ActionState, formData: FormData): P
   const t = await getT();
   const parsed = deductionSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  const user = await getSession();
-  await prisma.deduction.create({
-    data: {
-      id: nextId("DED"),
-      employeeId: parsed.data.employeeId,
-      type: parsed.data.type,
-      amount: Math.round(parsed.data.amount),
-      date: new Date(`${parsed.data.date}T00:00:00.000Z`),
+  await recordChange(
+    {
+      module: t.nav.deductions,
+      action: t.auditActions.addDeduction,
+      newValue: `${deductionTypeLabel(parsed.data.type, t)} — ${parsed.data.amount} EGP`,
       reason: parsed.data.reason,
-      notes: parsed.data.notes,
     },
-  });
-
-  await addAuditLog({
-    userName: user?.name ?? t.auditActions.system,
-    action: t.auditActions.addDeduction,
-    module: t.nav.deductions,
-    oldValue: "-",
-    newValue: `${deductionTypeLabel(parsed.data.type, t)} — ${parsed.data.amount} EGP`,
-    reason: parsed.data.reason,
-  });
+    (tx) =>
+      tx.deduction.create({
+        data: {
+          id: nextId("DED"),
+          employeeId: parsed.data.employeeId,
+          type: parsed.data.type,
+          amount: Math.round(parsed.data.amount),
+          date: new Date(`${parsed.data.date}T00:00:00.000Z`),
+          reason: parsed.data.reason,
+          notes: parsed.data.notes,
+        },
+      }),
+  );
 
   revalidatePath("/deductions");
   revalidatePath("/dashboard");

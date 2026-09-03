@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { addAuditLog } from "@/lib/store";
-import { getSession } from "@/lib/auth";
+import { auditActor, recordChange } from "@/lib/audit";
 import { recalculateDailyAttendance } from "@/lib/attendance-service";
 import { computeFromActuals } from "@/lib/attendance-engine";
+import { toShift } from "@/lib/serialize";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
@@ -63,7 +63,7 @@ export async function correctAttendance(_prev: ActionState, formData: FormData):
   if (!parsed.success) return { error: t.validation.invalidData };
 
   const { employeeId, date, correctedIn, correctedOut, reason } = parsed.data;
-  const user = await getSession();
+  const actor = await auditActor();
   const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });
   const shift = employee ? await prisma.shift.findUnique({ where: { id: employee.shiftId } }) : null;
   if (!employee || !shift) return { error: t.validation.invalidData };
@@ -74,15 +74,7 @@ export async function correctAttendance(_prev: ActionState, formData: FormData):
   });
   if (!before) return { error: t.validation.noAttendanceRecordForDay };
 
-  const shiftForEngine = {
-    id: shift.id,
-    name: shift.name,
-    startTime: shift.startTime,
-    endTime: shift.endTime,
-    gracePeriodMinutes: shift.gracePeriodMinutes,
-    workDays: (shift.workDays as number[]) ?? [],
-    allowOvertime: shift.allowOvertime,
-  };
+  const shiftForEngine = toShift(shift);
   const newIn = correctedIn ? new Date(`${date}T${correctedIn}:00`) : before.actualIn;
   const newOut = correctedOut ? new Date(`${date}T${correctedOut}:00`) : before.actualOut;
 
@@ -94,34 +86,35 @@ export async function correctAttendance(_prev: ActionState, formData: FormData):
     newOut,
   );
 
-  await prisma.dailyAttendance.update({
-    where: { employeeId_date: { employeeId, date: dateOnly } },
-    data: {
-      actualIn: computed.actualIn,
-      actualOut: computed.actualOut,
-      lateMinutes: computed.lateMinutes,
-      deductibleLateMinutes: computed.deductibleLateMinutes,
-      earlyLeaveMinutes: computed.earlyLeaveMinutes,
-      workedMinutes: computed.workedMinutes,
-      overtimeMinutes: computed.overtimeMinutes,
-      status: computed.status,
-      correctionReason: reason,
-      correctedBy: user?.name ?? t.auditActions.system,
-      correctedAt: new Date(),
-    },
-  });
-
   const timeFmt = (d: Date | null) =>
     d ? d.toLocaleTimeString(locale === "ar" ? "ar-EG" : "en-US", { hour: "2-digit", minute: "2-digit" }) : "—";
 
-  await addAuditLog({
-    userName: user?.name ?? t.auditActions.system,
-    action: t.auditActions.correctAttendance,
-    module: t.nav.attendance,
-    oldValue: `${t.attendance.colOut}: ${timeFmt(before.actualOut)}`,
-    newValue: `${t.attendance.colOut}: ${timeFmt(computed.actualOut)}`,
-    reason,
-  });
+  await recordChange(
+    {
+      module: t.nav.attendance,
+      action: t.auditActions.correctAttendance,
+      oldValue: `${t.attendance.colOut}: ${timeFmt(before.actualOut)}`,
+      newValue: `${t.attendance.colOut}: ${timeFmt(computed.actualOut)}`,
+      reason,
+    },
+    (tx) =>
+      tx.dailyAttendance.update({
+        where: { employeeId_date: { employeeId, date: dateOnly } },
+        data: {
+          actualIn: computed.actualIn,
+          actualOut: computed.actualOut,
+          lateMinutes: computed.lateMinutes,
+          deductibleLateMinutes: computed.deductibleLateMinutes,
+          earlyLeaveMinutes: computed.earlyLeaveMinutes,
+          workedMinutes: computed.workedMinutes,
+          overtimeMinutes: computed.overtimeMinutes,
+          status: computed.status,
+          correctionReason: reason,
+          correctedBy: actor,
+          correctedAt: new Date(),
+        },
+      }),
+  );
 
   revalidatePath("/attendance");
   revalidatePath("/dashboard");

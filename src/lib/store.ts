@@ -15,7 +15,6 @@ import {
   PayrollSettings,
   Shift,
 } from "@/lib/types";
-import { prisma } from "@/lib/prisma";
 
 /** Read-model snapshot shape. Hydrated from the database by `getDb()` in @/lib/data. */
 export interface Store {
@@ -34,18 +33,4 @@ export interface Store {
   companySettings: CompanySettings;
   attendanceSettings: AttendanceSettings;
   payrollSettings: PayrollSettings;
-}
-
-/** Appends an audit-log row. Call inside the same transaction as the change it records where possible. */
-export async function addAuditLog(entry: Omit<AuditLogEntry, "id" | "timestamp">) {
-  await prisma.auditLogEntry.create({
-    data: {
-      userName: entry.userName,
-      action: entry.action,
-      module: entry.module,
-      oldValue: entry.oldValue,
-      newValue: entry.newValue,
-      reason: entry.reason,
-    },
-  });
 }
