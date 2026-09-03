@@ -2,6 +2,7 @@ import { getDb } from "@/lib/data";
 import { getSession } from "@/lib/auth";
 import { canEditPayroll } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
+import { currentYearMonth } from "@/lib/demo-mode";
 import { getT, format } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
 import { payrollPeriodStatusLabel } from "@/lib/i18n/labels";
@@ -37,8 +38,13 @@ export default async function PayrollPage({
   const canEdit = canEditPayroll(user.role);
 
   const { period: periodParam } = await searchParams;
+  const ym = currentYearMonth();
   let period = periodParam ? db.payrollPeriods.find((p) => p.id === periodParam) : undefined;
-  if (!period) period = db.payrollPeriods.find((p) => p.id === "PP-2026-08") ?? db.payrollPeriods[0];
+  if (!period) {
+    period =
+      db.payrollPeriods.find((p) => p.year === ym.year && p.month === ym.month) ??
+      db.payrollPeriods[0]; // list is ordered newest-first
+  }
 
   let records = period
     ? db.payrollRecords

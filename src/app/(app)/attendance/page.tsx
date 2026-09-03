@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/data";
 import { getSession } from "@/lib/auth";
 import { canCorrectAttendance } from "@/lib/permissions";
-import { DEMO_DATE } from "@/lib/constants";
+import { today } from "@/lib/demo-mode";
 import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,7 +19,7 @@ export default async function AttendancePage({
   searchParams: Promise<{ date?: string; status?: string }>;
 }) {
   const { date: dateParam, status: statusParam } = await searchParams;
-  const date = dateParam ?? DEMO_DATE;
+  const date = dateParam ?? today();
   const initialStatus = statusParam ?? "all";
   const db = await getDb();
   const user = (await getSession())!;

@@ -104,13 +104,25 @@
 - [ ] فرض scoping المشرف (قسمه فقط) في `selectors` + الصفحات
 - [ ] seed: نفس الـ 4 حسابات التجريبية بكلمات مرور مشفّرة (للاستمرارية)
 
+### المرحلة 6.5 — الخروج من "وضع الديمو" ✅ (اكتملت — فرع `feat/demo-mode-flag`)
+> **ليه كان لسه موجود:** "DEMO MODE" مش مجرد بادج. `DEMO_DATE = "2026-08-21"` كان مستخدم في ~14 مكان كـ "النهارده". لو حوّلناه لـ `new Date()` من غير flag، الداشبورد يبقى فاضي (مفيش حضور للنهارده الحقيقي). فالحل flag مش حذف.
+- [x] **`NEXT_PUBLIC_DEMO_MODE`** في `.env` (افتراضي `false` للإنتاج) + helper `src/lib/demo-mode.ts` (`DEMO_MODE`, `today()`, `currentYearMonth()`)
+      - `true`: النهارده = `2026-08-21` · بادج "DEMO MODE" + "DEMO VERSION" · بيانات الدخول مملّاة على اللوجين · زر العرض التجريبي · `/demo` شغّال
+      - `false`: النهارده = `new Date()` · مفيش بادجات · حقول اللوجين فاضية · `/demo` → **404** · التوب بار "تاريخ النظام" بدل "(تجريبي)"
+- [x] كل استخدامات `DEMO_DATE` كـ "النهارده" اتحوّلت لـ `today()` / `currentYearMonth()` (selectors, dashboard, attendance, workforce-cost, reports, payroll, 4 فورمات، تقرير الحضور)
+- [x] KPIs الشهر + labels الشهر بقت ديناميكية (`monthName` / `monthYearLabel` — "سبتمبر" بدل "أغسطس" المثبّت)
+- [x] `payroll` / `reports` بيدوّروا على فترة الشهر الحالي، مش `PP-2026-08` مثبّت
+- [x] **seed إنتاجي:** `prisma/seed-prod.ts` + `npm run db:seed:prod` — 6 أقسام + 3 ورديات + الإعدادات + جهاز + مستخدم admin واحد (`ADMIN_EMAIL`/`ADMIN_PASSWORD` من env). بدون موظفين/حضور/رواتب وهمية. upsert (آمن للتكرار)
+- [x] `tsc` + `lint` + `build` + 18/18 test — نضيفة · متحقّق في المتصفح: الوضعين (on/off)
+- [ ] **قرار للمستخدم لاحقًا:** يبدأ الإنتاج بالـ 50 موظف الوهميين ويعدّلهم، ولا `db:seed:prod` ويدخّل موظفينه (نضيف استيراد CSV؟)
+
 ### المرحلة 7 — تثبيت وتجهيز النشر
-- [ ] `.env.example` (DATABASE_URL, SESSION_SECRET, ...)
-- [ ] `npm run build` + `npm start` نظيف على SQLite
-- [ ] سكربت migration للنشر (`prisma migrate deploy`)
+- [x] `.env.example` (DATABASE_URL, SESSION_SECRET, PUNCH_API_KEY)
+- [x] `prisma migrate deploy` جاهز (ملف الـ migration متعمل commit)
+- [ ] `npm run build` + `npm start` نظيف على MySQL الإنتاج
 - [ ] `README` محدّث: تشغيل محلي + خطوات النشر على سيرفرك
 - [ ] دليل ديمو مكتوب (سيناريو §55 خطوة بخطوة بالعربي)
-- [ ] (اختياري) `Dockerfile` + `docker-compose` لو تفضّل
+- [ ] (اختياري) `Dockerfile` للتطبيق نفسه لو تفضّل
 
 ---
 

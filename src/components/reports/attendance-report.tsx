@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { FileBarChart } from "lucide-react";
 import { DailyAttendance, Department, Employee } from "@/lib/types";
-import { DEMO_DATE } from "@/lib/constants";
+import { today } from "@/lib/demo-mode";
 import { attendanceStatusLabel } from "@/lib/i18n/labels";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { useLocale, useT } from "@/components/providers/locale-provider";
@@ -60,8 +60,8 @@ export function AttendanceReport({
 }) {
   const t = useT();
   const locale = useLocale();
-  const [from, setFrom] = useState(initialFrom ?? addDays(DEMO_DATE, -13));
-  const [to, setTo] = useState(initialTo ?? DEMO_DATE);
+  const [from, setFrom] = useState(initialFrom ?? addDays(today(), -13));
+  const [to, setTo] = useState(initialTo ?? today());
   const [departmentId, setDepartmentId] = useState("all");
   const [employeeId, setEmployeeId] = useState("all");
   const [status, setStatus] = useState(initialStatus ?? "all");

@@ -17,7 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Employee, LeaveType } from "@/lib/types";
-import { DEMO_DATE } from "@/lib/constants";
+import { today } from "@/lib/demo-mode";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -74,11 +74,11 @@ export function LeaveFormDialog({ employees }: { employees: Employee[] }) {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="from">{t.leaves.formFrom}</Label>
-              <Input id="from" name="from" type="date" defaultValue={DEMO_DATE} required />
+              <Input id="from" name="from" type="date" defaultValue={today()} required />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="to">{t.leaves.formTo}</Label>
-              <Input id="to" name="to" type="date" defaultValue={DEMO_DATE} required />
+              <Input id="to" name="to" type="date" defaultValue={today()} required />
             </div>
           </div>
           <div className="flex flex-col gap-1.5">

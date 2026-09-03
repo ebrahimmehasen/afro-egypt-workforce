@@ -2,7 +2,7 @@
 
 import { Bell, LogOut, Menu } from "lucide-react";
 import { User } from "@/lib/types";
-import { DEMO_DATE } from "@/lib/constants";
+import { DEMO_MODE, today } from "@/lib/demo-mode";
 import { roleLabel, displayUserName } from "@/lib/i18n/labels";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
@@ -19,8 +19,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "@/lib/actions/auth";
 
-function formatDemoDate(locale: "ar" | "en") {
-  const d = new Date(`${DEMO_DATE}T00:00:00`);
+function formatToday(locale: "ar" | "en") {
+  const d = new Date(`${today()}T00:00:00`);
   return new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en-US", {
     weekday: "long",
     year: "numeric",
@@ -41,13 +41,15 @@ export function Topbar({ user, onMenuClick }: { user: User; onMenuClick?: () => 
           <Menu className="h-5 w-5" />
         </Button>
         <div className="hidden flex-col sm:flex">
-          <span className="text-sm font-semibold text-foreground">{formatDemoDate(locale)}</span>
+          <span className="text-sm font-semibold text-foreground">{formatToday(locale)}</span>
           <span className="text-xs text-muted-foreground">{t.topbar.todayLabel}</span>
         </div>
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        <Badge variant="warning" className="hidden sm:inline-flex">{t.app.demoMode}</Badge>
+        {DEMO_MODE && (
+          <Badge variant="warning" className="hidden sm:inline-flex">{t.app.demoMode}</Badge>
+        )}
 
         <LanguageSwitcher />
 

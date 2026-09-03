@@ -1,8 +1,10 @@
 import { getDb } from "@/lib/data";
 import { formatEGP } from "@/lib/constants";
+import { currentYearMonth } from "@/lib/demo-mode";
 import { getMonthlyKpis, getTopLateEmployees, getWorkforceCostByDepartment } from "@/lib/selectors";
-import { getT } from "@/lib/i18n";
+import { getT, format } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
+import { monthYearLabel } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard } from "@/components/shared/kpi-card";
@@ -15,8 +17,10 @@ export default async function WorkforceCostPage() {
   const db = await getDb();
   const t = await getT();
   const locale = await getLocale();
-  const monthly = await getMonthlyKpis(2026, 8);
-  const byDept = (await getWorkforceCostByDepartment(2026, 8)).map((d) => ({ ...d, department: translateLabel(d.department, locale) }));
+  const ym = currentYearMonth();
+  const monthPrefix = `${ym.year}-${String(ym.month).padStart(2, "0")}`;
+  const monthly = await getMonthlyKpis(ym.year, ym.month);
+  const byDept = (await getWorkforceCostByDepartment(ym.year, ym.month)).map((d) => ({ ...d, department: translateLabel(d.department, locale) }));
   const topLate = await getTopLateEmployees(5, 30);
 
   const totalCost = monthly.totalPayroll + monthly.overtimeTotal;
@@ -25,14 +29,17 @@ export default async function WorkforceCostPage() {
   const deptLateMinutes = db.departments.map((dept) => {
     const ids = new Set(db.employees.filter((e) => e.departmentId === dept.id).map((e) => e.id));
     const minutes = db.dailyAttendance
-      .filter((a) => ids.has(a.employeeId) && a.date.startsWith("2026-08"))
+      .filter((a) => ids.has(a.employeeId) && a.date.startsWith(monthPrefix))
       .reduce((sum, a) => sum + a.deductibleLateMinutes, 0);
     return { department: translateLabel(dept.name, locale), minutes };
   }).sort((a, b) => b.minutes - a.minutes);
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={t.workforceCost.title} description={t.workforceCost.description} />
+      <PageHeader
+        title={t.workforceCost.title}
+        description={format(t.workforceCost.description, { month: monthYearLabel(ym.year, ym.month, locale) })}
+      />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label={t.workforceCost.totalCost} value={formatEGP(totalCost, locale)} icon={Wallet} tone="primary" />

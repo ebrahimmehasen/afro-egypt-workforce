@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
 import { useT } from "@/components/providers/locale-provider";
+import { DEMO_MODE } from "@/lib/demo-mode";
 
 const initialState: LoginState = {};
 
@@ -40,8 +41,8 @@ export function LoginForm() {
           name="email"
           type="email"
           dir="ltr"
-          defaultValue="admin@404legends.demo"
-          placeholder="admin@404legends.demo"
+          defaultValue={DEMO_MODE ? "admin@404legends.demo" : undefined}
+          placeholder="name@company.com"
           required
         />
       </div>
@@ -52,7 +53,7 @@ export function LoginForm() {
           name="password"
           type="password"
           dir="ltr"
-          defaultValue="demo123"
+          defaultValue={DEMO_MODE ? "demo123" : undefined}
           placeholder="••••••••"
           required
         />

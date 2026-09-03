@@ -1,28 +1,28 @@
 import { getDb } from "@/lib/data";
-import { DEMO_DATE } from "@/lib/constants";
+import { today } from "@/lib/demo-mode";
 import { AttendanceStatus, DailyAttendance } from "@/lib/types";
 import { ATTENDANCE_STATUS_GROUPS } from "@/lib/attendance-engine";
 
-export async function getTodayAttendance(date: string = DEMO_DATE): Promise<DailyAttendance[]> {
+export async function getTodayAttendance(date: string = today()): Promise<DailyAttendance[]> {
   const db = await getDb();
   return db.dailyAttendance.filter((a) => a.date === date);
 }
 
-export async function getTodayKpis(date: string = DEMO_DATE) {
+export async function getTodayKpis(date: string = today()) {
   const db = await getDb();
-  const today = db.dailyAttendance.filter((a) => a.date === date);
+  const dayRecords = db.dailyAttendance.filter((a) => a.date === date);
   const totalEmployees = db.employees.filter((e) => e.status === "active").length;
 
-  const count = (status: AttendanceStatus) => today.filter((a) => a.status === status).length;
+  const count = (status: AttendanceStatus) => dayRecords.filter((a) => a.status === status).length;
 
   return {
     totalEmployees,
-    presentToday: today.filter((a) => ATTENDANCE_STATUS_GROUPS.present!.includes(a.status)).length,
+    presentToday: dayRecords.filter((a) => ATTENDANCE_STATUS_GROUPS.present!.includes(a.status)).length,
     absentToday: count("absent"),
     lateToday: count("late"),
-    onLeaveToday: today.filter((a) => ATTENDANCE_STATUS_GROUPS.leave!.includes(a.status)).length,
+    onLeaveToday: dayRecords.filter((a) => ATTENDANCE_STATUS_GROUPS.leave!.includes(a.status)).length,
     missingPunchToday: count("missing_punch"),
-    notYetRecorded: totalEmployees - today.length,
+    notYetRecorded: totalEmployees - dayRecords.length,
   };
 }
 
@@ -69,7 +69,7 @@ export async function getMonthlyKpis(year: number, month: number) {
   };
 }
 
-export async function getAttendanceTrend(days = 14, endDate: string = DEMO_DATE) {
+export async function getAttendanceTrend(days = 14, endDate: string = today()) {
   const db = await getDb();
   const end = new Date(`${endDate}T00:00:00`);
   const trend: { date: string; present: number; late: number; absent: number }[] = [];
@@ -90,12 +90,12 @@ export async function getAttendanceTrend(days = 14, endDate: string = DEMO_DATE)
   return trend;
 }
 
-export async function getAttendanceByDepartment(date: string = DEMO_DATE) {
+export async function getAttendanceByDepartment(date: string = today()) {
   const db = await getDb();
-  const today = db.dailyAttendance.filter((a) => a.date === date);
+  const dayRecords = db.dailyAttendance.filter((a) => a.date === date);
   return db.departments.map((dept) => {
     const deptEmployeeIds = db.employees.filter((e) => e.departmentId === dept.id).map((e) => e.id);
-    const records = today.filter((a) => deptEmployeeIds.includes(a.employeeId));
+    const records = dayRecords.filter((a) => deptEmployeeIds.includes(a.employeeId));
     const present = records.filter((a) => ATTENDANCE_STATUS_GROUPS.present!.includes(a.status)).length;
     return {
       department: dept.name,
@@ -106,7 +106,7 @@ export async function getAttendanceByDepartment(date: string = DEMO_DATE) {
   });
 }
 
-export async function getTopLateEmployees(limit = 5, days = 30, endDate: string = DEMO_DATE) {
+export async function getTopLateEmployees(limit = 5, days = 30, endDate: string = today()) {
   const db = await getDb();
   const end = new Date(`${endDate}T00:00:00`);
   const start = new Date(end);

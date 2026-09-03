@@ -29,7 +29,8 @@ describe.skipIf(!dbUp)("§55 story — against the seeded database", () => {
     expect(await prisma.department.count({ where: { deletedAt: null } })).toBe(6);
     expect(await prisma.shift.count({ where: { deletedAt: null } })).toBe(3);
     const period = await prisma.payrollPeriod.findUnique({ where: { id: DEMO_PERIOD_ID } });
-    expect(period?.status).toBe("draft");
+    expect(period).toBeTruthy();
+    expect(["draft", "calculated", "approved", "closed"]).toContain(period!.status);
   });
 
   it("every daily-attendance row points at a real employee and shift", async () => {

@@ -5,9 +5,11 @@ import {
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getDb } from "@/lib/data";
-import { DEMO_DATE, formatEGP } from "@/lib/constants";
-import { getT } from "@/lib/i18n";
+import { formatEGP } from "@/lib/constants";
+import { DEMO_MODE, today as todayDate, currentYearMonth } from "@/lib/demo-mode";
+import { getT, format } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
+import { monthName } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { displayUserName } from "@/lib/i18n/labels";
 import {
@@ -34,9 +36,12 @@ export default async function DashboardPage() {
     return <EmployeeDashboard employeeId={user.employeeId} userName={displayUserName(user, t)} />;
   }
 
-  const today = await getTodayKpis();
-  const monthly = await getMonthlyKpis(2026, 8);
-  const trend = await getAttendanceTrend(14);
+  const todayIso = todayDate();
+  const ym = currentYearMonth();
+  const monthPrefix = `${ym.year}-${String(ym.month).padStart(2, "0")}`;
+  const today = await getTodayKpis(todayIso);
+  const monthly = await getMonthlyKpis(ym.year, ym.month);
+  const trend = await getAttendanceTrend(14, todayIso);
   const byDept = (await getAttendanceByDepartment()).map((d) => ({ ...d, department: translateLabel(d.department, locale) }));
   const topLate = await getTopLateEmployees(5);
 
@@ -46,12 +51,14 @@ export default async function DashboardPage() {
         title={`${t.dashboard.welcome} ${displayUserName(user, t)}`}
         description={t.dashboard.overview}
         actions={
-          <Link href="/demo">
-            <Button size="lg" className="gap-2">
-              <PlayCircle className="h-4 w-4" />
-              {t.dashboard.runDemo}
-            </Button>
-          </Link>
+          DEMO_MODE ? (
+            <Link href="/demo">
+              <Button size="lg" className="gap-2">
+                <PlayCircle className="h-4 w-4" />
+                {t.dashboard.runDemo}
+              </Button>
+            </Link>
+          ) : undefined
         }
       />
 
@@ -62,41 +69,41 @@ export default async function DashboardPage() {
           value={today.presentToday}
           icon={UserCheck}
           tone="success"
-          href={`/attendance?date=${DEMO_DATE}&status=present`}
+          href={`/attendance?date=${todayIso}&status=present`}
         />
         <KpiCard
           label={t.dashboard.absentToday}
           value={today.absentToday}
           icon={UserX}
           tone="destructive"
-          href={`/attendance?date=${DEMO_DATE}&status=absent`}
+          href={`/attendance?date=${todayIso}&status=absent`}
         />
         <KpiCard
           label={t.dashboard.lateToday}
           value={today.lateToday}
           icon={Clock3}
           tone="warning"
-          href={`/attendance?date=${DEMO_DATE}&status=late`}
+          href={`/attendance?date=${todayIso}&status=late`}
         />
         <KpiCard
           label={t.dashboard.onLeaveToday}
           value={today.onLeaveToday}
           icon={CalendarClock}
           tone="primary"
-          href={`/attendance?date=${DEMO_DATE}&status=leave`}
+          href={`/attendance?date=${todayIso}&status=leave`}
         />
         <KpiCard
           label={t.dashboard.missingPunchToday}
           value={today.missingPunchToday}
           icon={Fingerprint}
           tone="warning"
-          href={`/attendance?date=${DEMO_DATE}&status=missing_punch`}
+          href={`/attendance?date=${todayIso}&status=missing_punch`}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
-          label={t.dashboard.totalPayrollMonth}
+          label={format(t.dashboard.totalPayrollMonth, { month: monthName(ym.month, locale) })}
           value={formatEGP(monthly.totalPayroll, locale)}
           icon={Wallet}
           tone="primary"
@@ -115,14 +122,14 @@ export default async function DashboardPage() {
           value={formatEGP(monthly.deductionsTotal, locale)}
           icon={MinusCircle}
           tone="destructive"
-          href="/deductions?month=2026-08"
+          href={`/deductions?month=${monthPrefix}`}
         />
         <KpiCard
           label={t.dashboard.absenceLateCost}
           value={formatEGP(monthly.absenceCost + monthly.lateCost, locale)}
           icon={TrendingDown}
           tone="warning"
-          href="/reports?tab=attendance&from=2026-08-01&to=2026-08-31&status=absent_late"
+          href={`/reports?tab=attendance&from=${monthPrefix}-01&to=${monthPrefix}-28&status=absent_late`}
         />
       </div>
 
@@ -130,7 +137,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>{t.dashboard.attendanceTrend}</CardTitle>
-            <CardDescription>{t.dashboard.attendanceTrendDesc} {DEMO_DATE}</CardDescription>
+            <CardDescription>{t.dashboard.attendanceTrendDesc} {todayIso}</CardDescription>
           </CardHeader>
           <CardContent>
             <AttendanceTrendChart data={trend} />
@@ -140,7 +147,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>{t.dashboard.attendanceByDept}</CardTitle>
-            <CardDescription>{t.dashboard.attendanceByDeptDesc} {DEMO_DATE}</CardDescription>
+            <CardDescription>{t.dashboard.attendanceByDeptDesc} {todayIso}</CardDescription>
           </CardHeader>
           <CardContent>
             <DepartmentAttendanceChart data={byDept} />
@@ -186,13 +193,15 @@ async function EmployeeDashboard({ employeeId, userName }: { employeeId: string;
   const db = await getDb();
   const t = await getT();
   const locale = await getLocale();
+  const todayIso = todayDate();
+  const ym = currentYearMonth();
   const employee = db.employees.find((e) => e.id === employeeId);
-  const today = db.dailyAttendance.find((a) => a.employeeId === employeeId && a.date === DEMO_DATE);
-  const period = db.payrollPeriods.find((p) => p.id === "PP-2026-08");
+  const today = db.dailyAttendance.find((a) => a.employeeId === employeeId && a.date === todayIso);
+  const period = db.payrollPeriods.find((p) => p.year === ym.year && p.month === ym.month);
   const payrollRecord = period
     ? db.payrollRecords.find((r) => r.employeeId === employeeId && r.periodId === period.id)
     : undefined;
-  const upcomingLeaves = db.leaves.filter((l) => l.employeeId === employeeId && l.status === "approved" && l.to >= DEMO_DATE);
+  const upcomingLeaves = db.leaves.filter((l) => l.employeeId === employeeId && l.status === "approved" && l.to >= todayIso);
   const timeFmt = (iso: string | null) =>
     iso ? new Date(iso).toLocaleTimeString(locale === "ar" ? "ar-EG" : "en-US", { hour: "2-digit", minute: "2-digit" }) : "—";
 

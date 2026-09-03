@@ -16,7 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Employee } from "@/lib/types";
-import { DEMO_DATE } from "@/lib/constants";
+import { today } from "@/lib/demo-mode";
 import { DEVICE_ID } from "@/lib/constants";
 
 function SubmitButton() {
@@ -79,7 +79,7 @@ export function SimulatePunchDialog({ employees }: { employees: Employee[] }) {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="date">{t.common.date}</Label>
-              <Input id="date" name="date" type="date" defaultValue={DEMO_DATE} required />
+              <Input id="date" name="date" type="date" defaultValue={today()} required />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="time">{t.common.time}</Label>

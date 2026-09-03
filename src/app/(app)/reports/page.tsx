@@ -8,6 +8,7 @@ import { AttendanceReport } from "@/components/reports/attendance-report";
 import { OvertimeReport } from "@/components/reports/overtime-report";
 import { DeductionsReport } from "@/components/reports/deductions-report";
 import { PayrollReport } from "@/components/reports/payroll-report";
+import { currentYearMonth } from "@/lib/demo-mode";
 
 export default async function ReportsPage({
   searchParams,
@@ -17,7 +18,9 @@ export default async function ReportsPage({
   const db = await getDb();
   const t = await getT();
   const locale = await getLocale();
-  const period = db.payrollPeriods.find((p) => p.id === "PP-2026-08") ?? db.payrollPeriods[0];
+  const ym = currentYearMonth();
+  const period =
+    db.payrollPeriods.find((p) => p.year === ym.year && p.month === ym.month) ?? db.payrollPeriods[0];
   const payrollRecords = period ? db.payrollRecords.filter((r) => r.periodId === period.id) : [];
   const sp = await searchParams;
   const initialTab = sp.tab ?? "attendance";

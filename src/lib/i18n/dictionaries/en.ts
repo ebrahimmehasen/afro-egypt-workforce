@@ -90,8 +90,8 @@ export const en: Dictionary = {
     tagline: "Attendance, workforce and payroll management in one system",
   },
   topbar: {
-    todayLabel: "System's current date (demo)",
-    demoDateHint: "System's current date (demo)",
+    todayLabel: "System date",
+    demoDateHint: "System date",
     logout: "Log out",
     language: "العربية",
   },
@@ -105,7 +105,7 @@ export const en: Dictionary = {
     lateToday: "Late Today",
     onLeaveToday: "On Leave",
     missingPunchToday: "Missing Punch",
-    totalPayrollMonth: "Total Payroll (August)",
+    totalPayrollMonth: "Total Payroll ({month})",
     payrollNotCalculated: "Payroll not calculated yet",
     approvedOvertime: "Approved Overtime",
     deductions: "Deductions",
@@ -442,7 +442,7 @@ export const en: Dictionary = {
   },
   workforceCost: {
     title: "Workforce Cost Analysis",
-    description: "Where labor cost is being lost — August 2026",
+    description: "Where labor cost is being lost — {month}",
     totalCost: "Total Workforce Cost",
     totalPayroll: "Total Payroll",
     overtime: "Overtime",

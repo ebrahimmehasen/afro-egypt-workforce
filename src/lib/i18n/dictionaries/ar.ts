@@ -90,8 +90,8 @@ export const ar: Dictionary = {
     tagline: "إدارة الحضور والعمالة والرواتب في نظام واحد",
   },
   topbar: {
-    todayLabel: "التاريخ الحالي للنظام (تجريبي)",
-    demoDateHint: "التاريخ الحالي للنظام (تجريبي)",
+    todayLabel: "تاريخ النظام",
+    demoDateHint: "تاريخ النظام",
     logout: "تسجيل الخروج",
     language: "English",
   },
@@ -105,7 +105,7 @@ export const ar: Dictionary = {
     lateToday: "المتأخر اليوم",
     onLeaveToday: "في إجازة",
     missingPunchToday: "بصمة ناقصة",
-    totalPayrollMonth: "إجمالي الرواتب (أغسطس)",
+    totalPayrollMonth: "إجمالي الرواتب ({month})",
     payrollNotCalculated: "لم يتم حساب الرواتب بعد",
     approvedOvertime: "الإضافي المعتمد",
     deductions: "الخصومات",
@@ -442,7 +442,7 @@ export const ar: Dictionary = {
   },
   workforceCost: {
     title: "تحليل تكلفة العمالة",
-    description: "أين تُفقد تكلفة العمالة — أغسطس 2026",
+    description: "أين تُفقد تكلفة العمالة — {month}",
     totalCost: "إجمالي تكلفة العمالة",
     totalPayroll: "إجمالي الرواتب",
     overtime: "الإضافي",

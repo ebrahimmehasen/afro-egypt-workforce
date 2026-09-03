@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { getDictionary } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
+import { DEMO_MODE } from "@/lib/demo-mode";
 
 export default async function LoginPage() {
   const locale = await getLocale();
@@ -57,7 +58,7 @@ export default async function LoginPage() {
           <div className="flex flex-col gap-2 text-center lg:text-start">
             <div className="flex items-center justify-center gap-2 lg:justify-start">
               <h2 className="text-2xl font-bold text-foreground">{t.login.heading}</h2>
-              <Badge variant="warning">{t.app.demoVersion}</Badge>
+              {DEMO_MODE && <Badge variant="warning">{t.app.demoVersion}</Badge>}
             </div>
             <p className="text-sm text-muted-foreground">
               {t.login.subDescription} {COMPANY.name}
@@ -66,11 +67,13 @@ export default async function LoginPage() {
 
           <LoginForm />
 
-          <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-            <p className="mb-1 font-semibold text-foreground">{t.login.demoCredentialsTitle}</p>
-            <p dir="ltr" className="text-start">Email: admin@404legends.demo</p>
-            <p dir="ltr" className="text-start">Password: demo123</p>
-          </div>
+          {DEMO_MODE && (
+            <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+              <p className="mb-1 font-semibold text-foreground">{t.login.demoCredentialsTitle}</p>
+              <p dir="ltr" className="text-start">Email: admin@404legends.demo</p>
+              <p dir="ltr" className="text-start">Password: demo123</p>
+            </div>
+          )}
 
           <div className="flex flex-col items-center gap-1 text-center text-xs text-muted-foreground lg:hidden">
             <p>{t.app.poweredBy}</p>
