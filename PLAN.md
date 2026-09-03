@@ -105,8 +105,15 @@
 - [x] `requireSession()` helper — الصفحات المحمية تعمل redirect لـ `/login` لو مفيش جلسة
 - [x] middleware بيقرا الدور من الكوكي (توجيه UX فقط؛ الفرض الحقيقي في الـ layout)
 - [x] **الـ seeds:** `npm run db:seed` = **الإنتاجي** (هيكل + admin واحد) · `npm run db:seed:sample` = 50 موظف وهمي + تاريخ منتهي **النهارده الحقيقي** + 4 حسابات (كلمة مرور `demo123`) — للاستكشاف فقط
-- [x] `tsc` + `lint` + `build` + 18/18 test — نضيفة · تحقّق: session signing + bcrypt ضد الـ DB الحقيقي · curl: `/demo`→404، `/dashboard` بدون كوكي→redirect، اللوجين خالي من عناصر الديمو
-- [ ] **متبقّي (المرحلة 6-ب):** صفحة إدارة المستخدمين (Admin) · فرض scoping المشرف بالكامل في selectors
+- [x] `tsc` + `lint` + `build` + 18/18 test — نضيفة · تحقّق: session signing + bcrypt ضد الـ DB الحقيقي · تشغيل إنتاجي (`npm start`) + دخول فعلي في المتصفح
+- [x] إصلاح: `SECURE_COOKIES=false` للتشغيل الإنتاجي خلف HTTP/بروكسي
+
+### المرحلة 6-ب — إدارة المستخدمين + فرض النطاق ✅ (اكتملت — فرع `feat/user-mgmt-scoping`)
+- [x] **`src/lib/scope.ts`** — `visibleEmployeeIds` / `scopeEmployees` / `scopeByEmployee` / `canSeeEmployee`. admin+hr = الكل · المشرف = قسمه فقط · الموظف = نفسه فقط
+- [x] فرض النطاق موحّد في: `/employees` · `/employees/[id]` (→404 لو برّا النطاق) · `/attendance` · `/leaves` · `/overtime` · `/reports` (الـ4 تبويبات) · **الداشبورد** (KPIs + الرسوم للمشرف مقصورة على قسمه عبر `scope` اختياري في الـ selectors)
+- [x] **صفحة `/users`** (admin فقط، بادج درع في القائمة) — جدول: الاسم/الإيميل/الدور/النطاق/الحالة/آخر دخول · إضافة مستخدم · تعديل (دور، تفعيل/تعطيل، ربط بموظف/قسم) · إعادة تعيين كلمة المرور
+- [x] `actions/users.ts` — `createUser` / `updateUser` / `resetUserPassword` (bcrypt، حارس `canManageUsers`، منع الأدمن يقفل على نفسه، تسجيل تدقيق) + `canManageUsers` في permissions + `/users` في nav الأدمن
+- [x] `tsc` + `lint` + `build` + 18/18 test نضيفة · تحقّق بسكربت: admin→الكل، مشرف DEP-1→20/50، موظف→نفسه، منع رؤية قسم آخر · create/update/delete مستخدم بـ bcrypt · تحقّق بالمتصفح: صفحة `/users` بالإنتاج + ديالوج الإضافة
 - [ ] **قرار للمستخدم:** يبدأ بالـ 50 موظف (`db:seed:sample`) ويعدّلهم، ولا `db:seed` ويدخّل موظفينه (استيراد CSV؟)
 
 ### المرحلة 7 — تثبيت وتجهيز النشر

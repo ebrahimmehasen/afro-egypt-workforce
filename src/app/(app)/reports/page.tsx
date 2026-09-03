@@ -1,4 +1,6 @@
 import { getDb } from "@/lib/data";
+import { requireSession } from "@/lib/auth";
+import { scopeByEmployee, scopeEmployees } from "@/lib/scope";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
 import { translateLabel } from "@/lib/i18n/data-labels";
@@ -16,12 +18,23 @@ export default async function ReportsPage({
   searchParams: Promise<{ tab?: string; from?: string; to?: string; status?: string }>;
 }) {
   const db = await getDb();
+  const user = await requireSession();
   const t = await getT();
   const locale = await getLocale();
   const ym = currentYearMonth();
   const period =
     db.payrollPeriods.find((p) => p.year === ym.year && p.month === ym.month) ?? db.payrollPeriods[0];
-  const payrollRecords = period ? db.payrollRecords.filter((r) => r.periodId === period.id) : [];
+
+  const employees = scopeEmployees(db.employees, user);
+  const dailyAttendance = scopeByEmployee(db.dailyAttendance, user, db.employees);
+  const overtime = scopeByEmployee(db.overtime, user, db.employees);
+  const deductions = scopeByEmployee(db.deductions, user, db.employees);
+  const payrollRecords = scopeByEmployee(
+    period ? db.payrollRecords.filter((r) => r.periodId === period.id) : [],
+    user,
+    db.employees,
+  );
+
   const sp = await searchParams;
   const initialTab = sp.tab ?? "attendance";
 
@@ -40,8 +53,8 @@ export default async function ReportsPage({
         <TabsContent value="attendance">
           <AttendanceReport
             key={`${sp.from ?? ""}:${sp.to ?? ""}:${sp.status ?? ""}`}
-            records={db.dailyAttendance}
-            employees={db.employees}
+            records={dailyAttendance}
+            employees={employees}
             departments={db.departments}
             initialFrom={sp.from}
             initialTo={sp.to}
@@ -49,13 +62,13 @@ export default async function ReportsPage({
           />
         </TabsContent>
         <TabsContent value="overtime">
-          <OvertimeReport records={db.overtime} employees={db.employees} />
+          <OvertimeReport records={overtime} employees={employees} />
         </TabsContent>
         <TabsContent value="deductions">
-          <DeductionsReport deductions={db.deductions} employees={db.employees} />
+          <DeductionsReport deductions={deductions} employees={employees} />
         </TabsContent>
         <TabsContent value="payroll">
-          <PayrollReport records={payrollRecords} employees={db.employees} periodLabel={translateLabel(period?.label ?? "-", locale)} />
+          <PayrollReport records={payrollRecords} employees={employees} periodLabel={translateLabel(period?.label ?? "-", locale)} />
         </TabsContent>
       </Tabs>
     </div>

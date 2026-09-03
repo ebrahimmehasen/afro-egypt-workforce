@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/data";
 import { requireSession } from "@/lib/auth";
+import { scopeByEmployee, scopeEmployees } from "@/lib/scope";
 import { canApprove } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
@@ -16,16 +17,8 @@ export default async function OvertimePage({
   const user = await requireSession();
   const t = await getT();
 
-  let employees = db.employees;
-  let records = db.overtime;
-  if (user.role === "employee" && user.employeeId) {
-    employees = employees.filter((e) => e.id === user.employeeId);
-    records = records.filter((o) => o.employeeId === user.employeeId);
-  } else if (user.role === "supervisor" && user.departmentId) {
-    employees = employees.filter((e) => e.departmentId === user.departmentId);
-    const ids = new Set(employees.map((e) => e.id));
-    records = records.filter((o) => ids.has(o.employeeId));
-  }
+  const employees = scopeEmployees(db.employees, user);
+  const records = scopeByEmployee(db.overtime, user, db.employees);
 
   const sorted = [...records].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
