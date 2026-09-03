@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Building2, Clock, IdCard, Calendar } from "lucide-react";
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
-import { canSeeEmployee } from "@/lib/scope";
+import { inScope, viewerScope } from "@/lib/scope";
 import { formatEGP } from "@/lib/constants";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
@@ -26,7 +26,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   const locale = await getLocale();
   const { id } = await params;
   const employee = db.employees.find((e) => e.id === id);
-  if (!employee || !canSeeEmployee(user, id, db.employees)) notFound();
+  if (!employee || !inScope(viewerScope(user, db.employees), id)) notFound();
 
   const department = db.departments.find((d) => d.id === employee.departmentId);
   const shift = db.shifts.find((s) => s.id === employee.shiftId);

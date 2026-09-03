@@ -1,7 +1,5 @@
 import {
   Allowance,
-  AttendanceLog,
-  AuditLogEntry,
   AttendanceSettings,
   CompanySettings,
   DailyAttendance,
@@ -16,12 +14,17 @@ import {
   Shift,
 } from "@/lib/types";
 
-/** Read-model snapshot shape. Hydrated from the database by `getDb()` in @/lib/data. */
+/**
+ * Read-model snapshot shape, hydrated from the database by `getDb()` in
+ * @/lib/data. Deliberately excludes the two unbounded append-only tables —
+ * raw `AttendanceLog` punches and the `AuditLogEntry` trail: their single
+ * consumers (the attendance and audit-log pages) query them directly, with a
+ * date / row bound, so the snapshot cost does not grow with history.
+ */
 export interface Store {
   employees: Employee[];
   departments: Department[];
   shifts: Shift[];
-  attendanceLogs: AttendanceLog[]; // immutable raw punches
   dailyAttendance: DailyAttendance[]; // calculated, correctable
   leaves: Leave[];
   overtime: Overtime[];
@@ -29,7 +32,6 @@ export interface Store {
   allowances: Allowance[];
   payrollPeriods: PayrollPeriod[];
   payrollRecords: PayrollRecord[];
-  auditLog: AuditLogEntry[];
   companySettings: CompanySettings;
   attendanceSettings: AttendanceSettings;
   payrollSettings: PayrollSettings;

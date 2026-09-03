@@ -1,40 +1,58 @@
 import { Employee, User } from "@/lib/types";
+import { Store } from "@/lib/store";
 
 /**
- * Row-level visibility. admin / hr see everyone; a supervisor sees only their
- * own department; an employee sees only themselves; anything else sees nothing.
+ * Row-level visibility — the single seam for "what may this user see?".
  *
- * `null` means "no restriction" (see all).
+ * `{ all: true }`  → the whole company (admin / hr).
+ * `{ all: false }` → only employees whose id is in `ids` (a supervisor sees
+ *                    their department, an employee sees only themselves, any
+ *                    other role sees nothing).
+ *
+ * Every read entry point takes a `Scope` as its first argument, so a scoped
+ * read cannot be forgotten. Build one with `viewerScope(user, employees)`.
  */
-export function visibleEmployeeIds(user: User, allEmployees: Employee[]): string[] | null {
-  if (user.role === "admin" || user.role === "hr") return null;
+export type Scope = { all: true } | { all: false; ids: ReadonlySet<string> };
+
+export function viewerScope(user: User, allEmployees: Employee[]): Scope {
+  if (user.role === "admin" || user.role === "hr") return { all: true };
   if (user.role === "supervisor" && user.departmentId) {
-    return allEmployees.filter((e) => e.departmentId === user.departmentId).map((e) => e.id);
+    const ids = allEmployees
+      .filter((e) => e.departmentId === user.departmentId)
+      .map((e) => e.id);
+    return { all: false, ids: new Set(ids) };
   }
-  if (user.role === "employee" && user.employeeId) return [user.employeeId];
-  return [];
+  if (user.role === "employee" && user.employeeId) {
+    return { all: false, ids: new Set([user.employeeId]) };
+  }
+  return { all: false, ids: new Set() };
 }
 
-export function scopeEmployees(employees: Employee[], user: User): Employee[] {
-  const ids = visibleEmployeeIds(user, employees);
-  if (ids === null) return employees;
-  const set = new Set(ids);
-  return employees.filter((e) => set.has(e.id));
+export function inScope(scope: Scope, employeeId: string): boolean {
+  return scope.all || scope.ids.has(employeeId);
 }
 
-/** Filter any list of `{ employeeId }` rows down to what the user may see. */
-export function scopeByEmployee<T extends { employeeId: string }>(
-  rows: T[],
-  user: User,
-  allEmployees: Employee[],
-): T[] {
-  const ids = visibleEmployeeIds(user, allEmployees);
-  if (ids === null) return rows;
-  const set = new Set(ids);
-  return rows.filter((r) => set.has(r.employeeId));
+/** Narrow an employee list to the scope. */
+export function employeesInScope(scope: Scope, employees: Employee[]): Employee[] {
+  return scope.all ? employees : employees.filter((e) => scope.ids.has(e.id));
 }
 
-export function canSeeEmployee(user: User, employeeId: string, allEmployees: Employee[]): boolean {
-  const ids = visibleEmployeeIds(user, allEmployees);
-  return ids === null || ids.includes(employeeId);
+/** Narrow any list of employee-keyed rows to the scope. */
+export function rowsInScope<T extends { employeeId: string }>(scope: Scope, rows: T[]): T[] {
+  return scope.all ? rows : rows.filter((r) => scope.ids.has(r.employeeId));
+}
+
+/** A read-model snapshot with every employee-keyed collection narrowed to the scope. */
+export function scopedSnapshot(scope: Scope, db: Store): Store {
+  if (scope.all) return db;
+  return {
+    ...db,
+    employees: employeesInScope(scope, db.employees),
+    dailyAttendance: rowsInScope(scope, db.dailyAttendance),
+    leaves: rowsInScope(scope, db.leaves),
+    overtime: rowsInScope(scope, db.overtime),
+    deductions: rowsInScope(scope, db.deductions),
+    allowances: rowsInScope(scope, db.allowances),
+    payrollRecords: rowsInScope(scope, db.payrollRecords),
+  };
 }

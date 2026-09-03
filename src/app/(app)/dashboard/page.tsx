@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { getDb } from "@/lib/data";
-import { visibleEmployeeIds } from "@/lib/scope";
+import { viewerScope } from "@/lib/scope";
 import { formatEGP } from "@/lib/constants";
 import { today as todayDate, currentYearMonth } from "@/lib/today";
 import { getT, format } from "@/lib/i18n";
@@ -41,13 +41,13 @@ export default async function DashboardPage() {
   const monthPrefix = `${ym.year}-${String(ym.month).padStart(2, "0")}`;
 
   const db = await getDb();
-  const scope = visibleEmployeeIds(user, db.employees); // null for admin/hr
+  const scope = viewerScope(user, db.employees); // { all: true } for admin/hr
 
-  const today = await getTodayKpis(todayIso, scope);
-  const monthly = await getMonthlyKpis(ym.year, ym.month, scope);
-  const trend = await getAttendanceTrend(14, todayIso, scope);
-  const byDept = (await getAttendanceByDepartment(todayIso, scope)).map((d) => ({ ...d, department: translateLabel(d.department, locale) }));
-  const topLate = await getTopLateEmployees(5, 30, todayIso, scope);
+  const today = await getTodayKpis(scope, todayIso);
+  const monthly = await getMonthlyKpis(scope, ym.year, ym.month);
+  const trend = await getAttendanceTrend(scope, 14, todayIso);
+  const byDept = (await getAttendanceByDepartment(scope, todayIso)).map((d) => ({ ...d, department: translateLabel(d.department, locale) }));
+  const topLate = await getTopLateEmployees(scope, 5, 30, todayIso);
 
   return (
     <div className="flex flex-col gap-6">

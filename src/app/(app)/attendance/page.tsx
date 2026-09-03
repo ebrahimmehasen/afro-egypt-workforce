@@ -1,6 +1,6 @@
-import { getDb } from "@/lib/data";
+import { getDb, getAttendanceLogsForDate } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
-import { scopeEmployees } from "@/lib/scope";
+import { employeesInScope, viewerScope } from "@/lib/scope";
 import { canCorrectAttendance } from "@/lib/permissions";
 import { today } from "@/lib/today";
 import { getT } from "@/lib/i18n";
@@ -27,12 +27,13 @@ export default async function AttendancePage({
   const t = await getT();
   const canCorrect = canCorrectAttendance(user.role);
 
-  const employees = scopeEmployees(db.employees, user).filter((e) => e.status === "active");
+  const scope = viewerScope(user, db.employees);
+  const employees = employeesInScope(scope, db.employees).filter((e) => e.status === "active");
   const employeeIds = new Set(employees.map((e) => e.id));
   const canSimulate = user.role !== "employee";
 
   const records = db.dailyAttendance.filter((a) => a.date === date && employeeIds.has(a.employeeId));
-  const logs = db.attendanceLogs.filter((l) => l.timestamp.startsWith(date) && employeeIds.has(l.employeeId));
+  const logs = await getAttendanceLogsForDate(date, employeeIds);
   const summary = attendanceSummary(records);
 
   return (

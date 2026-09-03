@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
-import { scopeByEmployee, scopeEmployees } from "@/lib/scope";
+import { employeesInScope, rowsInScope, viewerScope } from "@/lib/scope";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
 import { translateLabel } from "@/lib/i18n/data-labels";
@@ -25,14 +25,14 @@ export default async function ReportsPage({
   const period =
     db.payrollPeriods.find((p) => p.year === ym.year && p.month === ym.month) ?? db.payrollPeriods[0];
 
-  const employees = scopeEmployees(db.employees, user);
-  const dailyAttendance = scopeByEmployee(db.dailyAttendance, user, db.employees);
-  const overtime = scopeByEmployee(db.overtime, user, db.employees);
-  const deductions = scopeByEmployee(db.deductions, user, db.employees);
-  const payrollRecords = scopeByEmployee(
+  const scope = viewerScope(user, db.employees);
+  const employees = employeesInScope(scope, db.employees);
+  const dailyAttendance = rowsInScope(scope, db.dailyAttendance);
+  const overtime = rowsInScope(scope, db.overtime);
+  const deductions = rowsInScope(scope, db.deductions);
+  const payrollRecords = rowsInScope(
+    scope,
     period ? db.payrollRecords.filter((r) => r.periodId === period.id) : [],
-    user,
-    db.employees,
   );
 
   const sp = await searchParams;

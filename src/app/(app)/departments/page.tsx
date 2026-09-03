@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
+import { viewerScope } from "@/lib/scope";
 import { canManageSettings, canCorrectAttendance } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
 import { getAttendanceByDepartment } from "@/lib/selectors";
@@ -18,7 +19,7 @@ export default async function DepartmentsPage() {
   const t = await getT();
   const locale = await getLocale();
   const canEdit = canCorrectAttendance(user.role);
-  const rates = await getAttendanceByDepartment();
+  const rates = await getAttendanceByDepartment(viewerScope(user, db.employees));
 
   const rows = db.departments.map((dept) => {
     const employees = db.employees.filter((e) => e.departmentId === dept.id);
