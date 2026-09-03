@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/data";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
 import { canManageSettings, canCorrectAttendance } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
 import { getAttendanceByDepartment } from "@/lib/selectors";
@@ -14,7 +14,7 @@ import { Building2, Users, Wallet, Percent } from "lucide-react";
 
 export default async function DepartmentsPage() {
   const db = await getDb();
-  const user = (await getSession())!;
+  const user = await requireSession();
   const t = await getT();
   const locale = await getLocale();
   const canEdit = canCorrectAttendance(user.role);

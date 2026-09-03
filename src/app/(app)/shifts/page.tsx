@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/data";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
 import { canManageSettings } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
@@ -12,7 +12,7 @@ import { Clock } from "lucide-react";
 
 export default async function ShiftsPage() {
   const db = await getDb();
-  const user = (await getSession())!;
+  const user = await requireSession();
   const t = await getT();
   const locale = await getLocale();
   const canEdit = canManageSettings(user.role) || user.role === "hr";

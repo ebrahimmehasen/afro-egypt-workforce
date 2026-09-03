@@ -1,12 +1,14 @@
 /**
- * Database seed — mirrors the in-memory demo seed (src/lib/seed.ts) exactly:
- * same 6 departments, 3 shifts, 50 employees (8 scripted), 13 days of history,
- * the scripted "today" (2026-08-21) scenarios, one draft payroll period for
- * August 2026, and the demo login accounts (now with hashed passwords).
+ * SAMPLE data seed — a full fictional org to explore the app with: 6 departments,
+ * 3 shifts, 50 employees (8 scripted), ~13 working days of history ending
+ * yesterday, scripted scenarios for "today", a draft payroll period for the
+ * current month, and 4 login accounts (password: demo123).
+ *
+ * This is NOT the production seed. For a real deployment use
+ * `npm run db:seed:prod` instead (org structure + one admin, no fake data).
  *
  * Idempotent: wipes every table first, then re-inserts. Safe to re-run.
- *
- * Run with:  npm run db:seed   (needs a reachable MySQL + `prisma migrate`)
+ *   npm run db:seed:sample
  */
 import { PrismaClient, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -16,8 +18,13 @@ import type { AttendanceLog, Shift } from "../src/lib/types";
 
 const prisma = new PrismaClient();
 
-const DEMO_DATE = "2026-08-21";
-const DEVICE_ID = "ZK-DEMO-01";
+// "today" for the sample data = the real current date, so the dashboard lands populated.
+const now = new Date();
+const DEMO_DATE = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+const CUR_YEAR = now.getFullYear();
+const CUR_MONTH = now.getMonth() + 1;
+const MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+const DEVICE_ID = "ZK-01";
 
 const DEPARTMENT_NAMES = ["الإنتاج", "المخازن", "الصيانة", "الأمن", "الموارد البشرية", "الحسابات"] as const;
 
@@ -385,7 +392,13 @@ async function main() {
   });
 
   await prisma.payrollPeriod.create({
-    data: { id: "PP-2026-08", label: "أغسطس 2026", year: 2026, month: 8, status: "draft" },
+    data: {
+      id: `PP-${CUR_YEAR}-${String(CUR_MONTH).padStart(2, "0")}`,
+      label: `${MONTHS_AR[CUR_MONTH - 1]} ${CUR_YEAR}`,
+      year: CUR_YEAR,
+      month: CUR_MONTH,
+      status: "draft",
+    },
   });
 
   await prisma.auditLogEntry.createMany({

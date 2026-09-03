@@ -1,12 +1,12 @@
 import Link from "next/link";
 import {
   Users, UserCheck, UserX, Clock3, CalendarClock, Fingerprint,
-  Wallet, TimerReset, MinusCircle, TrendingDown, PlayCircle,
+  Wallet, TimerReset, MinusCircle, TrendingDown,
 } from "lucide-react";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
 import { getDb } from "@/lib/data";
 import { formatEGP } from "@/lib/constants";
-import { DEMO_MODE, today as todayDate, currentYearMonth } from "@/lib/demo-mode";
+import { today as todayDate, currentYearMonth } from "@/lib/today";
 import { getT, format } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
 import { monthName } from "@/lib/i18n/format";
@@ -22,13 +22,12 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { AttendanceTrendChart, DepartmentAttendanceChart } from "@/components/dashboard/charts";
 import { Badge } from "@/components/ui/badge";
 import { AttendanceStatusBadge } from "@/components/shared/status-badge";
 
 export default async function DashboardPage() {
-  const user = (await getSession())!;
+  const user = await requireSession();
   const t = await getT();
   const locale = await getLocale();
 
@@ -50,16 +49,6 @@ export default async function DashboardPage() {
       <PageHeader
         title={`${t.dashboard.welcome} ${displayUserName(user, t)}`}
         description={t.dashboard.overview}
-        actions={
-          DEMO_MODE ? (
-            <Link href="/demo">
-              <Button size="lg" className="gap-2">
-                <PlayCircle className="h-4 w-4" />
-                {t.dashboard.runDemo}
-              </Button>
-            </Link>
-          ) : undefined
-        }
       />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">

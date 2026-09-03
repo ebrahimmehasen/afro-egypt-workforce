@@ -8,7 +8,7 @@ import { AttendanceReport } from "@/components/reports/attendance-report";
 import { OvertimeReport } from "@/components/reports/overtime-report";
 import { DeductionsReport } from "@/components/reports/deductions-report";
 import { PayrollReport } from "@/components/reports/payroll-report";
-import { currentYearMonth } from "@/lib/demo-mode";
+import { currentYearMonth } from "@/lib/today";
 
 export default async function ReportsPage({
   searchParams,

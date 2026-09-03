@@ -17,7 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Employee, LeaveType } from "@/lib/types";
-import { today } from "@/lib/demo-mode";
+import { today } from "@/lib/today";
 
 function SubmitButton() {
   const { pending } = useFormStatus();

@@ -2,7 +2,7 @@
 
 import { Bell, LogOut, Menu } from "lucide-react";
 import { User } from "@/lib/types";
-import { DEMO_MODE, today } from "@/lib/demo-mode";
+import { today } from "@/lib/today";
 import { roleLabel, displayUserName } from "@/lib/i18n/labels";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
@@ -47,10 +47,6 @@ export function Topbar({ user, onMenuClick }: { user: User; onMenuClick?: () => 
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        {DEMO_MODE && (
-          <Badge variant="warning" className="hidden sm:inline-flex">{t.app.demoMode}</Badge>
-        )}
-
         <LanguageSwitcher />
 
         <Button variant="ghost" size="icon" className="relative">

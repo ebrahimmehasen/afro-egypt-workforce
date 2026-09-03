@@ -1,8 +1,8 @@
 import { getDb } from "@/lib/data";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
 import { canEditPayroll } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
-import { currentYearMonth } from "@/lib/demo-mode";
+import { currentYearMonth } from "@/lib/today";
 import { getT, format } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
 import { payrollPeriodStatusLabel } from "@/lib/i18n/labels";
@@ -32,7 +32,7 @@ export default async function PayrollPage({
   searchParams: Promise<{ period?: string }>;
 }) {
   const db = await getDb();
-  const user = (await getSession())!;
+  const user = await requireSession();
   const t = await getT();
   const locale = await getLocale();
   const canEdit = canEditPayroll(user.role);

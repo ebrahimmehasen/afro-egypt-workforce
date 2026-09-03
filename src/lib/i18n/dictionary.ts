@@ -5,8 +5,6 @@ export interface Dictionary {
     subtitle: string;
     poweredBy: string;
     slogan: string;
-    demoMode: string;
-    demoVersion: string;
   };
   common: {
     save: string;
@@ -84,19 +82,16 @@ export interface Dictionary {
     submit: string;
     submitting: string;
     error: string;
-    demoCredentialsTitle: string;
     tagline: string;
   };
   topbar: {
     todayLabel: string;
-    demoDateHint: string;
     logout: string;
     language: string;
   };
   dashboard: {
     welcome: string;
     overview: string;
-    runDemo: string;
     totalEmployees: string;
     presentToday: string;
     absentToday: string;
@@ -491,51 +486,6 @@ export interface Dictionary {
     savedCompany: string;
     savedAttendance: string;
     savedPayroll: string;
-  };
-  demo: {
-    title: string;
-    description: string;
-    step1Title: string;
-    step1Desc: string;
-    step2Title: string;
-    step2Desc: string;
-    step3Title: string;
-    step3Desc: string;
-    step4Title: string;
-    step4Desc: string;
-    step5Title: string;
-    step5Desc: string;
-    step6Title: string;
-    step6Desc: string;
-    step7Title: string;
-    step7Desc: string;
-    step8Title: string;
-    step8Desc: string;
-    step9Title: string;
-    step9Desc: string;
-    step10Title: string;
-    step10Desc: string;
-    step11Title: string;
-    step11Desc: string;
-    next: string;
-    running: string;
-    restart: string;
-    openWorkforceCost: string;
-    fieldEmployee: string;
-    fieldDepartment: string;
-    fieldIn: string;
-    fieldStatus: string;
-    fieldDeductibleLate: string;
-    fieldOut: string;
-    fieldWorkedHours: string;
-    fieldOvertime: string;
-    fieldDeductionsAdded: string;
-    fieldGross: string;
-    fieldTotalDeductions: string;
-    fieldNetSalary: string;
-    pending: string;
-    approved: string;
-    stepDone: string;
   };
   statuses: {
     present: string;

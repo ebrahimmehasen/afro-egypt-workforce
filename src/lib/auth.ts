@@ -1,71 +1,29 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { User } from "@/lib/types";
+import { decodeSession, encodeSession } from "@/lib/session";
 
 const SESSION_COOKIE = "afro_egypt_session";
-
-export interface DemoCredential {
-  email: string;
-  password: string;
-  user: User;
-}
-
-export const DEMO_USERS: DemoCredential[] = [
-  {
-    email: "admin@404legends.demo",
-    password: "demo123",
-    user: { id: "USR-1", name: "مدير النظام", email: "admin@404legends.demo", role: "admin" },
-  },
-  {
-    email: "hr@afroegypt.demo",
-    password: "demo123",
-    user: { id: "USR-2", name: "Ahmed HR", email: "hr@afroegypt.demo", role: "hr" },
-  },
-  {
-    email: "supervisor@afroegypt.demo",
-    password: "demo123",
-    user: {
-      id: "USR-3",
-      name: "مشرف الإنتاج",
-      email: "supervisor@afroegypt.demo",
-      role: "supervisor",
-      departmentId: "DEP-1",
-    },
-  },
-  {
-    email: "ahmed@afroegypt.demo",
-    password: "demo123",
-    user: {
-      id: "USR-4",
-      name: "أحمد علي",
-      email: "ahmed@afroegypt.demo",
-      role: "employee",
-      employeeId: "EMP-1001",
-    },
-  },
-];
-
-export function findCredential(email: string, password: string): DemoCredential | undefined {
-  return DEMO_USERS.find(
-    (c) => c.email.toLowerCase() === email.trim().toLowerCase() && c.password === password,
-  );
-}
+const MAX_AGE = 60 * 60 * 8; // 8 hours
 
 export async function getSession(): Promise<User | null> {
-  const raw = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as User;
-  } catch {
-    return null;
-  }
+  return decodeSession((await cookies()).get(SESSION_COOKIE)?.value);
+}
+
+/** Use in server components that must have a session — redirects to /login if not. */
+export async function requireSession(): Promise<User> {
+  const user = await getSession();
+  if (!user) redirect("/login");
+  return user;
 }
 
 export async function setSessionCookie(user: User) {
-  (await cookies()).set(SESSION_COOKIE, JSON.stringify(user), {
+  (await cookies()).set(SESSION_COOKIE, encodeSession(user), {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24, // 1 day — demo session
+    maxAge: MAX_AGE,
   });
 }
 

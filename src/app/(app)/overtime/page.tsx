@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/data";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
 import { canApprove } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
@@ -13,7 +13,7 @@ export default async function OvertimePage({
 }) {
   const initialStatus = (await searchParams).status ?? "all";
   const db = await getDb();
-  const user = (await getSession())!;
+  const user = await requireSession();
   const t = await getT();
 
   let employees = db.employees;

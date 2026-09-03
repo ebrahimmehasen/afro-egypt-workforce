@@ -16,7 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Employee } from "@/lib/types";
-import { today } from "@/lib/demo-mode";
+import { today } from "@/lib/today";
 import { DEVICE_ID } from "@/lib/constants";
 
 function SubmitButton() {

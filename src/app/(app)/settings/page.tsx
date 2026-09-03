@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/data";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
 import { canManageSettings } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
@@ -9,7 +9,7 @@ import { CompanySettingsForm, AttendanceSettingsForm, PayrollSettingsForm } from
 import { Card, CardContent } from "@/components/ui/card";
 
 export default async function SettingsPage() {
-  const user = (await getSession())!;
+  const user = await requireSession();
   if (!canManageSettings(user.role)) redirect("/dashboard");
 
   const db = await getDb();

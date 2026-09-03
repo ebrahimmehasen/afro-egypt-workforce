@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { FileBarChart } from "lucide-react";
 import { DailyAttendance, Department, Employee } from "@/lib/types";
-import { today } from "@/lib/demo-mode";
+import { today } from "@/lib/today";
 import { attendanceStatusLabel } from "@/lib/i18n/labels";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { useLocale, useT } from "@/components/providers/locale-provider";

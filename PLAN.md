@@ -96,25 +96,18 @@
 - [x] **اختبار فعلي على MySQL:** كل الاختبارات 18/18 (بما فيها الـ integration ضد DB حقيقي) · فحص متصفح: login → dashboard → **حساب رواتب 50 موظف (563,532 ج.م) عبر `$transaction`** → فتح فترة سبتمبر → تبديل الفترة → **حذف ناعم مؤكّد في الـ DB** (الصف باقٍ، `deletedAt` متسجّل، مستبعد من الـ UI) → سجل التدقيق بيكتب فعليًا
 - [x] **`/api/punch` مختبر بـ curl:** بصمة دخول → `missing_punch` · مفتاح غلط → 401 · بصمة خروج → `late` (استنتاج in/out شغّال)
 
-### المرحلة 6 — المصادقة الحقيقية
-- [ ] جدول `User` (email, passwordHash, role, employeeId?, departmentId?, active)
-- [ ] `bcrypt` للتحقق + hashing
-- [ ] كوكي جلسة موقّع (`iron-session` أو JWT بمفتاح `.env`) بدل JSON خام
-- [ ] صفحة "إدارة المستخدمين" (Admin فقط): إضافة/تعطيل مستخدم، ربطه بموظف، تغيير دور
-- [ ] فرض scoping المشرف (قسمه فقط) في `selectors` + الصفحات
-- [ ] seed: نفس الـ 4 حسابات التجريبية بكلمات مرور مشفّرة (للاستمرارية)
-
-### المرحلة 6.5 — الخروج من "وضع الديمو" ✅ (اكتملت — فرع `feat/demo-mode-flag`)
-> **ليه كان لسه موجود:** "DEMO MODE" مش مجرد بادج. `DEMO_DATE = "2026-08-21"` كان مستخدم في ~14 مكان كـ "النهارده". لو حوّلناه لـ `new Date()` من غير flag، الداشبورد يبقى فاضي (مفيش حضور للنهارده الحقيقي). فالحل flag مش حذف.
-- [x] **`NEXT_PUBLIC_DEMO_MODE`** في `.env` (افتراضي `false` للإنتاج) + helper `src/lib/demo-mode.ts` (`DEMO_MODE`, `today()`, `currentYearMonth()`)
-      - `true`: النهارده = `2026-08-21` · بادج "DEMO MODE" + "DEMO VERSION" · بيانات الدخول مملّاة على اللوجين · زر العرض التجريبي · `/demo` شغّال
-      - `false`: النهارده = `new Date()` · مفيش بادجات · حقول اللوجين فاضية · `/demo` → **404** · التوب بار "تاريخ النظام" بدل "(تجريبي)"
-- [x] كل استخدامات `DEMO_DATE` كـ "النهارده" اتحوّلت لـ `today()` / `currentYearMonth()` (selectors, dashboard, attendance, workforce-cost, reports, payroll, 4 فورمات، تقرير الحضور)
-- [x] KPIs الشهر + labels الشهر بقت ديناميكية (`monthName` / `monthYearLabel` — "سبتمبر" بدل "أغسطس" المثبّت)
-- [x] `payroll` / `reports` بيدوّروا على فترة الشهر الحالي، مش `PP-2026-08` مثبّت
-- [x] **seed إنتاجي:** `prisma/seed-prod.ts` + `npm run db:seed:prod` — 6 أقسام + 3 ورديات + الإعدادات + جهاز + مستخدم admin واحد (`ADMIN_EMAIL`/`ADMIN_PASSWORD` من env). بدون موظفين/حضور/رواتب وهمية. upsert (آمن للتكرار)
-- [x] `tsc` + `lint` + `build` + 18/18 test — نضيفة · متحقّق في المتصفح: الوضعين (on/off)
-- [ ] **قرار للمستخدم لاحقًا:** يبدأ الإنتاج بالـ 50 موظف الوهميين ويعدّلهم، ولا `db:seed:prod` ويدخّل موظفينه (نضيف استيراد CSV؟)
+### المرحلة 6 — المصادقة الحقيقية + إزالة وضع الديمو نهائيًا ✅ (اكتملت — فرع `feat/remove-demo-real-auth`)
+> المستخدم قرر: النظام حقيقي مش ديمو → **وضع الديمو اتشال بالكامل** (مش flag).
+- [x] **إزالة الديمو:** اتحذف `/demo` + `demo-runner` + `actions/demo.ts` + `demo-mode.ts` + كل البادجات + بيانات الدخول على اللوجين + `DEMO_DATE`/`DEMO_EMPLOYEE_ID`/`DEMO_PERIOD_ID` + قسم `demo` في القواميس
+- [x] **`src/lib/today.ts`** — `today()` / `currentYearMonth()` بالساعة الحقيقية فقط
+- [x] **تسجيل دخول حقيقي:** `loginAction` بيدوّر على `User` بالإيميل → يتأكد `active` → `bcrypt.compare` → يحدّث `lastLoginAt` → جلسة. مفيش `DEMO_USERS` ولا كلمات مرور نصّية
+- [x] **كوكي جلسة موقّع:** `src/lib/session.ts` — `base64url(json).HMAC-SHA256` بمفتاح `SESSION_SECRET` (مطلوب، التطبيق بيرفض يشتغل من غيره). كوكي متلاعب فيه → مرفوض. `httpOnly` + `secure` في الإنتاج + 8 ساعات
+- [x] `requireSession()` helper — الصفحات المحمية تعمل redirect لـ `/login` لو مفيش جلسة
+- [x] middleware بيقرا الدور من الكوكي (توجيه UX فقط؛ الفرض الحقيقي في الـ layout)
+- [x] **الـ seeds:** `npm run db:seed` = **الإنتاجي** (هيكل + admin واحد) · `npm run db:seed:sample` = 50 موظف وهمي + تاريخ منتهي **النهارده الحقيقي** + 4 حسابات (كلمة مرور `demo123`) — للاستكشاف فقط
+- [x] `tsc` + `lint` + `build` + 18/18 test — نضيفة · تحقّق: session signing + bcrypt ضد الـ DB الحقيقي · curl: `/demo`→404، `/dashboard` بدون كوكي→redirect، اللوجين خالي من عناصر الديمو
+- [ ] **متبقّي (المرحلة 6-ب):** صفحة إدارة المستخدمين (Admin) · فرض scoping المشرف بالكامل في selectors
+- [ ] **قرار للمستخدم:** يبدأ بالـ 50 موظف (`db:seed:sample`) ويعدّلهم، ولا `db:seed` ويدخّل موظفينه (استيراد CSV؟)
 
 ### المرحلة 7 — تثبيت وتجهيز النشر
 - [x] `.env.example` (DATABASE_URL, SESSION_SECRET, PUNCH_API_KEY)

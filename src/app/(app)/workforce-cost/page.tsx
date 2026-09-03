@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/data";
 import { formatEGP } from "@/lib/constants";
-import { currentYearMonth } from "@/lib/demo-mode";
+import { currentYearMonth } from "@/lib/today";
 import { getMonthlyKpis, getTopLateEmployees, getWorkforceCostByDepartment } from "@/lib/selectors";
 import { getT, format } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";

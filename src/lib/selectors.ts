@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/data";
-import { today } from "@/lib/demo-mode";
+import { today } from "@/lib/today";
 import { AttendanceStatus, DailyAttendance } from "@/lib/types";
 import { ATTENDANCE_STATUS_GROUPS } from "@/lib/attendance-engine";
 

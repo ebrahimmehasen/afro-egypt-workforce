@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/data";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
 import { canCorrectAttendance } from "@/lib/permissions";
-import { today } from "@/lib/demo-mode";
+import { today } from "@/lib/today";
 import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,7 +22,7 @@ export default async function AttendancePage({
   const date = dateParam ?? today();
   const initialStatus = statusParam ?? "all";
   const db = await getDb();
-  const user = (await getSession())!;
+  const user = await requireSession();
   const t = await getT();
   const canCorrect = canCorrectAttendance(user.role);
 

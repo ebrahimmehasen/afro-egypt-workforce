@@ -8,12 +8,8 @@ export const COMPANY = {
   logo: "/brand/afro-egypt-logo.jpg",
 } as const;
 
-export const DEMO_DATE = "2026-08-21"; // fixed demo "today"
-export const DEMO_EMPLOYEE_ID = "EMP-1001";
-export const DEMO_PERIOD_ID = "PP-2026-08";
-
-/** Seeded biometric device id (see prisma/seed.ts). */
-export const DEVICE_ID = "ZK-DEMO-01";
+/** Default biometric device id, prefilled in the manual punch form (see prisma/seed-prod.ts). */
+export const DEVICE_ID = "ZK-01";
 
 export const DEPARTMENT_NAMES = [
   "الإنتاج",
