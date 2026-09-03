@@ -18,9 +18,12 @@ export async function requireSession(): Promise<User> {
 }
 
 export async function setSessionCookie(user: User) {
+  // secure by default in production; set SECURE_COOKIES=false only when serving
+  // prod over plain HTTP behind a trusted network / reverse proxy.
+  const secure = process.env.NODE_ENV === "production" && process.env.SECURE_COOKIES !== "false";
   (await cookies()).set(SESSION_COOKIE, encodeSession(user), {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure,
     sameSite: "lax",
     path: "/",
     maxAge: MAX_AGE,
