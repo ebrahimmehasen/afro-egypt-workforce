@@ -127,10 +127,11 @@
 ### المرحلة 7 — تثبيت وتجهيز النشر
 - [x] `.env.example` (DATABASE_URL, SESSION_SECRET, PUNCH_API_KEY)
 - [x] `prisma migrate deploy` جاهز (ملف الـ migration متعمل commit)
-- [ ] `npm run build` + `npm start` نظيف على MySQL الإنتاج
-- [ ] `README` محدّث: تشغيل محلي + خطوات النشر على سيرفرك
-- [ ] دليل ديمو مكتوب (سيناريو §55 خطوة بخطوة بالعربي)
-- [ ] (اختياري) `Dockerfile` للتطبيق نفسه لو تفضّل
+- [x] `npm run build` + `npm start` نظيف على MySQL — تحقّق كمان `POST /api/punch` شغّال (401 بلا مفتاح، 200 بمفتاح صحيح)
+- [x] إصلاح تحذير Next عن workspace root (`outputFileTracingRoot` في `next.config.mjs`)
+- [x] `README` محدّث بالكامل: التقنيات الحالية (Next 15 + Prisma/MySQL)، التشغيل محلي، خطوات النشر، النسخ الاحتياطي، جدول الأدوار والصلاحيات
+- [x] دليل ديمو (`docs/DEMO-GUIDE.md`) — سيناريو §55 كامل خطوة بخطوة بالعربي (تسجيل دخول → بصمة → إضافي → خصم → رواتب → تكلفة عمالة → تصدير → تدقيق) + سيناريوهات إضافية (بصمة ناقصة، تصحيح يدوي، إجازة، الأدوار المختلفة)
+- [x] `Dockerfile` + `output: "standalone"` — تحقّق بتشغيل السيرفر standalone فعليًا (`node .next/standalone/server.js`) بنفس تخطيط الملفات اللي الـDockerfile بينسخه؛ الـ`docker build` نفسه ما اتجربش (مفيش Docker على جهاز التطوير)
 
 ---
 
