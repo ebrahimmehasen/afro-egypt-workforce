@@ -7,17 +7,25 @@ import { recordChange } from "@/lib/audit";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
 
-const employeeSchema = z.object({
-  name: z.string().min(2),
-  departmentId: z.string().min(1),
-  jobTitle: z.string().min(1),
-  hireDate: z.string().min(1),
-  shiftId: z.string().min(1),
-  basicSalary: z.coerce.number().positive(),
-  allowances: z.coerce.number().min(0).default(0),
-  biometricDeviceUserId: z.string().min(1),
-  status: z.enum(["active", "on_leave", "suspended", "terminated"]),
-});
+const employeeSchema = z
+  .object({
+    name: z.string().min(2),
+    departmentId: z.string().min(1),
+    jobTitle: z.string().min(1),
+    hireDate: z.string().min(1),
+    shiftId: z.string().min(1),
+    salaryType: z.enum(["monthly", "daily"]).default("monthly"),
+    basicSalary: z.coerce.number().min(0).default(0),
+    dailyRate: z.coerce.number().min(0).optional(),
+    dailyWorkingHours: z.coerce.number().positive().default(8),
+    allowances: z.coerce.number().min(0).default(0),
+    biometricDeviceUserId: z.string().min(1),
+    status: z.enum(["active", "on_leave", "suspended", "terminated"]),
+  })
+  .refine((d) => (d.salaryType === "daily" ? (d.dailyRate ?? 0) > 0 : d.basicSalary > 0), {
+    path: ["salaryType"],
+    message: "salary amount required",
+  });
 
 async function nextEmployeeId() {
   const rows = await prisma.employee.findMany({ select: { id: true } });
@@ -33,7 +41,7 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
   const parsed = employeeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const id = await nextEmployeeId();
-  const { allowances, hireDate, ...rest } = parsed.data;
+  const { allowances, hireDate, dailyRate, salaryType, ...rest } = parsed.data;
 
   await recordChange(
     {
@@ -46,6 +54,8 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
         data: {
           id,
           ...rest,
+          salaryType,
+          dailyRate: salaryType === "daily" ? dailyRate ?? null : null,
           hireDate: new Date(`${hireDate}T00:00:00.000Z`),
           allowancesTotal: allowances,
         },
@@ -65,7 +75,7 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
   const before = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
   if (!before) return { error: t.validation.employeeNotFound };
 
-  const { allowances, hireDate, ...rest } = parsed.data;
+  const { allowances, hireDate, dailyRate, salaryType, ...rest } = parsed.data;
   await recordChange(
     {
       module: t.nav.employees,
@@ -78,6 +88,8 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
         where: { id },
         data: {
           ...rest,
+          salaryType,
+          dailyRate: salaryType === "daily" ? dailyRate ?? null : null,
           hireDate: new Date(`${hireDate}T00:00:00.000Z`),
           allowancesTotal: allowances,
         },

@@ -96,7 +96,9 @@ type EmployeeSeed = {
   jobTitle: string;
   hireDate: string;
   shiftId: string;
+  salaryType: "monthly" | "daily";
   basicSalary: number;
+  dailyRate: number | null;
   allowancesTotal: number;
   biometricDeviceUserId: string;
   status: "active";
@@ -151,8 +153,12 @@ function buildEmployees(): EmployeeSeed[] {
     const deptName = departments.find((d) => d.id === s.departmentId)!.name;
     const qIdx = deptQueue.indexOf(deptName);
     if (qIdx >= 0) deptQueue.splice(qIdx, 1);
+    // EMP-1002 / EMP-1003 are daily-wage production workers (demo variety)
+    const daily = s.id === "EMP-1002" || s.id === "EMP-1003";
     employees.push({
       ...s,
+      salaryType: daily ? "daily" : "monthly",
+      dailyRate: daily ? Math.round(s.basicSalary / 26) : null,
       hireDate: isoDate(addDays(DEMO_DATE, -(400 + idx * 37))),
       allowancesTotal: 1000,
       biometricDeviceUserId: `${1001 + idx}`,
@@ -166,6 +172,8 @@ function buildEmployees(): EmployeeSeed[] {
     const [min, max] = SALARY_RANGE[deptName];
     const salary = Math.round((min + rng() * (max - min)) / 100) * 100;
     const shift = deptName === "الأمن" ? pick(SHIFTS, rng) : SHIFTS[0];
+    // ~30% of production-line workers are on a daily wage
+    const daily = deptName === "الإنتاج" && rng() < 0.3;
     employees.push({
       id: `EMP-${seq}`,
       name: uniqueName(),
@@ -173,7 +181,9 @@ function buildEmployees(): EmployeeSeed[] {
       jobTitle: pick(JOB_TITLES[deptName], rng),
       hireDate: isoDate(addDays(DEMO_DATE, -Math.floor(60 + rng() * 1200))),
       shiftId: shift.id,
+      salaryType: daily ? "daily" : "monthly",
       basicSalary: salary,
+      dailyRate: daily ? Math.round(salary / 26) : null,
       allowancesTotal: Math.round((300 + rng() * 1200) / 50) * 50,
       biometricDeviceUserId: `${seq}`,
       status: "active",

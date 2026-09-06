@@ -146,6 +146,13 @@ export interface Dictionary {
     formHireDate: string;
     formShift: string;
     formBasicSalary: string;
+    formSalaryType: string;
+    salaryMonthly: string;
+    salaryDaily: string;
+    formDailyRate: string;
+    formDailyHours: string;
+    salaryTypeCol: string;
+    paidDaysCol: string;
     formAllowances: string;
     formBiometricId: string;
     formStatus: string;

@@ -50,6 +50,7 @@ export function EmployeeFormDialog({
   const t = useT();
   const locale = useLocale();
   const [open, setOpen] = useState(false);
+  const [salaryType, setSalaryType] = useState<"monthly" | "daily">(employee?.salaryType ?? "monthly");
   const action = employee ? updateEmployee : createEmployee;
   const [state, formAction] = useActionState(action, {});
   useActionFeedback(state, () => setOpen(false));
@@ -116,9 +117,41 @@ export function EmployeeFormDialog({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="basicSalary">{t.employees.formBasicSalary}</Label>
-            <Input id="basicSalary" name="basicSalary" type="number" min={0} defaultValue={employee?.basicSalary} required />
+            <Label>{t.employees.formSalaryType}</Label>
+            <Select
+              name="salaryType"
+              value={salaryType}
+              onValueChange={(v) => setSalaryType(v as "monthly" | "daily")}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="monthly">{t.employees.salaryMonthly}</SelectItem>
+                <SelectItem value="daily">{t.employees.salaryDaily}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+
+          {salaryType === "monthly" ? (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="basicSalary">{t.employees.formBasicSalary}</Label>
+                <Input id="basicSalary" name="basicSalary" type="number" min={0} defaultValue={employee?.basicSalary} required />
+              </div>
+              <input type="hidden" name="dailyWorkingHours" value={employee?.dailyWorkingHours ?? 8} />
+            </>
+          ) : (
+            <>
+              <input type="hidden" name="basicSalary" value={0} />
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="dailyRate">{t.employees.formDailyRate}</Label>
+                <Input id="dailyRate" name="dailyRate" type="number" min={0} defaultValue={employee?.dailyRate} required />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="dailyWorkingHours">{t.employees.formDailyHours}</Label>
+                <Input id="dailyWorkingHours" name="dailyWorkingHours" type="number" min={1} step="0.5" defaultValue={employee?.dailyWorkingHours ?? 8} />
+              </div>
+            </>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="allowances">{t.employees.formAllowances}</Label>

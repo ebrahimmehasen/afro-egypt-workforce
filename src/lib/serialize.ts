@@ -44,7 +44,10 @@ export function toEmployee(e: PEmployee): Employee {
     jobTitle: e.jobTitle,
     hireDate: dayStr(e.hireDate),
     shiftId: e.shiftId,
+    salaryType: e.salaryType,
     basicSalary: e.basicSalary,
+    dailyRate: e.dailyRate ?? undefined,
+    dailyWorkingHours: e.dailyWorkingHours,
     allowances: e.allowancesTotal,
     biometricDeviceUserId: e.biometricDeviceUserId,
     status: e.status,
@@ -188,6 +191,8 @@ export function toPayrollRecord(r: PPayrollRecord): PayrollRecord {
     otherDeductions: r.otherDeductions,
     totalDeductions: r.totalDeductions,
     netSalary: r.netSalary,
+    paidDaysCount: r.paidDaysCount ?? undefined,
+    dailyRateApplied: r.dailyRateApplied ?? undefined,
   };
 }
 

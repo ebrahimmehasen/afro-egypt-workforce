@@ -11,6 +11,8 @@ export interface User {
 
 export type EmployeeStatus = "active" | "on_leave" | "suspended" | "terminated";
 
+export type SalaryType = "monthly" | "daily";
+
 export interface Employee {
   id: string; // EMP-1001
   name: string;
@@ -18,7 +20,10 @@ export interface Employee {
   jobTitle: string;
   hireDate: string; // ISO date
   shiftId: string;
-  basicSalary: number;
+  salaryType: SalaryType;
+  basicSalary: number; // monthly: full salary; daily: fallback only
+  dailyRate?: number; // set when salaryType === "daily"
+  dailyWorkingHours: number; // contracted daily hours
   allowances: number; // fixed monthly allowances total (for quick display; itemized in Allowance[])
   biometricDeviceUserId: string;
   status: EmployeeStatus;
@@ -184,6 +189,8 @@ export interface PayrollRecord {
   otherDeductions: number;
   totalDeductions: number;
   netSalary: number;
+  paidDaysCount?: number; // daily employees only
+  dailyRateApplied?: number; // daily employees only
 }
 
 export interface AuditLogEntry {

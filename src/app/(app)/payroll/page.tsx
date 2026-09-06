@@ -116,7 +116,14 @@ export default async function PayrollPage({
                 <TableRow key={record.id}>
                   <TableCell>
                     <div className="font-medium">{employee!.name}</div>
-                    <div className="text-xs text-muted-foreground">{employee!.id}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {employee!.id}
+                      {record.paidDaysCount != null && (
+                        <span className="ms-1.5 text-primary">
+                          · {t.employees.salaryDaily} ({record.paidDaysCount} {t.common.days})
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="tabular-nums">{formatEGP(record.basicSalary, locale)}</TableCell>
                   <TableCell className="tabular-nums">{formatEGP(record.allowances, locale)}</TableCell>

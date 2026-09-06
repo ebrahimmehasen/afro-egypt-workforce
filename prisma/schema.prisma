@@ -33,6 +33,11 @@ enum EmployeeStatus {
   terminated
 }
 
+enum SalaryType {
+  monthly
+  daily
+}
+
 enum PunchType {
   in
   out
@@ -160,7 +165,10 @@ model Employee {
   hireDate              DateTime       @db.Date
   shiftId               String
   shift                 Shift          @relation(fields: [shiftId], references: [id])
-  basicSalary           Int
+  salaryType            SalaryType     @default(monthly)
+  basicSalary           Int            // monthly: the full salary. daily: fallback only — dailyRate is authoritative
+  dailyRate             Int?           // required when salaryType = daily — pay for one worked day
+  dailyWorkingHours     Float          @default(8) // this employee's contracted daily hours (for hourly rate)
   allowancesTotal       Int            @default(0) // quick-display fixed monthly allowances; itemised in Allowance[]
   biometricDeviceUserId String
   status                EmployeeStatus @default(active)
@@ -356,6 +364,8 @@ model PayrollRecord {
   otherDeductions     Int
   totalDeductions     Int
   netSalary           Int
+  paidDaysCount       Int?          // daily employees only — worked days paid this period
+  dailyRateApplied    Int?          // daily employees only — day rate at calculation time (historical record)
   createdAt           DateTime      @default(now())
 
   @@unique([periodId, employeeId])

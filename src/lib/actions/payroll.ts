@@ -81,6 +81,10 @@ export async function calculatePayroll(periodId: string) {
       const lateMinutesTotal = monthAttendance.reduce((s, a) => s + a.deductibleLateMinutes, 0);
       const absenceDays = monthAttendance.filter((a) => a.status === "absent").length;
       const earlyLeaveMinutesTotal = monthAttendance.reduce((s, a) => s + a.earlyLeaveMinutes, 0);
+      // A daily worker gets paid for any day they showed up — a single punch
+      // (missing_punch) counts as a full paid day for them (spec §1.2).
+      const PAID_STATUSES = ["present", "late", "early_leave", "missing_punch"];
+      const paidDays = monthAttendance.filter((a) => PAID_STATUSES.includes(a.status)).length;
 
       const allowancesTotal = empAllowances
         .filter((a) => a.type === "transport" || a.type === "meal" || a.type === "fixed")
@@ -97,7 +101,10 @@ export async function calculatePayroll(periodId: string) {
           jobTitle: employee.jobTitle,
           hireDate: employee.hireDate.toISOString().slice(0, 10),
           shiftId: employee.shiftId,
+          salaryType: employee.salaryType,
           basicSalary: employee.basicSalary,
+          dailyRate: employee.dailyRate ?? undefined,
+          dailyWorkingHours: employee.dailyWorkingHours,
           allowances: employee.allowancesTotal,
           biometricDeviceUserId: employee.biometricDeviceUserId,
           status: employee.status,
@@ -108,6 +115,7 @@ export async function calculatePayroll(periodId: string) {
         bonuses,
         lateMinutesTotal,
         absenceDays,
+        paidDays,
         earlyLeaveMinutesTotal,
         deductions: manualDeductions.map((d) => ({
           id: d.id,

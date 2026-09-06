@@ -49,7 +49,9 @@ describe.skipIf(!sampleLoaded)("sample-seeded database", () => {
   });
 
   it("produces a coherent payroll record from a real employee's data", async () => {
-    const employee = await prisma.employee.findFirstOrThrow({ where: { deletedAt: null } });
+    const employee = await prisma.employee.findFirstOrThrow({
+      where: { deletedAt: null, salaryType: "monthly" },
+    });
     const [settings, attSettings, allowances, monthAttendance] = await Promise.all([
       prisma.payrollSettings.findUniqueOrThrow({ where: { id: "singleton" } }),
       prisma.attendanceSettings.findUniqueOrThrow({ where: { id: "singleton" } }),
@@ -68,7 +70,10 @@ describe.skipIf(!sampleLoaded)("sample-seeded database", () => {
         jobTitle: employee.jobTitle,
         hireDate: employee.hireDate.toISOString().slice(0, 10),
         shiftId: employee.shiftId,
+        salaryType: employee.salaryType,
         basicSalary: employee.basicSalary,
+        dailyRate: employee.dailyRate ?? undefined,
+        dailyWorkingHours: employee.dailyWorkingHours,
         allowances: employee.allowancesTotal,
         biometricDeviceUserId: employee.biometricDeviceUserId,
         status: employee.status,
@@ -79,6 +84,7 @@ describe.skipIf(!sampleLoaded)("sample-seeded database", () => {
       bonuses: 0,
       lateMinutesTotal: monthAttendance.reduce((s, a) => s + a.deductibleLateMinutes, 0),
       absenceDays: monthAttendance.filter((a) => a.status === "absent").length,
+      paidDays: 0,
       earlyLeaveMinutesTotal: 0,
       deductions: [],
       settings: {

@@ -128,9 +128,15 @@ export interface BreakdownRow {
 
 /** Builds payslip/breakdown line items from a PayrollRecord's numeric fields — never from pre-baked labels, so it stays correct in either language. */
 export function payrollBreakdownRows(record: PayrollRecord, t: Dictionary): { earnings: BreakdownRow[]; deductions: BreakdownRow[] } {
+  const isDaily = record.paidDaysCount != null;
   return {
     earnings: [
-      { label: t.payslip.basicSalary, amount: record.basicSalary },
+      isDaily
+        ? {
+            label: `${t.payslip.basicSalary} (${record.paidDaysCount} ${t.common.days} × ${record.dailyRateApplied})`,
+            amount: record.basicSalary,
+          }
+        : { label: t.payslip.basicSalary, amount: record.basicSalary },
       { label: t.payslip.allowances, amount: record.allowances },
       { label: t.payslip.overtime, amount: record.overtimeAmount },
       ...(record.incentives ? [{ label: t.allowanceTypes.incentive, amount: record.incentives }] : []),
@@ -138,7 +144,8 @@ export function payrollBreakdownRows(record: PayrollRecord, t: Dictionary): { ea
     ],
     deductions: [
       { label: t.payslip.lateDeduction, amount: record.lateDeduction },
-      { label: t.payslip.absenceDeduction, amount: record.absenceDeduction },
+      // a daily worker has no absence deduction — absent days simply aren't paid
+      ...(isDaily ? [] : [{ label: t.payslip.absenceDeduction, amount: record.absenceDeduction }]),
       ...(record.earlyLeaveDeduction ? [{ label: t.payslip.earlyLeaveDeduction, amount: record.earlyLeaveDeduction }] : []),
       ...(record.penalties ? [{ label: t.payslip.penalties, amount: record.penalties }] : []),
       ...(record.advances ? [{ label: t.payslip.advances, amount: record.advances }] : []),
