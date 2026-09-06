@@ -11,6 +11,7 @@ import type {
   Deduction as PDeduction,
   Department as PDepartment,
   Employee as PEmployee,
+  EmployeeAcknowledgment as PEmployeeAcknowledgment,
   EmployeeDocument as PEmployeeDocument,
   Leave as PLeave,
   Overtime as POvertime,
@@ -26,6 +27,7 @@ import type {
   Deduction,
   Department,
   Employee,
+  EmployeeAcknowledgment,
   EmployeeDocument,
   Leave,
   Overtime,
@@ -59,6 +61,20 @@ export function toEmployee(e: PEmployee): Employee {
     militaryStatus: e.militaryStatus ?? undefined,
     nationalId: e.nationalId ?? undefined,
     avatarColor: e.avatarColor ?? undefined,
+  };
+}
+
+export function toEmployeeAcknowledgment(a: PEmployeeAcknowledgment): EmployeeAcknowledgment {
+  return {
+    id: a.id,
+    employeeId: a.employeeId,
+    type: a.type,
+    title: a.title,
+    fileUrl: a.fileUrl ?? undefined,
+    fileName: a.fileName ?? undefined,
+    generatedAt: iso(a.generatedAt),
+    signedAt: isoOrNull(a.signedAt) ?? undefined,
+    createdBy: a.createdBy ?? undefined,
   };
 }
 

@@ -14,7 +14,7 @@ import { Store } from "@/lib/store";
  */
 export type Scope = { all: true } | { all: false; ids: ReadonlySet<string> };
 
-export function viewerScope(user: User, allEmployees: Employee[]): Scope {
+export function viewerScope(user: User, allEmployees: Pick<Employee, "id" | "departmentId">[]): Scope {
   if (user.role === "admin" || user.role === "hr") return { all: true };
   if (user.role === "supervisor" && user.departmentId) {
     const ids = allEmployees
@@ -55,5 +55,6 @@ export function scopedSnapshot(scope: Scope, db: Store): Store {
     allowances: rowsInScope(scope, db.allowances),
     payrollRecords: rowsInScope(scope, db.payrollRecords),
     employeeDocuments: rowsInScope(scope, db.employeeDocuments),
+    employeeAcknowledgments: rowsInScope(scope, db.employeeAcknowledgments),
   };
 }

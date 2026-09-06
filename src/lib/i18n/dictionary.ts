@@ -556,6 +556,38 @@ export interface Dictionary {
       cv: string;
     };
   };
+  acknowledgments: {
+    title: string;
+    new: string;
+    generate: string;
+    type: string;
+    customText: string;
+    flowHint: string;
+    none: string;
+    generatedAt: string;
+    awaitingSignature: string;
+    signedOn: string;
+    signedCopy: string;
+    uploadSigned: string;
+    signedUploaded: string;
+    generated: string;
+    deleted: string;
+    print: string;
+    back: string;
+    date: string;
+    employeeSignature: string;
+    nameAndSignature: string;
+    auditGenerate: string;
+    auditUploadSigned: string;
+    auditDelete: string;
+    types: {
+      employment_terms: string;
+      custody_receipt: string;
+      confidentiality: string;
+      code_of_conduct: string;
+      other: string;
+    };
+  };
   statuses: {
     present: string;
     late: string;

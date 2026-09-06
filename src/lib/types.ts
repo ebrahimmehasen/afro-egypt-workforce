@@ -231,6 +231,33 @@ export interface EmployeeDocument {
   uploadedAt: string;
 }
 
+export type AcknowledgmentType =
+  | "employment_terms"
+  | "custody_receipt"
+  | "confidentiality"
+  | "code_of_conduct"
+  | "other";
+
+export const ACKNOWLEDGMENT_TYPES: AcknowledgmentType[] = [
+  "employment_terms",
+  "custody_receipt",
+  "confidentiality",
+  "code_of_conduct",
+  "other",
+];
+
+export interface EmployeeAcknowledgment {
+  id: string;
+  employeeId: string;
+  type: AcknowledgmentType;
+  title: string;
+  fileUrl?: string;
+  fileName?: string;
+  generatedAt: string;
+  signedAt?: string;
+  createdBy?: string;
+}
+
 export interface AuditLogEntry {
   id: string;
   userName: string;

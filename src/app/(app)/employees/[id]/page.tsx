@@ -13,6 +13,7 @@ import { requestStatusLabel, deductionTypeLabel } from "@/lib/i18n/labels";
 import { canCorrectAttendance } from "@/lib/permissions";
 import { missingDocumentTypes } from "@/lib/documents";
 import { DocumentsPanel } from "@/components/employees/documents-panel";
+import { AcknowledgmentsPanel } from "@/components/employees/acknowledgments-panel";
 import { FileWarning } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,6 +57,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
     .map((r) => ({ record: r, period: db.payrollPeriods.find((p) => p.id === r.periodId) }));
 
   const documents = db.employeeDocuments.filter((d) => d.employeeId === employee.id);
+  const acknowledgments = db.employeeAcknowledgments.filter((a) => a.employeeId === employee.id);
   const missingDocs = missingDocumentTypes(documents);
   const canManageDocs = canCorrectAttendance(user.role);
 
@@ -104,8 +106,13 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
           <TabsTrigger value="payroll">{t.employees.tabPayroll}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="documents">
+        <TabsContent value="documents" className="flex flex-col gap-4">
           <DocumentsPanel employeeId={employee.id} documents={documents} canManage={canManageDocs} />
+          <AcknowledgmentsPanel
+            employeeId={employee.id}
+            acknowledgments={acknowledgments}
+            canManage={canManageDocs}
+          />
         </TabsContent>
 
         <TabsContent value="basic">
