@@ -575,6 +575,12 @@ export const en: Dictionary = {
       confidentiality: "Confidentiality acknowledgment",
     },
   },
+  filePreview: {
+    view: "Preview",
+    download: "Download",
+    noPreview: "This file can't be previewed — download it to open",
+    openTab: "Open in new tab",
+  },
   statuses: {
     present: "Present",
     late: "Late",

@@ -575,6 +575,12 @@ export const ar: Dictionary = {
       confidentiality: "إقرار سرية",
     },
   },
+  filePreview: {
+    view: "معاينة",
+    download: "تنزيل",
+    noPreview: "لا يمكن معاينة هذا الملف — نزّله لفتحه",
+    openTab: "فتح في تبويب جديد",
+  },
   statuses: {
     present: "حاضر",
     late: "متأخر",

@@ -3,10 +3,11 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileCheck2, FileSignature, Plus, Trash2, Upload, ExternalLink } from "lucide-react";
+import { FileCheck2, FileSignature, Plus, Trash2, Upload } from "lucide-react";
 import { EmployeeAcknowledgment, STANDARD_ACKNOWLEDGMENT_KEYS } from "@/lib/types";
 import { ACCEPTED_DOCUMENT_MIME } from "@/lib/documents";
 import { useT } from "@/components/providers/locale-provider";
+import { FilePreview } from "@/components/employees/file-preview";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -166,13 +167,7 @@ export function AcknowledgmentsPanel({
               </div>
 
               <div className="flex shrink-0 items-center gap-1.5">
-                {row.doc && (
-                  <a href={row.doc.fileUrl} target="_blank" rel="noopener noreferrer">
-                    <Button size="icon" variant="ghost" aria-label={t.common.view}>
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </a>
-                )}
+                {row.doc && <FilePreview url={row.doc.fileUrl} name={row.doc.fileName} mime={row.doc.mimeType} />}
                 {canManage && (
                   <>
                     <input

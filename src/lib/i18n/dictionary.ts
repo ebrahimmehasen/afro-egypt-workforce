@@ -573,6 +573,12 @@ export interface Dictionary {
       confidentiality: string;
     };
   };
+  filePreview: {
+    view: string;
+    download: string;
+    noPreview: string;
+    openTab: string;
+  };
   statuses: {
     present: string;
     late: string;
