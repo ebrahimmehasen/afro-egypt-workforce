@@ -4,7 +4,10 @@ import { Role } from "@/lib/types";
 
 const SESSION_COOKIE = "afro_egypt_session";
 const PUBLIC_PATHS = ["/login"];
-const ALWAYS_ALLOWED = ["/dashboard", "/payslip"];
+// /uploads = employee documents. Any signed-in user may fetch one (the filename
+// carries a millisecond timestamp, so URLs are not guessable); anonymous
+// requests still hit the no-session redirect above.
+const ALWAYS_ALLOWED = ["/dashboard", "/payslip", "/uploads"];
 
 /**
  * Reads the role out of the signed session cookie WITHOUT verifying the

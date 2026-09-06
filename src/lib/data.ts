@@ -9,6 +9,7 @@ import {
   toDeduction,
   toDepartment,
   toEmployee,
+  toEmployeeDocument,
   toLeave,
   toOvertime,
   toPayrollPeriod,
@@ -52,6 +53,7 @@ export async function getDb(): Promise<Store> {
     allowances,
     payrollPeriods,
     payrollRecords,
+    employeeDocuments,
     companySettings,
     attendanceSettings,
     payrollSettings,
@@ -66,6 +68,7 @@ export async function getDb(): Promise<Store> {
     prisma.allowance.findMany(),
     prisma.payrollPeriod.findMany({ orderBy: [{ year: "desc" }, { month: "desc" }] }),
     prisma.payrollRecord.findMany(),
+    prisma.employeeDocument.findMany(),
     prisma.companySettings.findUnique({ where: { id: "singleton" } }),
     prisma.attendanceSettings.findUnique({ where: { id: "singleton" } }),
     prisma.payrollSettings.findUnique({ where: { id: "singleton" } }),
@@ -82,6 +85,7 @@ export async function getDb(): Promise<Store> {
     allowances: allowances.map(toAllowance),
     payrollPeriods: payrollPeriods.map(toPayrollPeriod),
     payrollRecords: payrollRecords.map(toPayrollRecord),
+    employeeDocuments: employeeDocuments.map(toEmployeeDocument),
     companySettings: companySettings
       ? {
           companyName: companySettings.companyName,

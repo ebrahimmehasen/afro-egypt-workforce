@@ -6,6 +6,7 @@ import {
   Deduction,
   Department,
   Employee,
+  EmployeeDocument,
   Leave,
   Overtime,
   PayrollPeriod,
@@ -32,6 +33,7 @@ export interface Store {
   allowances: Allowance[];
   payrollPeriods: PayrollPeriod[];
   payrollRecords: PayrollRecord[];
+  employeeDocuments: EmployeeDocument[]; // bounded: at most one per type per employee
   companySettings: CompanySettings;
   attendanceSettings: AttendanceSettings;
   payrollSettings: PayrollSettings;

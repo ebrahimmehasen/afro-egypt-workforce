@@ -20,6 +20,9 @@
 # production
 /build
 
+# uploaded employee files (real personal data — never commit; back these up separately)
+/public/uploads/
+
 # misc
 .DS_Store
 *.pem

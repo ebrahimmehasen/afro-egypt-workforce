@@ -201,6 +201,36 @@ export interface PayrollRecord {
   dailyRateApplied?: number; // daily employees only
 }
 
+export type EmployeeDocumentType =
+  | "national_id_photo"
+  | "birth_certificate"
+  | "qualification_certificate"
+  | "criminal_record"
+  | "military_certificate"
+  | "work_experience_certificate"
+  | "cv";
+
+export const EMPLOYEE_DOCUMENT_TYPES: EmployeeDocumentType[] = [
+  "national_id_photo",
+  "birth_certificate",
+  "qualification_certificate",
+  "criminal_record",
+  "military_certificate",
+  "work_experience_certificate",
+  "cv",
+];
+
+export interface EmployeeDocument {
+  id: string;
+  employeeId: string;
+  type: EmployeeDocumentType;
+  fileUrl: string;
+  fileName?: string;
+  mimeType?: string;
+  uploadedBy?: string;
+  uploadedAt: string;
+}
+
 export interface AuditLogEntry {
   id: string;
   userName: string;

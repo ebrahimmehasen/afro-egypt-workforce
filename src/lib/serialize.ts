@@ -11,6 +11,7 @@ import type {
   Deduction as PDeduction,
   Department as PDepartment,
   Employee as PEmployee,
+  EmployeeDocument as PEmployeeDocument,
   Leave as PLeave,
   Overtime as POvertime,
   PayrollPeriod as PPayrollPeriod,
@@ -25,6 +26,7 @@ import type {
   Deduction,
   Department,
   Employee,
+  EmployeeDocument,
   Leave,
   Overtime,
   PayrollPeriod,
@@ -57,6 +59,19 @@ export function toEmployee(e: PEmployee): Employee {
     militaryStatus: e.militaryStatus ?? undefined,
     nationalId: e.nationalId ?? undefined,
     avatarColor: e.avatarColor ?? undefined,
+  };
+}
+
+export function toEmployeeDocument(d: PEmployeeDocument): EmployeeDocument {
+  return {
+    id: d.id,
+    employeeId: d.employeeId,
+    type: d.type,
+    fileUrl: d.fileUrl,
+    fileName: d.fileName ?? undefined,
+    mimeType: d.mimeType ?? undefined,
+    uploadedBy: d.uploadedBy ?? undefined,
+    uploadedAt: iso(d.uploadedAt),
   };
 }
 

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Eye, Users } from "lucide-react";
+import { Search, Eye, Users, FileWarning } from "lucide-react";
 import { Employee, Department, Shift } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -41,14 +41,17 @@ export function EmployeesTable({
   departments,
   shifts,
   canEdit,
+  incompleteDocIds = [],
 }: {
   employees: Employee[];
   departments: Department[];
   shifts: Shift[];
   canEdit: boolean;
+  incompleteDocIds?: string[];
 }) {
   const t = useT();
   const locale = useLocale();
+  const incompleteDocs = new Set(incompleteDocIds);
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -129,7 +132,14 @@ export function EmployeesTable({
               {filtered.map((e) => (
                 <TableRow key={e.id}>
                   <TableCell className="font-mono text-xs tabular-nums">{e.id}</TableCell>
-                  <TableCell className="font-medium">{e.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <span className="flex items-center gap-1.5">
+                      {e.name}
+                      {incompleteDocs.has(e.id) && (
+                        <FileWarning className="h-3.5 w-3.5 text-warning" aria-label={t.documents.incomplete} />
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell>{translateLabel(deptMap.get(e.departmentId) ?? "", locale)}</TableCell>
                   <TableCell>{translateLabel(e.jobTitle, locale)}</TableCell>
                   <TableCell>{translateLabel(shiftMap.get(e.shiftId) ?? "", locale)}</TableCell>

@@ -535,6 +535,27 @@ export interface Dictionary {
     auditUpdate: string;
     auditResetPassword: string;
   };
+  documents: {
+    title: string;
+    complete: string;
+    incomplete: string;
+    upload: string;
+    replace: string;
+    uploaded: string;
+    uploadFailed: string;
+    deleted: string;
+    auditUpload: string;
+    auditDelete: string;
+    types: {
+      national_id_photo: string;
+      birth_certificate: string;
+      qualification_certificate: string;
+      criminal_record: string;
+      military_certificate: string;
+      work_experience_certificate: string;
+      cv: string;
+    };
+  };
   statuses: {
     present: string;
     late: string;

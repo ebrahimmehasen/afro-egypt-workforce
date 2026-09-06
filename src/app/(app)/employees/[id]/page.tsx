@@ -10,6 +10,10 @@ import { getLocale } from "@/lib/i18n/locale";
 import { intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { requestStatusLabel, deductionTypeLabel } from "@/lib/i18n/labels";
+import { canCorrectAttendance } from "@/lib/permissions";
+import { missingDocumentTypes } from "@/lib/documents";
+import { DocumentsPanel } from "@/components/employees/documents-panel";
+import { FileWarning } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +55,10 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
     .filter((r) => r.employeeId === employee.id)
     .map((r) => ({ record: r, period: db.payrollPeriods.find((p) => p.id === r.periodId) }));
 
+  const documents = db.employeeDocuments.filter((d) => d.employeeId === employee.id);
+  const missingDocs = missingDocumentTypes(documents);
+  const canManageDocs = canCorrectAttendance(user.role);
+
   return (
     <div className="flex flex-col gap-6">
       <Link href="/employees" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground w-fit">
@@ -69,6 +77,12 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
               <p className="text-sm text-muted-foreground">
                 {translateLabel(employee.jobTitle, locale)} · {translateLabel(department?.name ?? "", locale)}
               </p>
+              {missingDocs.length > 0 && (
+                <p className="mt-1 flex items-center gap-1 text-xs font-medium text-warning">
+                  <FileWarning className="h-3.5 w-3.5" />
+                  {t.documents.incomplete} ({missingDocs.length})
+                </p>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
@@ -83,11 +97,16 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
       <Tabs defaultValue="basic">
         <TabsList>
           <TabsTrigger value="basic">{t.employees.tabBasic}</TabsTrigger>
+          <TabsTrigger value="documents">{t.documents.title}</TabsTrigger>
           <TabsTrigger value="attendance">{t.employees.tabAttendance}</TabsTrigger>
           <TabsTrigger value="overtime">{t.employees.tabOvertime}</TabsTrigger>
           <TabsTrigger value="deductions">{t.employees.tabDeductions}</TabsTrigger>
           <TabsTrigger value="payroll">{t.employees.tabPayroll}</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="documents">
+          <DocumentsPanel employeeId={employee.id} documents={documents} canManage={canManageDocs} />
+        </TabsContent>
 
         <TabsContent value="basic">
           <Card>

@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { employeesInScope, viewerScope } from "@/lib/scope";
+import { missingDocumentTypes } from "@/lib/documents";
 import { canCorrectAttendance } from "@/lib/permissions";
 import { getT, format } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
@@ -15,6 +16,10 @@ export default async function EmployeesPage() {
 
   const employees = employeesInScope(viewerScope(user, db.employees), db.employees);
 
+  const incompleteDocIds = employees
+    .filter((e) => missingDocumentTypes(db.employeeDocuments.filter((d) => d.employeeId === e.id)).length > 0)
+    .map((e) => e.id);
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -22,7 +27,13 @@ export default async function EmployeesPage() {
         description={format(t.employees.totalCount, { count: employees.length })}
         actions={canEdit ? <EmployeeFormDialog departments={db.departments} shifts={db.shifts} /> : null}
       />
-      <EmployeesTable employees={employees} departments={db.departments} shifts={db.shifts} canEdit={canEdit} />
+      <EmployeesTable
+        employees={employees}
+        departments={db.departments}
+        shifts={db.shifts}
+        canEdit={canEdit}
+        incompleteDocIds={incompleteDocIds}
+      />
     </div>
   );
 }

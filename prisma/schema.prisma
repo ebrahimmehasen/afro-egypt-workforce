@@ -108,6 +108,16 @@ enum PayrollPeriodStatus {
   closed
 }
 
+enum EmployeeDocumentType {
+  national_id_photo // صورة البطاقة
+  birth_certificate // شهادة الميلاد
+  qualification_certificate // شهادة المؤهل
+  criminal_record // الفيش والتشبيه
+  military_certificate // شهادة الموقف من التجنيد
+  work_experience_certificate // كعب عمل
+  cv // السيرة الذاتية
+}
+
 // ---------------------------------------------------------------------------
 // Identity & access
 // ---------------------------------------------------------------------------
@@ -196,6 +206,7 @@ model Employee {
   deductions      Deduction[]
   allowances      Allowance[]
   payrollRecords  PayrollRecord[]
+  documents       EmployeeDocument[]
   users           User[]
 
   @@index([departmentId])
@@ -383,6 +394,26 @@ model PayrollRecord {
   createdAt           DateTime      @default(now())
 
   @@unique([periodId, employeeId])
+  @@index([employeeId])
+}
+
+// ---------------------------------------------------------------------------
+// HR documents
+// ---------------------------------------------------------------------------
+
+/// One uploaded file per document type per employee (a re-upload replaces it).
+model EmployeeDocument {
+  id         String               @id @default(cuid())
+  employeeId String
+  employee   Employee             @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type       EmployeeDocumentType
+  fileUrl    String // /uploads/employees/<id>/documents/<type>-<ts>.<ext>
+  fileName   String?
+  mimeType   String?
+  uploadedBy String? // display name of the user who uploaded it
+  uploadedAt DateTime             @default(now())
+
+  @@unique([employeeId, type])
   @@index([employeeId])
 }
 
