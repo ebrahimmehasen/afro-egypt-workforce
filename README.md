@@ -74,10 +74,20 @@ npm run dev
    ```bash
    ADMIN_EMAIL=you@company.com ADMIN_PASSWORD='strong-password' npm run db:seed
    ```
-5. **شغّل:**
+5. **جهّز مخرجات الـ standalone وشغّل:**
+
+   المشروع مبني بـ `output: "standalone"` (في `next.config.mjs`)، فبيطلع سيرفر Node مكتفي ذاتيًا في `.next/standalone/`. لكن `next build` **مابينسخش** الأصول الثابتة و`public/` جواه — لازم تتنسخ يدويًا:
+
    ```bash
-   npm start
+   cp -r .next/static      .next/standalone/.next/static
+   cp -r public            .next/standalone/public      # يشمل مستندات الموظفين المرفوعة لو موجودة
+   cp    .env              .next/standalone/.env
+
+   PORT=3000 HOSTNAME=0.0.0.0 node .next/standalone/server.js
    ```
+
+   > `npm start` (`next start`) لسه بيشتغل لكن Next بيحذّر إنه مش الأمثل مع `output: standalone` — استخدم `node .next/standalone/server.js`.
+
    خليه شغّال دايمًا عبر process manager (pm2، systemd، أو Docker — شوف `Dockerfile`) ووصّله بريفرس بروكسي (nginx/Caddy) لو محتاج TLS.
 
 ### بديل: Docker
@@ -87,11 +97,15 @@ docker build -t afro-egypt-workforce .
 docker run -p 3000:3000 --env-file .env afro-egypt-workforce
 ```
 
-الـmigrations **مش** بتتشغّل تلقائيًا جوّا الكونتينر — شغّل `npx prisma migrate deploy` (والزرع أول مرة) ضد قاعدة البيانات قبل ما تبعت أي traffic للكونتينر.
+الـ`Dockerfile` بيعمل خطوات النسخ اللي فوق (static + public) جواه، فما تحتاجش تعملها يدويًا مع Docker.
+
+الـmigrations **مش** بتتشغّل تلقائيًا جوّا الكونتينر — شغّل `npx prisma migrate deploy` (والزرع أول مرة) ضد قاعدة البيانات قبل ما تبعت أي traffic للكونتينر. ولو بتخزّن مستندات الموظفين محليًا، اعمل `-v` (volume) لـ `/app/public/uploads` عشان الملفات ما تضيعش مع كل إعادة تشغيل للكونتينر.
 
 ### نسخ احتياطي
 
 قاعدة البيانات هي مصدر الحقيقة الوحيد. اعمل نسخة احتياطية دورية بـ `mysqldump` (أو أداة النسخ الاحتياطي بتاعة مزوّد الاستضافة) — الجدول `AttendanceLog` تحديدًا append-only ومفيش طريقة تانية تسترجعه.
+
+**كمان:** لو التخزين المحلي للمستندات مفعّل، ضمّ فولدر `public/uploads/` لنفس روتين النسخ الاحتياطي — فيه بيانات حقيقية (صور بطاقات، شهادات، إقرارات موقّعة) مش موجودة في قاعدة البيانات.
 
 ## أهم المسارات
 
