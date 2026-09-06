@@ -115,6 +115,27 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
                   </Badge>
                 }
               />
+
+              <div className="sm:col-span-2 lg:col-span-3 border-t border-border pt-3 -mb-1 mt-1">
+                <p className="text-sm font-semibold text-muted-foreground">{t.employees.sectionPersonal}</p>
+              </div>
+              <Field label={t.employees.formNationalId} value={employee.nationalId ?? "—"} />
+              <Field label={t.employees.formPhone} value={employee.phone ?? "—"} />
+              <Field label={t.employees.formQualification} value={employee.qualification ?? "—"} />
+              <Field
+                label={t.employees.formMilitaryStatus}
+                value={
+                  employee.militaryStatus
+                    ? {
+                        completed: t.employees.militaryCompleted,
+                        exempted: t.employees.militaryExempted,
+                        postponed: t.employees.militaryPostponed,
+                        not_applicable: t.employees.militaryNotApplicable,
+                      }[employee.militaryStatus]
+                    : "—"
+                }
+              />
+              <Field label={t.employees.formAddress} value={employee.address ?? "—"} />
             </CardContent>
           </Card>
         </TabsContent>

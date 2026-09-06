@@ -38,6 +38,13 @@ enum SalaryType {
   daily
 }
 
+enum MilitaryStatus {
+  completed // أدى الخدمة
+  exempted // إعفاء
+  postponed // مؤجل
+  not_applicable // لا ينطبق (إناث / خارج السن)
+}
+
 enum PunchType {
   in
   out
@@ -173,6 +180,10 @@ model Employee {
   biometricDeviceUserId String
   status                EmployeeStatus @default(active)
   phone                 String?
+  address               String?         @db.Text
+  qualification         String?
+  militaryStatus        MilitaryStatus?
+  nationalId            String?         @unique // الرقم القومي — enforced required by the form; nullable for the migration of existing rows
   avatarColor           String?
   deletedAt             DateTime?
   createdAt             DateTime       @default(now())

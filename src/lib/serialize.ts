@@ -52,6 +52,10 @@ export function toEmployee(e: PEmployee): Employee {
     biometricDeviceUserId: e.biometricDeviceUserId,
     status: e.status,
     phone: e.phone ?? undefined,
+    address: e.address ?? undefined,
+    qualification: e.qualification ?? undefined,
+    militaryStatus: e.militaryStatus ?? undefined,
+    nationalId: e.nationalId ?? undefined,
     avatarColor: e.avatarColor ?? undefined,
   };
 }

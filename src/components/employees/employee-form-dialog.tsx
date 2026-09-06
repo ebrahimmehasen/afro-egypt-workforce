@@ -176,6 +176,43 @@ export function EmployeeFormDialog({
             </Select>
           </div>
 
+          <div className="mt-2 border-t border-border pt-3 sm:col-span-2">
+            <p className="text-sm font-semibold text-muted-foreground">{t.employees.sectionPersonal}</p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="nationalId">{t.employees.formNationalId}</Label>
+            <Input id="nationalId" name="nationalId" dir="ltr" inputMode="numeric" pattern="\d{14}" maxLength={14} defaultValue={employee?.nationalId} required />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="phone">{t.employees.formPhone}</Label>
+            <Input id="phone" name="phone" dir="ltr" defaultValue={employee?.phone} required />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="qualification">{t.employees.formQualification}</Label>
+            <Input id="qualification" name="qualification" defaultValue={employee?.qualification} required />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t.employees.formMilitaryStatus}</Label>
+            <Select name="militaryStatus" defaultValue={employee?.militaryStatus ?? "not_applicable"}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="completed">{t.employees.militaryCompleted}</SelectItem>
+                <SelectItem value="exempted">{t.employees.militaryExempted}</SelectItem>
+                <SelectItem value="postponed">{t.employees.militaryPostponed}</SelectItem>
+                <SelectItem value="not_applicable">{t.employees.militaryNotApplicable}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label htmlFor="address">{t.employees.formAddress}</Label>
+            <Input id="address" name="address" defaultValue={employee?.address} required />
+          </div>
+
           <DialogFooter className="sm:col-span-2">
             <SubmitButton label={employee ? t.common.save : t.employees.addEmployee} />
           </DialogFooter>

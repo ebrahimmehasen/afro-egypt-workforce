@@ -21,6 +21,11 @@ const employeeSchema = z
     allowances: z.coerce.number().min(0).default(0),
     biometricDeviceUserId: z.string().min(1),
     status: z.enum(["active", "on_leave", "suspended", "terminated"]),
+    phone: z.string().min(6),
+    address: z.string().min(3),
+    qualification: z.string().min(2),
+    militaryStatus: z.enum(["completed", "exempted", "postponed", "not_applicable"]),
+    nationalId: z.string().regex(/^\d{14}$/),
   })
   .refine((d) => (d.salaryType === "daily" ? (d.dailyRate ?? 0) > 0 : d.basicSalary > 0), {
     path: ["salaryType"],
@@ -41,7 +46,11 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
   const parsed = employeeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const id = await nextEmployeeId();
-  const { allowances, hireDate, dailyRate, salaryType, ...rest } = parsed.data;
+  const { allowances, hireDate, dailyRate, salaryType, nationalId, ...rest } = parsed.data;
+
+  if (await prisma.employee.findUnique({ where: { nationalId } })) {
+    return { error: t.validation.nationalIdTaken };
+  }
 
   await recordChange(
     {
@@ -54,6 +63,7 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
         data: {
           id,
           ...rest,
+          nationalId,
           salaryType,
           dailyRate: salaryType === "daily" ? dailyRate ?? null : null,
           hireDate: new Date(`${hireDate}T00:00:00.000Z`),
@@ -75,7 +85,11 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
   const before = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
   if (!before) return { error: t.validation.employeeNotFound };
 
-  const { allowances, hireDate, dailyRate, salaryType, ...rest } = parsed.data;
+  const { allowances, hireDate, dailyRate, salaryType, nationalId, ...rest } = parsed.data;
+
+  const nidOwner = await prisma.employee.findUnique({ where: { nationalId } });
+  if (nidOwner && nidOwner.id !== id) return { error: t.validation.nationalIdTaken };
+
   await recordChange(
     {
       module: t.nav.employees,
@@ -88,6 +102,7 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
         where: { id },
         data: {
           ...rest,
+          nationalId,
           salaryType,
           dailyRate: salaryType === "daily" ? dailyRate ?? null : null,
           hireDate: new Date(`${hireDate}T00:00:00.000Z`),

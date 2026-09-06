@@ -13,6 +13,8 @@ export type EmployeeStatus = "active" | "on_leave" | "suspended" | "terminated";
 
 export type SalaryType = "monthly" | "daily";
 
+export type MilitaryStatus = "completed" | "exempted" | "postponed" | "not_applicable";
+
 export interface Employee {
   id: string; // EMP-1001
   name: string;
@@ -28,6 +30,10 @@ export interface Employee {
   biometricDeviceUserId: string;
   status: EmployeeStatus;
   phone?: string;
+  address?: string;
+  qualification?: string;
+  militaryStatus?: MilitaryStatus;
+  nationalId?: string;
   avatarColor?: string;
 }
 

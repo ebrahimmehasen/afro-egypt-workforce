@@ -154,6 +154,16 @@ export interface Dictionary {
     salaryTypeCol: string;
     paidDaysCol: string;
     formAllowances: string;
+    sectionPersonal: string;
+    formPhone: string;
+    formAddress: string;
+    formQualification: string;
+    formNationalId: string;
+    formMilitaryStatus: string;
+    militaryCompleted: string;
+    militaryExempted: string;
+    militaryPostponed: string;
+    militaryNotApplicable: string;
     formBiometricId: string;
     formStatus: string;
     statusActive: string;
@@ -581,6 +591,7 @@ export interface Dictionary {
     shiftNameRequired: string;
     departmentInUse: string;
     employeeNotFound: string;
+    nationalIdTaken: string;
     departmentNotFound: string;
     shiftNotFound: string;
     hoursPositive: string;

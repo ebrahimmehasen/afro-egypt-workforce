@@ -102,7 +102,45 @@ type EmployeeSeed = {
   allowancesTotal: number;
   biometricDeviceUserId: string;
   status: "active";
+  phone: string;
+  address: string;
+  qualification: string;
+  militaryStatus: "completed" | "exempted" | "postponed" | "not_applicable";
+  nationalId: string;
 };
+
+const CAIRO_AREAS = [
+  "المرج، القاهرة", "شبرا الخيمة، القليوبية", "حلوان، القاهرة", "المطرية، القاهرة",
+  "عين شمس، القاهرة", "الزاوية الحمراء، القاهرة", "السلام، القاهرة", "بولاق الدكرور، الجيزة",
+  "إمبابة، الجيزة", "الوراق، الجيزة", "15 مايو، القاهرة", "التبين، حلوان",
+];
+const QUALIFICATIONS = [
+  "دبلوم صناعي", "دبلوم تجارة", "ثانوية عامة", "مؤهل متوسط", "بكالوريوس تجارة",
+  "بكالوريوس هندسة", "دبلوم فني", "محو أمية", "دبلوم زراعي",
+];
+
+/** Deterministic 14-digit Egyptian-style national id from a seed number. */
+function makeNationalId(seq: number, rng: () => number): string {
+  const century = 2; // born 19xx
+  const yy = String(70 + Math.floor(rng() * 30)).padStart(2, "0");
+  const mm = String(1 + Math.floor(rng() * 12)).padStart(2, "0");
+  const dd = String(1 + Math.floor(rng() * 28)).padStart(2, "0");
+  const gov = String(1 + Math.floor(rng() * 27)).padStart(2, "0");
+  const serial = String((seq * 7 + Math.floor(rng() * 900) + 100) % 10000).padStart(4, "0");
+  const check = String(seq % 10);
+  return `${century}${yy}${mm}${dd}${gov}${serial}${check}`;
+}
+
+function makePhone(rng: () => number): string {
+  const prefix = ["010", "011", "012", "015"][Math.floor(rng() * 4)];
+  return prefix + String(Math.floor(rng() * 1e8)).padStart(8, "0");
+}
+
+function makeMilitaryStatus(isFemale: boolean, rng: () => number): EmployeeSeed["militaryStatus"] {
+  if (isFemale) return "not_applicable";
+  const r = rng();
+  return r < 0.6 ? "completed" : r < 0.8 ? "exempted" : r < 0.95 ? "postponed" : "not_applicable";
+}
 
 const SHIFTS: Shift[] = [
   { id: "SHIFT-MORNING", name: "الوردية الصباحية", startTime: "08:00", endTime: "16:00", gracePeriodMinutes: 10, workDays: [0, 1, 2, 3, 4, 5], allowOvertime: true },
@@ -155,6 +193,7 @@ function buildEmployees(): EmployeeSeed[] {
     if (qIdx >= 0) deptQueue.splice(qIdx, 1);
     // EMP-1002 / EMP-1003 are daily-wage production workers (demo variety)
     const daily = s.id === "EMP-1002" || s.id === "EMP-1003";
+    const isFemale = FEMALE_FIRST.includes(s.name.split(" ")[0]);
     employees.push({
       ...s,
       salaryType: daily ? "daily" : "monthly",
@@ -163,6 +202,11 @@ function buildEmployees(): EmployeeSeed[] {
       allowancesTotal: 1000,
       biometricDeviceUserId: `${1001 + idx}`,
       status: "active",
+      phone: makePhone(rng),
+      address: pick(CAIRO_AREAS, rng),
+      qualification: pick(QUALIFICATIONS, rng),
+      militaryStatus: makeMilitaryStatus(isFemale, rng),
+      nationalId: makeNationalId(1001 + idx, rng),
     });
   });
 
@@ -174,9 +218,11 @@ function buildEmployees(): EmployeeSeed[] {
     const shift = deptName === "الأمن" ? pick(SHIFTS, rng) : SHIFTS[0];
     // ~30% of production-line workers are on a daily wage
     const daily = deptName === "الإنتاج" && rng() < 0.3;
+    const name = uniqueName();
+    const isFemale = FEMALE_FIRST.includes(name.split(" ")[0]);
     employees.push({
       id: `EMP-${seq}`,
-      name: uniqueName(),
+      name,
       departmentId: dept.id,
       jobTitle: pick(JOB_TITLES[deptName], rng),
       hireDate: isoDate(addDays(DEMO_DATE, -Math.floor(60 + rng() * 1200))),
@@ -187,6 +233,11 @@ function buildEmployees(): EmployeeSeed[] {
       allowancesTotal: Math.round((300 + rng() * 1200) / 50) * 50,
       biometricDeviceUserId: `${seq}`,
       status: "active",
+      phone: makePhone(rng),
+      address: pick(CAIRO_AREAS, rng),
+      qualification: pick(QUALIFICATIONS, rng),
+      militaryStatus: makeMilitaryStatus(isFemale, rng),
+      nationalId: makeNationalId(seq, rng),
     });
     seq++;
   }
