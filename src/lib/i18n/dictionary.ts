@@ -332,6 +332,10 @@ export interface Dictionary {
     colActions: string;
     monthly: string;
     oneTime: string;
+    bonusHint: string;
+    recurringHint: string;
+    bonusMonth: string;
+    bonusYear: string;
     noDeductions: string;
     noAllowances: string;
     deletedDeduction: string;

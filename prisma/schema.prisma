@@ -312,16 +312,19 @@ model Deduction {
 }
 
 model Allowance {
-  id         String        @id @default(cuid())
-  employeeId String
-  employee   Employee      @relation(fields: [employeeId], references: [id])
-  type       AllowanceType
-  amount     Int
-  monthly    Boolean       @default(true)
-  notes      String?       @db.Text
-  createdAt  DateTime      @default(now())
+  id             String        @id @default(cuid())
+  employeeId     String
+  employee       Employee      @relation(fields: [employeeId], references: [id])
+  type           AllowanceType
+  amount         Int
+  monthly        Boolean       @default(true) // recurring every month (transport / meal / fixed / incentive)
+  effectiveYear  Int? // set when monthly = false — the one period this applies to (a bonus)
+  effectiveMonth Int? // 1-12
+  notes          String?       @db.Text
+  createdAt      DateTime      @default(now())
 
   @@index([employeeId])
+  @@index([effectiveYear, effectiveMonth])
 }
 
 // ---------------------------------------------------------------------------

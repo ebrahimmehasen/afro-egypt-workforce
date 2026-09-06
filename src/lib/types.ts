@@ -155,6 +155,8 @@ export interface Allowance {
   type: AllowanceType;
   amount: number;
   monthly: boolean;
+  effectiveYear?: number; // set when monthly === false (a one-off bonus)
+  effectiveMonth?: number; // 1-12
   notes?: string;
 }
 

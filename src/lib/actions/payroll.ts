@@ -67,7 +67,16 @@ export async function calculatePayroll(periodId: string) {
     for (const employee of activeEmployees) {
       const [monthAttendance, empAllowances, approvedOvertime, manualDeductions] = await Promise.all([
         tx.dailyAttendance.findMany({ where: { employeeId: employee.id, date: { gte: from, lt: to } } }),
-        tx.allowance.findMany({ where: { employeeId: employee.id } }),
+        tx.allowance.findMany({
+          where: {
+            employeeId: employee.id,
+            // recurring allowances always apply; a one-off bonus only in its own month
+            OR: [
+              { monthly: true },
+              { monthly: false, effectiveYear: period.year, effectiveMonth: period.month },
+            ],
+          },
+        }),
         tx.overtime.findMany({ where: { employeeId: employee.id, status: "approved", date: { gte: from, lt: to } } }),
         tx.deduction.findMany({
           where: {

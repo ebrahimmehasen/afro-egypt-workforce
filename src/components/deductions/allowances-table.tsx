@@ -56,7 +56,13 @@ export function AllowancesTable({
                 </TableCell>
                 <TableCell><Badge variant="gold">{allowanceTypeLabel(a.type, t)}</Badge></TableCell>
                 <TableCell className="tabular-nums font-medium text-success">+{formatEGP(a.amount, locale)}</TableCell>
-                <TableCell className="text-muted-foreground">{a.monthly ? t.deductions.monthly : t.deductions.oneTime}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {a.monthly
+                    ? t.deductions.monthly
+                    : a.effectiveYear && a.effectiveMonth
+                      ? `${t.deductions.oneTime} — ${a.effectiveYear}-${String(a.effectiveMonth).padStart(2, "0")}`
+                      : t.deductions.oneTime}
+                </TableCell>
                 {canManage && (
                   <TableCell className="text-end">
                     <Button

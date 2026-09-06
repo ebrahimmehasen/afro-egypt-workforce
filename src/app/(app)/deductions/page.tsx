@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
+import { currentYearMonth } from "@/lib/today";
 import { canEditPayroll } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
@@ -31,6 +32,12 @@ export default async function DeductionsPage({
   const deductions = [...db.deductions].sort((a, b) => (a.date < b.date ? 1 : -1));
   const allowances = [...db.allowances];
 
+  // default the bonus month to the open (draft) period, else the real month
+  const openPeriod = db.payrollPeriods.find((p) => p.status === "draft" || p.status === "calculated");
+  const bonusPeriod = openPeriod
+    ? { year: openPeriod.year, month: openPeriod.month }
+    : currentYearMonth();
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={t.deductions.title} description={t.deductions.description} />
@@ -56,7 +63,11 @@ export default async function DeductionsPage({
         </TabsContent>
 
         <TabsContent value="allowances" className="flex flex-col gap-4">
-          {canManage && <div className="flex justify-end"><AllowanceFormDialog employees={db.employees} /></div>}
+          {canManage && (
+            <div className="flex justify-end">
+              <AllowanceFormDialog employees={db.employees} currentPeriod={bonusPeriod} />
+            </div>
+          )}
           <AllowancesTable allowances={allowances} employees={db.employees} canManage={canManage} />
         </TabsContent>
       </Tabs>

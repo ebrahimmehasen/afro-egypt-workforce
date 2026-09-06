@@ -155,6 +155,8 @@ export function toAllowance(a: PAllowance): Allowance {
     type: a.type,
     amount: a.amount,
     monthly: a.monthly,
+    effectiveYear: a.effectiveYear ?? undefined,
+    effectiveMonth: a.effectiveMonth ?? undefined,
     notes: a.notes ?? undefined,
   };
 }
