@@ -2,36 +2,20 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useFormStatus } from "react-dom";
-import { useActionState } from "react";
 import { toast } from "sonner";
-import { FileSignature, Printer, Trash2, Upload, CheckCircle2, Clock } from "lucide-react";
-import { ACKNOWLEDGMENT_TYPES, AcknowledgmentType, EmployeeAcknowledgment } from "@/lib/types";
-import { generateAcknowledgment, deleteAcknowledgment } from "@/lib/actions/acknowledgments";
-import { useActionFeedback } from "@/hooks/use-action-feedback";
-import { useLocale, useT } from "@/components/providers/locale-provider";
-import { intlLocale } from "@/lib/i18n/format";
+import { FileCheck2, FileSignature, Plus, Trash2, Upload, ExternalLink } from "lucide-react";
+import { EmployeeAcknowledgment, STANDARD_ACKNOWLEDGMENT_KEYS } from "@/lib/types";
+import { ACCEPTED_DOCUMENT_MIME } from "@/lib/documents";
+import { useT } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 
-const selectCls = "h-10 rounded-md border border-input bg-background px-3 text-sm";
-
-function GenerateButton() {
-  const { pending } = useFormStatus();
-  const t = useT();
-  return (
-    <Button type="submit" disabled={pending} className="gap-2">
-      <FileSignature className="h-4 w-4" />
-      {pending ? t.common.saving : t.acknowledgments.generate}
-    </Button>
-  );
-}
+type Row = { key: string; label: string; doc?: EmployeeAcknowledgment };
 
 export function AcknowledgmentsPanel({
   employeeId,
@@ -43,30 +27,34 @@ export function AcknowledgmentsPanel({
   canManage: boolean;
 }) {
   const t = useT();
-  const locale = useLocale();
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [type, setType] = useState<AcknowledgmentType>("employment_terms");
   const [busy, setBusy] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
   const inputs = useRef<Record<string, HTMLInputElement | null>>({});
-  const [state, formAction] = useActionState(generateAcknowledgment, {});
-  useActionFeedback(state, () => {
-    setOpen(false);
-    router.refresh();
-  });
+  const newInput = useRef<HTMLInputElement | null>(null);
 
-  const fmt = (iso: string) => new Date(iso).toLocaleDateString(intlLocale(locale), { year: "numeric", month: "short", day: "numeric" });
+  const byKey = new Map(acknowledgments.map((a) => [a.key, a]));
+  const rows: Row[] = [
+    ...STANDARD_ACKNOWLEDGMENT_KEYS.map((key) => ({
+      key,
+      label: t.acknowledgments.slots[key],
+      doc: byKey.get(key),
+    })),
+    ...acknowledgments
+      .filter((a) => a.key.startsWith("custom-"))
+      .map((a) => ({ key: a.key, label: a.label, doc: a })),
+  ];
 
-  async function uploadSigned(ackId: string, file: File) {
-    setBusy(ackId);
+  async function send(fd: FormData, busyKey: string) {
+    setBusy(busyKey);
     try {
-      const fd = new FormData();
-      fd.set("ackId", ackId);
-      fd.set("file", file);
       const res = await fetch(`/api/employees/${employeeId}/acknowledgments`, { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "upload failed");
-      toast.success(t.acknowledgments.signedUploaded);
+      toast.success(t.acknowledgments.uploaded);
+      setAddOpen(false);
+      setNewLabel("");
       router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t.documents.uploadFailed);
@@ -75,11 +63,30 @@ export function AcknowledgmentsPanel({
     }
   }
 
-  async function remove(id: string) {
-    setBusy(id);
+  function uploadInto(key: string, file: File) {
+    const fd = new FormData();
+    fd.set("key", key);
+    fd.set("file", file);
+    void send(fd, key);
+  }
+
+  function addCustom(file: File) {
+    if (!newLabel.trim()) {
+      toast.error(t.acknowledgments.nameRequired);
+      return;
+    }
+    const fd = new FormData();
+    fd.set("key", "new");
+    fd.set("label", newLabel.trim());
+    fd.set("file", file);
+    void send(fd, "new");
+  }
+
+  async function remove(key: string) {
+    setBusy(key);
     try {
-      const res = await deleteAcknowledgment(id);
-      if (res?.error) throw new Error(res.error);
+      const res = await fetch(`/api/employees/${employeeId}/acknowledgments?key=${key}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json()).error ?? "delete failed");
       toast.success(t.acknowledgments.deleted);
       router.refresh();
     } catch (e) {
@@ -95,123 +102,119 @@ export function AcknowledgmentsPanel({
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">{t.acknowledgments.title}</h3>
           {canManage && (
-            <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog open={addOpen} onOpenChange={setAddOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="outline" className="gap-2">
-                  <FileSignature className="h-4 w-4" />
-                  {t.acknowledgments.new}
+                  <Plus className="h-4 w-4" />
+                  {t.acknowledgments.addCustom}
                 </Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>{t.acknowledgments.new}</DialogTitle></DialogHeader>
-                <form action={formAction} className="flex flex-col gap-4">
-                  <input type="hidden" name="employeeId" value={employeeId} />
+                <DialogHeader><DialogTitle>{t.acknowledgments.addCustom}</DialogTitle></DialogHeader>
+                <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="ack-type">{t.acknowledgments.type}</Label>
-                    <select
-                      id="ack-type"
-                      name="type"
-                      value={type}
-                      onChange={(e) => setType(e.target.value as AcknowledgmentType)}
-                      className={selectCls}
-                    >
-                      {ACKNOWLEDGMENT_TYPES.map((ty) => (
-                        <option key={ty} value={ty}>{t.acknowledgments.types[ty]}</option>
-                      ))}
-                    </select>
+                    <Label htmlFor="ack-label">{t.acknowledgments.name}</Label>
+                    <Input
+                      id="ack-label"
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      placeholder={t.acknowledgments.namePlaceholder}
+                    />
                   </div>
-                  {type === "other" && (
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="ack-custom">{t.acknowledgments.customText}</Label>
-                      <Textarea id="ack-custom" name="customText" rows={4} required />
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground">{t.acknowledgments.flowHint}</p>
-                  <DialogFooter><GenerateButton /></DialogFooter>
-                </form>
+                  <input
+                    ref={newInput}
+                    type="file"
+                    accept={ACCEPTED_DOCUMENT_MIME.join(",")}
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) addCustom(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <DialogFooter>
+                    <Button
+                      className="gap-2"
+                      disabled={busy === "new" || !newLabel.trim()}
+                      onClick={() => newInput.current?.click()}
+                    >
+                      <Upload className="h-4 w-4" />
+                      {t.acknowledgments.chooseFile}
+                    </Button>
+                  </DialogFooter>
+                </div>
               </DialogContent>
             </Dialog>
           )}
         </div>
 
-        {acknowledgments.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">{t.acknowledgments.none}</p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-border">
-            {acknowledgments.map((a) => (
-              <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+        <ul className="flex flex-col divide-y divide-border">
+          {rows.map((row) => (
+            <li key={row.key} className="flex items-center justify-between gap-3 py-2.5">
+              <div className="flex min-w-0 items-center gap-2">
+                {row.doc ? (
+                  <FileCheck2 className="h-4 w-4 shrink-0 text-success" />
+                ) : (
+                  <FileSignature className="h-4 w-4 shrink-0 text-muted-foreground" />
+                )}
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{t.acknowledgments.types[a.type]}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {t.acknowledgments.generatedAt}: {fmt(a.generatedAt)}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {a.signedAt ? (
-                    <Badge variant="success" className="gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {t.acknowledgments.signedOn} {fmt(a.signedAt)}
-                    </Badge>
-                  ) : (
-                    <Badge variant="warning" className="gap-1">
-                      <Clock className="h-3.5 w-3.5" />
-                      {t.acknowledgments.awaitingSignature}
-                    </Badge>
+                  <p className="truncate text-sm font-medium">{row.label}</p>
+                  {row.doc && (
+                    <p className="truncate text-xs text-muted-foreground">{row.doc.fileName ?? row.doc.fileUrl}</p>
                   )}
+                </div>
+              </div>
 
-                  <a href={`/acknowledgment/${a.id}`} target="_blank" rel="noopener noreferrer">
-                    <Button size="icon" variant="ghost" aria-label={t.acknowledgments.print}>
-                      <Printer className="h-4 w-4" />
+              <div className="flex shrink-0 items-center gap-1.5">
+                {row.doc && (
+                  <a href={row.doc.fileUrl} target="_blank" rel="noopener noreferrer">
+                    <Button size="icon" variant="ghost" aria-label={t.common.view}>
+                      <ExternalLink className="h-4 w-4" />
                     </Button>
                   </a>
-                  {a.fileUrl && (
-                    <a href={a.fileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">
-                      {t.acknowledgments.signedCopy}
-                    </a>
-                  )}
-
-                  {canManage && (
-                    <>
-                      <input
-                        ref={(el) => {
-                          inputs.current[a.id] = el;
-                        }}
-                        type="file"
-                        accept="application/pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) void uploadSigned(a.id, f);
-                          e.target.value = "";
-                        }}
-                      />
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label={t.acknowledgments.uploadSigned}
-                        disabled={busy === a.id}
-                        onClick={() => inputs.current[a.id]?.click()}
-                      >
-                        <Upload className="h-4 w-4" />
-                      </Button>
+                )}
+                {canManage && (
+                  <>
+                    <input
+                      ref={(el) => {
+                        inputs.current[row.key] = el;
+                      }}
+                      type="file"
+                      accept={ACCEPTED_DOCUMENT_MIME.join(",")}
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) uploadInto(row.key, f);
+                        e.target.value = "";
+                      }}
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label={row.doc ? t.documents.replace : t.documents.upload}
+                      disabled={busy === row.key}
+                      onClick={() => inputs.current[row.key]?.click()}
+                    >
+                      <Upload className="h-4 w-4" />
+                    </Button>
+                    {row.doc && (
                       <Button
                         size="icon"
                         variant="ghost"
                         className="text-destructive"
                         aria-label={t.common.delete}
-                        disabled={busy === a.id}
-                        onClick={() => void remove(a.id)}
+                        disabled={busy === row.key}
+                        onClick={() => void remove(row.key)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+                    )}
+                  </>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
       </CardContent>
     </Card>
   );

@@ -558,34 +558,19 @@ export interface Dictionary {
   };
   acknowledgments: {
     title: string;
-    new: string;
-    generate: string;
-    type: string;
-    customText: string;
-    flowHint: string;
-    none: string;
-    generatedAt: string;
-    awaitingSignature: string;
-    signedOn: string;
-    signedCopy: string;
-    uploadSigned: string;
-    signedUploaded: string;
-    generated: string;
+    addCustom: string;
+    name: string;
+    namePlaceholder: string;
+    nameRequired: string;
+    chooseFile: string;
+    uploaded: string;
     deleted: string;
-    print: string;
-    back: string;
-    date: string;
-    employeeSignature: string;
-    nameAndSignature: string;
-    auditGenerate: string;
-    auditUploadSigned: string;
+    auditUpload: string;
     auditDelete: string;
-    types: {
+    slots: {
       employment_terms: string;
       custody_receipt: string;
       confidentiality: string;
-      code_of_conduct: string;
-      other: string;
     };
   };
   statuses: {

@@ -71,7 +71,7 @@ export async function getDb(): Promise<Store> {
     prisma.payrollPeriod.findMany({ orderBy: [{ year: "desc" }, { month: "desc" }] }),
     prisma.payrollRecord.findMany(),
     prisma.employeeDocument.findMany(),
-    prisma.employeeAcknowledgment.findMany({ orderBy: { generatedAt: "desc" } }),
+    prisma.employeeAcknowledgment.findMany({ orderBy: { uploadedAt: "desc" } }),
     prisma.companySettings.findUnique({ where: { id: "singleton" } }),
     prisma.attendanceSettings.findUnique({ where: { id: "singleton" } }),
     prisma.payrollSettings.findUnique({ where: { id: "singleton" } }),

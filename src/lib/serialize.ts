@@ -68,13 +68,13 @@ export function toEmployeeAcknowledgment(a: PEmployeeAcknowledgment): EmployeeAc
   return {
     id: a.id,
     employeeId: a.employeeId,
-    type: a.type,
-    title: a.title,
-    fileUrl: a.fileUrl ?? undefined,
+    key: a.key,
+    label: a.label,
+    fileUrl: a.fileUrl,
     fileName: a.fileName ?? undefined,
-    generatedAt: iso(a.generatedAt),
-    signedAt: isoOrNull(a.signedAt) ?? undefined,
-    createdBy: a.createdBy ?? undefined,
+    mimeType: a.mimeType ?? undefined,
+    uploadedBy: a.uploadedBy ?? undefined,
+    uploadedAt: iso(a.uploadedAt),
   };
 }
 

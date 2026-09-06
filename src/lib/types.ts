@@ -231,31 +231,24 @@ export interface EmployeeDocument {
   uploadedAt: string;
 }
 
-export type AcknowledgmentType =
-  | "employment_terms"
-  | "custody_receipt"
-  | "confidentiality"
-  | "code_of_conduct"
-  | "other";
-
-export const ACKNOWLEDGMENT_TYPES: AcknowledgmentType[] = [
+/** The three fixed acknowledgment slots. Custom slots use `key` = "custom-<id>". */
+export const STANDARD_ACKNOWLEDGMENT_KEYS = [
   "employment_terms",
   "custody_receipt",
   "confidentiality",
-  "code_of_conduct",
-  "other",
-];
+] as const;
+export type StandardAcknowledgmentKey = (typeof STANDARD_ACKNOWLEDGMENT_KEYS)[number];
 
 export interface EmployeeAcknowledgment {
   id: string;
   employeeId: string;
-  type: AcknowledgmentType;
-  title: string;
-  fileUrl?: string;
+  key: string;
+  label: string;
+  fileUrl: string;
   fileName?: string;
-  generatedAt: string;
-  signedAt?: string;
-  createdBy?: string;
+  mimeType?: string;
+  uploadedBy?: string;
+  uploadedAt: string;
 }
 
 export interface AuditLogEntry {

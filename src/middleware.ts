@@ -7,7 +7,7 @@ const PUBLIC_PATHS = ["/login"];
 // /uploads = employee documents. Any signed-in user may fetch one (the filename
 // carries a millisecond timestamp, so URLs are not guessable); anonymous
 // requests still hit the no-session redirect above.
-const ALWAYS_ALLOWED = ["/dashboard", "/payslip", "/acknowledgment", "/uploads"];
+const ALWAYS_ALLOWED = ["/dashboard", "/payslip", "/uploads"];
 
 /**
  * Reads the role out of the signed session cookie WITHOUT verifying the
