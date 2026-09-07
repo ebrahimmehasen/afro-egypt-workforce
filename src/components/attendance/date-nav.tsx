@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,26 +17,42 @@ export function DateNav({ date }: { date: string }) {
   const t = useT();
   const locale = useLocale();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   function go(newDate: string) {
-    router.push(`/attendance?date=${newDate}`);
+    startTransition(() => {
+      router.push(`/attendance?date=${newDate}`);
+    });
   }
 
   const Prev = locale === "ar" ? ChevronRight : ChevronLeft;
   const Next = locale === "ar" ? ChevronLeft : ChevronRight;
 
   return (
-    <div className="flex items-center gap-1">
-      <Button variant="outline" size="icon" onClick={() => go(shiftDate(date, -1))} aria-label={t.attendance.prevDay}>
+    <div className="flex items-center gap-1" aria-busy={isPending}>
+      <Button
+        variant="outline"
+        size="icon"
+        disabled={isPending}
+        onClick={() => go(shiftDate(date, -1))}
+        aria-label={t.attendance.prevDay}
+      >
         <Prev className="h-4 w-4" />
       </Button>
       <Input
         type="date"
         value={date}
+        disabled={isPending}
         onChange={(e) => go(e.target.value)}
         className="w-40"
       />
-      <Button variant="outline" size="icon" onClick={() => go(shiftDate(date, 1))} aria-label={t.attendance.nextDay}>
+      <Button
+        variant="outline"
+        size="icon"
+        disabled={isPending}
+        onClick={() => go(shiftDate(date, 1))}
+        aria-label={t.attendance.nextDay}
+      >
         <Next className="h-4 w-4" />
       </Button>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import { useActionState } from "react";
@@ -42,6 +42,7 @@ export function PayrollPeriodBar({
   const t = useT();
   const locale = useLocale();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(openPayrollPeriod, {});
   useActionFeedback(state, () => {
@@ -55,8 +56,12 @@ export function PayrollPeriodBar({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {periods.length > 1 && (
-        <Select value={currentId} onValueChange={(v) => router.push(`/payroll?period=${v}`)}>
-          <SelectTrigger className="w-[200px]">
+        <Select
+          value={currentId}
+          disabled={isPending}
+          onValueChange={(v) => startTransition(() => router.push(`/payroll?period=${v}`))}
+        >
+          <SelectTrigger className="w-[200px]" aria-busy={isPending}>
             <SelectValue placeholder={t.payroll.selectPeriod} />
           </SelectTrigger>
           <SelectContent>
