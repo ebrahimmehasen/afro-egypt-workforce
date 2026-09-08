@@ -36,11 +36,11 @@ export function FilePreview({
       <Button size="icon" variant="ghost" aria-label={t.filePreview.view} onClick={() => setOpen(true)}>
         <Eye className="h-4 w-4" />
       </Button>
-      <a href={url} download={filename}>
-        <Button size="icon" variant="ghost" aria-label={t.filePreview.download}>
+      <Button asChild size="icon" variant="ghost" aria-label={t.filePreview.download}>
+        <a href={url} download={filename}>
           <Download className="h-4 w-4" />
-        </Button>
-      </a>
+        </a>
+      </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-3xl">
@@ -62,18 +62,18 @@ export function FilePreview({
           </div>
 
           <div className="flex items-center justify-end gap-2">
-            <a href={url} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm" className="gap-1.5">
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <a href={url} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="h-4 w-4" />
                 {t.filePreview.openTab}
-              </Button>
-            </a>
-            <a href={url} download={filename}>
-              <Button size="sm" className="gap-1.5">
+              </a>
+            </Button>
+            <Button asChild size="sm" className="gap-1.5">
+              <a href={url} download={filename}>
                 <Download className="h-4 w-4" />
                 {t.filePreview.download}
-              </Button>
-            </a>
+              </a>
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
