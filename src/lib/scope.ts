@@ -1,5 +1,6 @@
 import { Employee, User } from "@/lib/types";
 import { Store } from "@/lib/store";
+import { prisma } from "@/lib/prisma";
 
 /**
  * Row-level visibility — the single seam for "what may this user see?".
@@ -30,6 +31,25 @@ export function viewerScope(user: User, allEmployees: Pick<Employee, "id" | "dep
 
 export function inScope(scope: Scope, employeeId: string): boolean {
   return scope.all || scope.ids.has(employeeId);
+}
+
+/**
+ * Same rule as `viewerScope`, for a single employee id, without loading the
+ * whole roster — for API routes (e.g. serving an uploaded file) that only
+ * ever need one yes/no answer. Only hits the database when the caller is a
+ * supervisor (to read the target's department).
+ */
+export async function canViewEmployee(user: User, employeeId: string): Promise<boolean> {
+  if (user.role === "admin" || user.role === "hr") return true;
+  if (user.role === "employee") return user.employeeId === employeeId;
+  if (user.role === "supervisor" && user.departmentId) {
+    const target = await prisma.employee.findFirst({
+      where: { id: employeeId, deletedAt: null },
+      select: { departmentId: true },
+    });
+    return target?.departmentId === user.departmentId;
+  }
+  return false;
 }
 
 /** Narrow an employee list to the scope. */

@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mkdir, writeFile, unlink } from "node:fs/promises";
+import { mkdir, readFile, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { canCorrectAttendance } from "@/lib/permissions";
+import { canManageEmployeeFiles } from "@/lib/permissions";
+import { canViewEmployee } from "@/lib/scope";
 import { recordChangeAs } from "@/lib/audit";
 import { getT } from "@/lib/i18n";
-import {
-  ACCEPTED_DOCUMENT_MIME,
-  MAX_DOCUMENT_BYTES,
-} from "@/lib/documents";
+import { ACCEPTED_DOCUMENT_MIME, MAX_DOCUMENT_BYTES } from "@/lib/documents";
+import { DOCUMENT_STORAGE_ROOT } from "@/lib/document-storage";
 import { EMPLOYEE_DOCUMENT_TYPES, EmployeeDocumentType } from "@/lib/types";
 
 const EXT_BY_MIME: Record<string, string> = {
@@ -19,12 +18,49 @@ const EXT_BY_MIME: Record<string, string> = {
   "application/pdf": "pdf",
 };
 
-const UPLOAD_ROOT = path.join(process.cwd(), "public", "uploads", "employees");
+/**
+ * GET /api/employees/:id/documents?type=... — streams the file back.
+ * Scope-checked (same rule as the /employees/[id] page): admin/hr see anyone,
+ * a supervisor only their department, an employee only themselves. The
+ * physical path is read from the database row, never from the request.
+ */
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getSession();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  if (!(await canViewEmployee(user, id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+
+  const type = req.nextUrl.searchParams.get("type") as EmployeeDocumentType | null;
+  if (!type || !EMPLOYEE_DOCUMENT_TYPES.includes(type)) {
+    return NextResponse.json({ error: "invalid document type" }, { status: 400 });
+  }
+
+  const doc = await prisma.employeeDocument.findUnique({
+    where: { employeeId_type: { employeeId: id, type } },
+  });
+  if (!doc) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  try {
+    const bytes = await readFile(path.join(DOCUMENT_STORAGE_ROOT, doc.fileUrl));
+    return new NextResponse(new Uint8Array(bytes), {
+      headers: {
+        "Content-Type": doc.mimeType ?? "application/octet-stream",
+        "Content-Disposition": `inline; filename="${encodeURIComponent(doc.fileName ?? "file")}"`,
+        "Cache-Control": "private, max-age=0, no-cache",
+      },
+    });
+  } catch {
+    return NextResponse.json({ error: "file missing on disk" }, { status: 404 });
+  }
+}
 
 /** POST /api/employees/:id/documents — multipart { file, type } */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSession();
-  if (!user || !canCorrectAttendance(user.role)) {
+  if (!user || !canManageEmployeeFiles(user.role)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -48,11 +84,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "file too large" }, { status: 413 });
   }
 
-  const dir = path.join(UPLOAD_ROOT, id, "documents");
+  const dir = path.join(DOCUMENT_STORAGE_ROOT, id, "documents");
   await mkdir(dir, { recursive: true });
   const filename = `${type}-${Date.now()}.${EXT_BY_MIME[file.type]}`;
   const absPath = path.join(dir, filename);
-  const fileUrl = `/uploads/employees/${id}/documents/${filename}`;
+  // Stored in the DB as a path relative to DOCUMENT_STORAGE_ROOT — never a public URL.
+  const storageKey = path.posix.join(id, "documents", filename);
 
   await writeFile(absPath, Buffer.from(await file.arrayBuffer()));
 
@@ -73,27 +110,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       (tx) =>
         tx.employeeDocument.upsert({
           where: { employeeId_type: { employeeId: id, type } },
-          create: { employeeId: id, type, fileUrl, fileName: file.name, mimeType: file.type, uploadedBy: user.name },
-          update: { fileUrl, fileName: file.name, mimeType: file.type, uploadedBy: user.name, uploadedAt: new Date() },
+          create: { employeeId: id, type, fileUrl: storageKey, fileName: file.name, mimeType: file.type, uploadedBy: user.name },
+          update: { fileUrl: storageKey, fileName: file.name, mimeType: file.type, uploadedBy: user.name, uploadedAt: new Date() },
         }),
     );
 
     // replaced an older file — remove it (best effort)
-    if (existing && existing.fileUrl !== fileUrl) {
-      await unlink(path.join(process.cwd(), "public", existing.fileUrl)).catch(() => {});
+    if (existing && existing.fileUrl !== storageKey) {
+      await unlink(path.join(DOCUMENT_STORAGE_ROOT, existing.fileUrl)).catch(() => {});
     }
-  } catch (err) {
+  } catch {
     await unlink(absPath).catch(() => {});
     return NextResponse.json({ error: "save failed" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, fileUrl, type });
+  return NextResponse.json({ ok: true, type });
 }
 
 /** DELETE /api/employees/:id/documents?type=... */
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSession();
-  if (!user || !canCorrectAttendance(user.role)) {
+  if (!user || !canManageEmployeeFiles(user.role)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const { id } = await params;
@@ -118,7 +155,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     },
     (tx) => tx.employeeDocument.delete({ where: { id: doc.id } }),
   );
-  await unlink(path.join(process.cwd(), "public", doc.fileUrl)).catch(() => {});
+  await unlink(path.join(DOCUMENT_STORAGE_ROOT, doc.fileUrl)).catch(() => {});
 
   return NextResponse.json({ ok: true });
 }

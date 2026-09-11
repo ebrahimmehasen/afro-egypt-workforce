@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile, unlink } from "node:fs/promises";
+import { mkdir, readFile, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { canCorrectAttendance } from "@/lib/permissions";
+import { canManageEmployeeFiles } from "@/lib/permissions";
+import { canViewEmployee } from "@/lib/scope";
 import { recordChangeAs } from "@/lib/audit";
 import { isCustomAcknowledgmentKey, isStandardAcknowledgmentKey } from "@/lib/acknowledgments";
 import { ACCEPTED_DOCUMENT_MIME, MAX_DOCUMENT_BYTES } from "@/lib/documents";
+import { DOCUMENT_STORAGE_ROOT } from "@/lib/document-storage";
 import { getT } from "@/lib/i18n";
 
 const EXT_BY_MIME: Record<string, string> = {
@@ -17,7 +19,42 @@ const EXT_BY_MIME: Record<string, string> = {
   "application/pdf": "pdf",
 };
 
-const UPLOAD_ROOT = path.join(process.cwd(), "public", "uploads", "employees");
+/**
+ * GET /api/employees/:id/acknowledgments?key=... — streams the file back.
+ * Same scope check and DB-resolved-path discipline as the documents route.
+ */
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getSession();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  if (!(await canViewEmployee(user, id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+
+  const key = req.nextUrl.searchParams.get("key") ?? "";
+  if (!isStandardAcknowledgmentKey(key) && !isCustomAcknowledgmentKey(key)) {
+    return NextResponse.json({ error: "invalid key" }, { status: 400 });
+  }
+
+  const ack = await prisma.employeeAcknowledgment.findUnique({
+    where: { employeeId_key: { employeeId: id, key } },
+  });
+  if (!ack) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  try {
+    const bytes = await readFile(path.join(DOCUMENT_STORAGE_ROOT, ack.fileUrl));
+    return new NextResponse(new Uint8Array(bytes), {
+      headers: {
+        "Content-Type": ack.mimeType ?? "application/octet-stream",
+        "Content-Disposition": `inline; filename="${encodeURIComponent(ack.fileName ?? "file")}"`,
+        "Cache-Control": "private, max-age=0, no-cache",
+      },
+    });
+  } catch {
+    return NextResponse.json({ error: "file missing on disk" }, { status: 404 });
+  }
+}
 
 /**
  * POST /api/employees/:id/acknowledgments — multipart { key, file, label? }
@@ -26,7 +63,7 @@ const UPLOAD_ROOT = path.join(process.cwd(), "public", "uploads", "employees");
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSession();
-  if (!user || !canCorrectAttendance(user.role)) {
+  if (!user || !canManageEmployeeFiles(user.role)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -65,10 +102,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "invalid key" }, { status: 400 });
   }
 
-  const dir = path.join(UPLOAD_ROOT, id, "acknowledgments");
+  const dir = path.join(DOCUMENT_STORAGE_ROOT, id, "acknowledgments");
   await mkdir(dir, { recursive: true });
   const filename = `${key}-${Date.now()}.${EXT_BY_MIME[file.type]}`;
-  const fileUrl = `/uploads/employees/${id}/acknowledgments/${filename}`;
+  const storageKey = path.posix.join(id, "acknowledgments", filename);
   await writeFile(path.join(dir, filename), Buffer.from(await file.arrayBuffer()));
 
   try {
@@ -89,29 +126,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           where: { employeeId_key: { employeeId: id, key } },
           create: {
             employeeId: id, key, label: resolvedLabel,
-            fileUrl, fileName: file.name, mimeType: file.type, uploadedBy: user.name,
+            fileUrl: storageKey, fileName: file.name, mimeType: file.type, uploadedBy: user.name,
           },
           update: {
             label: resolvedLabel,
-            fileUrl, fileName: file.name, mimeType: file.type, uploadedBy: user.name, uploadedAt: new Date(),
+            fileUrl: storageKey, fileName: file.name, mimeType: file.type, uploadedBy: user.name, uploadedAt: new Date(),
           },
         }),
     );
-    if (prev && prev.fileUrl !== fileUrl) {
-      await unlink(path.join(process.cwd(), "public", prev.fileUrl)).catch(() => {});
+    if (prev && prev.fileUrl !== storageKey) {
+      await unlink(path.join(DOCUMENT_STORAGE_ROOT, prev.fileUrl)).catch(() => {});
     }
   } catch {
     await unlink(path.join(dir, filename)).catch(() => {});
     return NextResponse.json({ error: "save failed" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, key, fileUrl });
+  return NextResponse.json({ ok: true, key });
 }
 
 /** DELETE /api/employees/:id/acknowledgments?key=... */
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSession();
-  if (!user || !canCorrectAttendance(user.role)) {
+  if (!user || !canManageEmployeeFiles(user.role)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const { id } = await params;
@@ -133,7 +170,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     },
     (tx) => tx.employeeAcknowledgment.delete({ where: { id: ack.id } }),
   );
-  await unlink(path.join(process.cwd(), "public", ack.fileUrl)).catch(() => {});
+  await unlink(path.join(DOCUMENT_STORAGE_ROOT, ack.fileUrl)).catch(() => {});
 
   return NextResponse.json({ ok: true });
 }

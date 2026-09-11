@@ -70,7 +70,9 @@ export function toEmployeeAcknowledgment(a: PEmployeeAcknowledgment): EmployeeAc
     employeeId: a.employeeId,
     key: a.key,
     label: a.label,
-    fileUrl: a.fileUrl,
+    // `a.fileUrl` is a private on-disk storage key (see DOCUMENT_STORAGE_ROOT) —
+    // never exposed. The client gets the scope-checked API route instead.
+    fileUrl: `/api/employees/${a.employeeId}/acknowledgments?key=${encodeURIComponent(a.key)}`,
     fileName: a.fileName ?? undefined,
     mimeType: a.mimeType ?? undefined,
     uploadedBy: a.uploadedBy ?? undefined,
@@ -83,7 +85,8 @@ export function toEmployeeDocument(d: PEmployeeDocument): EmployeeDocument {
     id: d.id,
     employeeId: d.employeeId,
     type: d.type,
-    fileUrl: d.fileUrl,
+    // see toEmployeeAcknowledgment — d.fileUrl is a private storage key, not a URL.
+    fileUrl: `/api/employees/${d.employeeId}/documents?type=${encodeURIComponent(d.type)}`,
     fileName: d.fileName ?? undefined,
     mimeType: d.mimeType ?? undefined,
     uploadedBy: d.uploadedBy ?? undefined,

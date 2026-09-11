@@ -10,7 +10,7 @@ import { getLocale } from "@/lib/i18n/locale";
 import { intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { requestStatusLabel, deductionTypeLabel } from "@/lib/i18n/labels";
-import { canCorrectAttendance } from "@/lib/permissions";
+import { canManageEmployeeFiles } from "@/lib/permissions";
 import { missingDocumentTypes } from "@/lib/documents";
 import { DocumentsPanel } from "@/components/employees/documents-panel";
 import { AcknowledgmentsPanel } from "@/components/employees/acknowledgments-panel";
@@ -59,7 +59,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   const documents = db.employeeDocuments.filter((d) => d.employeeId === employee.id);
   const acknowledgments = db.employeeAcknowledgments.filter((a) => a.employeeId === employee.id);
   const missingDocs = missingDocumentTypes(documents);
-  const canManageDocs = canCorrectAttendance(user.role);
+  const canManageDocs = canManageEmployeeFiles(user.role);
 
   return (
     <div className="flex flex-col gap-6">

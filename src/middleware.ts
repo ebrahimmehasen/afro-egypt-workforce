@@ -4,15 +4,16 @@ import { Role } from "@/lib/types";
 
 const SESSION_COOKIE = "afro_egypt_session";
 const PUBLIC_PATHS = ["/login"];
-// /uploads = employee documents. Any signed-in user may fetch one (the filename
-// carries a millisecond timestamp, so URLs are not guessable); anonymous
-// requests still hit the no-session redirect above.
-const ALWAYS_ALLOWED = ["/dashboard", "/payslip", "/uploads"];
+const ALWAYS_ALLOWED = ["/dashboard", "/payslip"];
 
 /**
  * Reads the role out of the signed session cookie WITHOUT verifying the
- * signature — this is only a coarse UX redirect. Real enforcement is in
- * (app)/layout.tsx via getSession(), which rejects tampered cookies.
+ * signature — this is only a coarse UX redirect. Real enforcement is
+ * `requireAccess()` in each (app) page (see src/lib/auth.ts), which verifies
+ * the session signature and checks role-vs-path itself. Employee files
+ * (/api/employees/[id]/documents|acknowledgments) are under /api, so this
+ * middleware never runs on them at all — they carry their own session +
+ * per-record scope check (canViewEmployee).
  */
 function roleFromCookie(raw: string): Role | null {
   try {

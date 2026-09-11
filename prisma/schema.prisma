@@ -409,7 +409,11 @@ model EmployeeDocument {
   employeeId String
   employee   Employee             @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   type       EmployeeDocumentType
-  fileUrl    String // /uploads/employees/<id>/documents/<type>-<ts>.<ext>
+  // Private on-disk path, relative to DOCUMENT_STORAGE_ROOT (src/lib/documents.ts)
+  // — NOT a public URL. Never sent to the client as-is; serialize.ts derives
+  // the scope-checked API URL instead. Resolved server-side only, by the
+  // GET handler on the same route that accepts the upload.
+  fileUrl    String
   fileName   String?
   mimeType   String?
   uploadedBy String? // display name of the user who uploaded it
@@ -429,7 +433,7 @@ model EmployeeAcknowledgment {
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   key        String // "employment_terms" | "custody_receipt" | "confidentiality" | "custom-<cuid>"
   label      String // display name (fixed for the standard three, user-typed for custom)
-  fileUrl    String
+  fileUrl    String // private storage key — see the comment on EmployeeDocument.fileUrl
   fileName   String?
   mimeType   String?
   uploadedBy String?

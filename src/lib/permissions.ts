@@ -42,3 +42,8 @@ export function canManageUsers(role: Role): boolean {
 export function canCorrectAttendance(role: Role): boolean {
   return role === "admin" || role === "hr";
 }
+
+/** Upload / replace / delete an employee's documents and signed acknowledgments. */
+export function canManageEmployeeFiles(role: Role): boolean {
+  return role === "admin" || role === "hr";
+}

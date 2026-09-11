@@ -1,6 +1,10 @@
 import { EMPLOYEE_DOCUMENT_TYPES, EmployeeDocument, EmployeeDocumentType } from "@/lib/types";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 
+// Client-safe (imported by documents-panel.tsx / acknowledgments-panel.tsx) —
+// no Node built-ins here. Server-only storage paths live in
+// @/lib/document-storage instead.
+
 /** Document types this employee has not uploaded yet. */
 export function missingDocumentTypes(docs: EmployeeDocument[]): EmployeeDocumentType[] {
   const present = new Set(docs.map((d) => d.type));
