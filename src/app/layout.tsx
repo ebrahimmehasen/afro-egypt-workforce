@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Cairo } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { LocaleProvider } from "@/components/providers/locale-provider";
+import { ChunkReloadOnDeploy } from "@/components/providers/chunk-reload-on-deploy";
 import { getDictionary } from "@/lib/i18n";
 import { dir, getLocale } from "@/lib/i18n/locale";
 import "./globals.css";
@@ -28,6 +29,7 @@ export default async function RootLayout({
     <html lang={locale} dir={dir(locale)} className={`${cairo.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
         <LocaleProvider locale={locale} dictionary={dictionary}>
+          <ChunkReloadOnDeploy />
           {children}
           <Toaster position="top-center" richColors closeButton />
         </LocaleProvider>

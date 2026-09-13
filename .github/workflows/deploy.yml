@@ -27,6 +27,18 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Assemble static assets into the standalone build
+        shell: powershell
+        run: |
+          # Next's standalone output doesn't include .next/static or public/ -
+          # they have to be copied in by hand or the deployed app serves HTML
+          # with no CSS/JS/images.
+          robocopy ".next\static" ".next\standalone\.next\static" /E /NFL /NDL /NJH /NJS /R:3 /W:5
+          if ($LASTEXITCODE -ge 8) { throw "robocopy (.next/static) failed with exit code $LASTEXITCODE" }
+          robocopy "public" ".next\standalone\public" /E /NFL /NDL /NJH /NJS /R:3 /W:5
+          if ($LASTEXITCODE -ge 8) { throw "robocopy (public) failed with exit code $LASTEXITCODE" }
+          exit 0
+
       - name: Stop app service
         shell: powershell
         run: |
