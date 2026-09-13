@@ -27,12 +27,22 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Stop app service
+        shell: powershell
+        run: |
+          Stop-Service -Name AfroEgyptApp -ErrorAction SilentlyContinue
+          # give node.exe a moment to actually release its file handles after
+          # the service reports Stopped — this is what made robocopy hang
+          # (default /R:1000000 /W:30) instead of just failing fast.
+          Start-Sleep -Seconds 3
+
       - name: Sync build output to the live app directory
         shell: powershell
         run: |
           $liveDir = "C:\Users\Host\Desktop\main\afro-egypt-workforce\.next\standalone"
-          robocopy ".next\standalone" $liveDir /E /XF ".env" /XD "uploads" /NFL /NDL /NJH /NJS
+          robocopy ".next\standalone" $liveDir /E /XF ".env" /XD "uploads" /NFL /NDL /NJH /NJS /R:3 /W:5
           if ($LASTEXITCODE -ge 8) { throw "robocopy failed with exit code $LASTEXITCODE" }
 
-      - name: Restart app service
-        run: Restart-Service -Name AfroEgyptApp
+      - name: Start app service
+        shell: powershell
+        run: Start-Service -Name AfroEgyptApp
