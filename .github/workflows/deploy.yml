@@ -41,8 +41,13 @@ jobs:
         run: |
           $liveDir = "C:\Users\Host\Desktop\main\afro-egypt-workforce\.next\standalone"
           robocopy ".next\standalone" $liveDir /E /XF ".env" /XD "uploads" /NFL /NDL /NJH /NJS /R:3 /W:5
-          if ($LASTEXITCODE -ge 8) { throw "robocopy failed with exit code $LASTEXITCODE" }
+          $rc = $LASTEXITCODE
+          if ($rc -ge 8) { throw "robocopy failed with exit code $rc" }
+          # robocopy uses 0-7 for success (e.g. 1 = files copied OK), not just 0 -
+          # exit cleanly so the runner doesn't treat that as a step failure.
+          exit 0
 
       - name: Start app service
+        if: always()
         shell: powershell
         run: Start-Service -Name AfroEgyptApp
