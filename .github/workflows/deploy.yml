@@ -1,0 +1,38 @@
+name: Deploy to Afro Egypt server
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: afro-egypt-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Windows, afro-egypt]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add portable Node to PATH
+        run: echo "C:\Users\Host\Desktop\main\tools\node-v20.18.1-win-x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Sync build output to the live app directory
+        shell: pwsh
+        run: |
+          $liveDir = "C:\Users\Host\Desktop\main\afro-egypt-workforce\.next\standalone"
+          robocopy ".next\standalone" $liveDir /E /XF ".env" /XD "uploads" /NFL /NDL /NJH /NJS
+          if ($LASTEXITCODE -ge 8) { throw "robocopy failed with exit code $LASTEXITCODE" }
+
+      - name: Restart app service
+        run: Restart-Service -Name AfroEgyptApp
