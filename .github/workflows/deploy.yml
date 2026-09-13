@@ -28,7 +28,7 @@ jobs:
         run: npm run build
 
       - name: Sync build output to the live app directory
-        shell: pwsh
+        shell: powershell
         run: |
           $liveDir = "C:\Users\Host\Desktop\main\afro-egypt-workforce\.next\standalone"
           robocopy ".next\standalone" $liveDir /E /XF ".env" /XD "uploads" /NFL /NDL /NJH /NJS
