@@ -18,6 +18,7 @@ import {
   setDeviceEnabled,
   startDeviceEnroll,
   testDeviceConnection,
+  updateDeviceUserName,
 } from "@/lib/zk-device";
 
 const PATH = "/biometric-device";
@@ -153,6 +154,24 @@ export async function setDeviceEnabledAction(enabled: boolean) {
   } catch (e) {
     return { error: e instanceof Error ? e.message : t.biometricDevice.deviceUnreachable };
   }
+}
+
+/** Renames a user on the device itself (not just in our DB — there's nothing of
+ * this in our DB to begin with, the name lives entirely on the hardware). */
+export async function updateDeviceUserNameAction(uid: number, newName: string, oldName: string) {
+  const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
+  const trimmed = newName.trim();
+  if (!trimmed) return { error: t.validation.invalidData };
+  try {
+    await updateDeviceUserName(uid, trimmed);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : t.biometricDevice.deviceUnreachable };
+  }
+  await logDeviceAction(t, t.auditActions.renameDeviceUser, `${oldName} -> ${trimmed}`);
+  revalidatePath(PATH);
+  return { success: true };
 }
 
 /** Links a device user to an employee. If the device user was already linked to a

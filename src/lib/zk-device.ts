@@ -135,6 +135,51 @@ function enrollPayload(uid: number, fingerIndex: number): Buffer {
   return buf;
 }
 
+/**
+ * Builds the 72-byte TCP user record node-zklib's own `decodeUserData72`
+ * (node_modules/node-zklib/utils.js) reads back — this is the exact layout
+ * this library already uses to decode every user this device sends us via
+ * getUsers(), so the offsets below aren't a guess: uid(2) + role(1) +
+ * password(8, ascii) + name(24, ascii, starts at 11) + cardno(4, at 35) +
+ * userId(9, ascii, at 48). CMD_USER_WRQ (write) mirrors the read record
+ * layout, per the standard ZK "PULL SDK" protocol convention.
+ */
+function encodeUserData72(user: { uid: number; role: number; password: string; name: string; cardno: number; userId: string }): Buffer {
+  const buf = Buffer.alloc(72);
+  buf.writeUIntLE(user.uid, 0, 2);
+  buf.writeUIntLE(user.role, 2, 1);
+  buf.write(user.password.slice(0, 8), 3, 8, "ascii");
+  buf.write(user.name.slice(0, 23), 11, 24, "ascii");
+  buf.writeUIntLE(user.cardno, 35, 4);
+  buf.write(user.userId.slice(0, 8), 48, 9, "ascii");
+  return buf;
+}
+
+/**
+ * Renames a user directly on the device. Re-reads the user's current full
+ * record (role/password/cardno, which our DeviceUser type never exposes to
+ * the client) immediately before writing, so the rest of the record round-
+ * trips unchanged — only `name` differs from what's on the device right now.
+ * Untested against real hardware (none available here); built strictly from
+ * this library's own verified read-side byte layout, not a blind guess.
+ */
+export async function updateDeviceUserName(uid: number, newName: string): Promise<void> {
+  await withDevice(async (zk) => {
+    const usersRes = await zk.getUsers();
+    const current = (usersRes?.data ?? []).find((u: any) => u.uid === uid);
+    if (!current) throw new Error(`Device user uid=${uid} not found`);
+    const payload = encodeUserData72({
+      uid: current.uid,
+      role: current.role ?? 0,
+      password: current.password ?? "",
+      name: newName,
+      cardno: current.cardno ?? 0,
+      userId: String(current.userId ?? current.uid),
+    });
+    await zk.executeCmd(COMMANDS.CMD_USER_WRQ, payload);
+  });
+}
+
 /** Deletes a user (and all their fingerprints/card/password) from the device entirely. */
 export async function deleteDeviceUser(uid: number): Promise<void> {
   await withDevice((zk) => zk.executeCmd(COMMANDS.CMD_DELETE_USER, uidPayload(uid)));

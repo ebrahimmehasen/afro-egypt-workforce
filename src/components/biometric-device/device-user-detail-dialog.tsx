@@ -10,11 +10,14 @@ import {
   linkDeviceUserAction,
   startDeviceEnrollAction,
   unlinkDeviceUserAction,
+  updateDeviceUserNameAction,
 } from "@/lib/actions/biometric-device";
 import { useT } from "@/components/providers/locale-provider";
 import { format } from "@/lib/i18n/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -43,6 +46,28 @@ function useDeviceAction() {
     });
   }
   return { pending, run };
+}
+
+function EditNameSection({ user }: { user: DeviceUser }) {
+  const t = useT();
+  const { pending, run } = useDeviceAction();
+  const [name, setName] = useState(user.name);
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+      <Label htmlFor="device-user-name">{t.biometricDevice.editNameLabel}</Label>
+      <div className="flex items-center gap-2">
+        <Input id="device-user-name" value={name} onChange={(e) => setName(e.target.value)} className="flex-1" />
+        <Button
+          size="sm"
+          disabled={pending || !name.trim() || name.trim() === user.name}
+          onClick={() => run(() => updateDeviceUserNameAction(user.uid, name, user.name), t.biometricDevice.nameSaved)}
+        >
+          {t.biometricDevice.saveName}
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 function LinkEmployeeSection({
@@ -171,7 +196,7 @@ export function DeviceUserDetailDialog({
     <Dialog open={!!user} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         {user && (
-          <>
+          <div key={user.uid} className="contents">
             <DialogHeader>
               <DialogTitle>{user.name}</DialogTitle>
               <DialogDescription dir="ltr" className="font-mono text-xs">
@@ -180,6 +205,7 @@ export function DeviceUserDetailDialog({
             </DialogHeader>
 
             <div className="flex flex-col gap-3">
+              <EditNameSection user={user} />
               <LinkEmployeeSection user={user} linkedEmployee={linkedEmployee} employees={employees} />
               <FingerprintsSection user={user} />
 
@@ -219,7 +245,7 @@ export function DeviceUserDetailDialog({
                 </AlertDialogContent>
               </AlertDialog>
             </DialogFooter>
-          </>
+          </div>
         )}
       </DialogContent>
     </Dialog>

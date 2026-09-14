@@ -670,6 +670,7 @@ export const ar: Dictionary = {
     clearDeviceLog: "مسح سجل جهاز البصمة",
     linkDeviceUser: "ربط مستخدم جهاز البصمة بموظف",
     unlinkDeviceUser: "إلغاء ربط مستخدم جهاز البصمة",
+    renameDeviceUser: "تعديل اسم مستخدم على جهاز البصمة",
     system: "النظام",
   },
   biometricDevice: {
@@ -744,5 +745,8 @@ export const ar: Dictionary = {
     faceTitle: "بصمة الوجه",
     faceUnsupported: "الجهاز/بروتوكول الاتصال الحالي مايدعمش بصمة الوجه.",
     backToList: "رجوع للقائمة",
+    editNameLabel: "الاسم على الجهاز",
+    saveName: "حفظ الاسم",
+    nameSaved: "تم تعديل الاسم على الجهاز",
   },
 };

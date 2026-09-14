@@ -668,6 +668,7 @@ export interface Dictionary {
     clearDeviceLog: string;
     linkDeviceUser: string;
     unlinkDeviceUser: string;
+    renameDeviceUser: string;
     system: string;
   };
   biometricDevice: {
@@ -742,5 +743,8 @@ export interface Dictionary {
     faceTitle: string;
     faceUnsupported: string;
     backToList: string;
+    editNameLabel: string;
+    saveName: string;
+    nameSaved: string;
   };
 }

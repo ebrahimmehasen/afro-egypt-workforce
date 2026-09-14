@@ -670,6 +670,7 @@ export const en: Dictionary = {
     clearDeviceLog: "Clear Biometric Device Log",
     linkDeviceUser: "Link biometric device user to employee",
     unlinkDeviceUser: "Unlink biometric device user",
+    renameDeviceUser: "Rename biometric device user",
     system: "System",
   },
   biometricDevice: {
@@ -744,5 +745,8 @@ export const en: Dictionary = {
     faceTitle: "Face",
     faceUnsupported: "The current device/protocol doesn't support face enrollment.",
     backToList: "Back to list",
+    editNameLabel: "Name on device",
+    saveName: "Save name",
+    nameSaved: "Name updated on the device",
   },
 };
