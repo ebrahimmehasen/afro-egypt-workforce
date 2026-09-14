@@ -764,5 +764,9 @@ export interface Dictionary {
     pauseRealtimeConfirm: string;
     pausedDone: string;
     resumedDone: string;
+    historyTitle: string;
+    historyDesc: string;
+    historyEmpty: string;
+    historyShowingLimited: string;
   };
 }

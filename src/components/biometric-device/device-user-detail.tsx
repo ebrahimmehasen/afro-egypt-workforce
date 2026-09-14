@@ -2,8 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
-import { Fingerprint, Link2, Link2Off, ScanFace, Trash2, XCircle } from "lucide-react";
+import {
+  ExternalLink, Fingerprint, Link2, Link2Off, ScanFace, Trash2, XCircle,
+} from "lucide-react";
 import {
   cancelDeviceCaptureAction,
   deleteDeviceFingerprintAction,
@@ -13,13 +16,17 @@ import {
   unlinkDeviceUserAction,
   updateDeviceUserNameAction,
 } from "@/lib/actions/biometric-device";
-import { useT } from "@/components/providers/locale-provider";
-import { format } from "@/lib/i18n/format";
+import { useLocale, useT } from "@/components/providers/locale-provider";
+import { format, intlLocale } from "@/lib/i18n/format";
+import { translateLabel } from "@/lib/i18n/data-labels";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -28,7 +35,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { DeviceUser } from "@/lib/zk-device";
-import { Employee } from "@/lib/types";
+import { AttendanceLog, Department, Employee, Shift } from "@/lib/types";
 
 const FINGER_SLOTS = Array.from({ length: 10 }, (_, i) => i);
 
@@ -71,9 +78,65 @@ function EditNameSection({ user }: { user: DeviceUser }) {
   );
 }
 
+function LinkedEmployeeSummary({
+  employee, department, shift,
+}: { employee: Employee; department: Department | null; shift: Shift | null }) {
+  const t = useT();
+  const locale = useLocale();
+  const STATUS_LABEL: Record<Employee["status"], string> = {
+    active: t.employees.statusActive,
+    on_leave: t.employees.statusOnLeave,
+    suspended: t.employees.statusSuspended,
+    terminated: t.employees.statusTerminated,
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-muted/30 p-3 text-sm sm:grid-cols-4">
+      <div>
+        <div className="text-xs text-muted-foreground">{t.employees.colId}</div>
+        <div dir="ltr" className="font-medium">{employee.employeeNumber}</div>
+      </div>
+      <div>
+        <div className="text-xs text-muted-foreground">{t.employees.colDepartment}</div>
+        <div className="font-medium">{translateLabel(department?.name ?? "-", locale)}</div>
+      </div>
+      <div>
+        <div className="text-xs text-muted-foreground">{t.employees.colJobTitle}</div>
+        <div className="font-medium">{translateLabel(employee.jobTitle, locale)}</div>
+      </div>
+      <div>
+        <div className="text-xs text-muted-foreground">{t.employees.colShift}</div>
+        <div className="font-medium">{translateLabel(shift?.name ?? "-", locale)}</div>
+      </div>
+      <div>
+        <div className="text-xs text-muted-foreground">{t.employees.colStatus}</div>
+        <div className="font-medium">{STATUS_LABEL[employee.status]}</div>
+      </div>
+      {employee.phone && (
+        <div>
+          <div className="text-xs text-muted-foreground">{t.employees.formPhone}</div>
+          <div dir="ltr" className="font-medium">{employee.phone}</div>
+        </div>
+      )}
+      <div className="col-span-2 flex items-end justify-end sm:col-span-1">
+        <Link href={`/employees/${employee.employeeNumber}`} className="flex items-center gap-1 text-xs text-primary hover:underline">
+          {t.common.view}
+          <ExternalLink className="h-3 w-3" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function LinkEmployeeSection({
-  user, linkedEmployee, employees,
-}: { user: DeviceUser; linkedEmployee: Employee | null; employees: Employee[] }) {
+  user, linkedEmployee, linkedDepartment, linkedShift, employees,
+}: {
+  user: DeviceUser;
+  linkedEmployee: Employee | null;
+  linkedDepartment: Department | null;
+  linkedShift: Shift | null;
+  employees: Employee[];
+}) {
   const t = useT();
   const { pending, run } = useDeviceAction();
   const unlinked = employees.filter((e) => !e.biometricDeviceUserId || e.biometricDeviceUserId === user.userId);
@@ -83,9 +146,7 @@ function LinkEmployeeSection({
     <Card>
       <CardContent className="flex flex-col gap-2 p-4">
         <div className="text-sm font-medium">{t.biometricDevice.linkEmployeeLabel}</div>
-        {linkedEmployee && (
-          <Badge variant="success" className="w-fit">{linkedEmployee.name}</Badge>
-        )}
+        {linkedEmployee && <LinkedEmployeeSummary employee={linkedEmployee} department={linkedDepartment} shift={linkedShift} />}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Select value={selectedId} onValueChange={setSelectedId}>
             <SelectTrigger className="flex-1"><SelectValue placeholder={t.biometricDevice.linkEmployeeSelectPlaceholder} /></SelectTrigger>
@@ -191,12 +252,64 @@ function FingerprintsSection({ user }: { user: DeviceUser }) {
   );
 }
 
+function HistorySection({
+  history, historyTotal, historyLimit,
+}: { history: AttendanceLog[]; historyTotal: number; historyLimit: number }) {
+  const t = useT();
+  const locale = useLocale();
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-2 p-4">
+        <div className="text-sm font-medium">{t.biometricDevice.historyTitle}</div>
+        <p className="text-xs text-muted-foreground">{t.biometricDevice.historyDesc}</p>
+        {historyTotal > historyLimit && (
+          <p className="text-xs text-muted-foreground">{format(t.biometricDevice.historyShowingLimited, { limit: historyLimit, total: historyTotal })}</p>
+        )}
+        {history.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">{t.biometricDevice.historyEmpty}</p>
+        ) : (
+          <div className="max-h-80 overflow-y-auto rounded-md border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t.attendance.rawColTimestamp}</TableHead>
+                  <TableHead>{t.attendance.rawColType}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {history.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell dir="ltr" className="tabular-nums text-xs">
+                      {new Date(log.timestamp).toLocaleString(intlLocale(locale))}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={log.punchType === "in" ? "success" : "secondary"}>
+                        {log.punchType === "in" ? t.attendance.punchIn : t.attendance.punchOut}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function DeviceUserDetail({
-  user, linkedEmployee, employees,
+  user, linkedEmployee, linkedDepartment, linkedShift, employees, history, historyTotal, historyLimit,
 }: {
   user: DeviceUser;
   linkedEmployee: Employee | null;
+  linkedDepartment: Department | null;
+  linkedShift: Shift | null;
   employees: Employee[];
+  history: AttendanceLog[];
+  historyTotal: number;
+  historyLimit: number;
 }) {
   const t = useT();
   const router = useRouter();
@@ -206,8 +319,15 @@ export function DeviceUserDetail({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3">
         <EditNameSection user={user} />
-        <LinkEmployeeSection user={user} linkedEmployee={linkedEmployee} employees={employees} />
+        <LinkEmployeeSection
+          user={user}
+          linkedEmployee={linkedEmployee}
+          linkedDepartment={linkedDepartment}
+          linkedShift={linkedShift}
+          employees={employees}
+        />
         <FingerprintsSection user={user} />
+        <HistorySection history={history} historyTotal={historyTotal} historyLimit={historyLimit} />
 
         <Card className="border-dashed">
           <CardContent className="flex flex-col gap-1 p-4 text-xs text-muted-foreground">

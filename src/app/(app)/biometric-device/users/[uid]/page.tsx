@@ -4,6 +4,8 @@ import { requireAccess } from "@/lib/auth";
 import { getDb } from "@/lib/data";
 import { getT } from "@/lib/i18n";
 import { getDeviceSnapshot } from "@/lib/zk-device";
+import { prisma } from "@/lib/prisma";
+import { toAttendanceLog } from "@/lib/serialize";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { DeviceUserDetail } from "@/components/biometric-device/device-user-detail";
@@ -51,6 +53,19 @@ export default async function BiometricDeviceUserPage({
   }
 
   const linkedEmployee = db.employees.find((e) => e.biometricDeviceUserId === user.userId) ?? null;
+  const linkedDepartment = linkedEmployee ? db.departments.find((d) => d.id === linkedEmployee.departmentId) : null;
+  const linkedShift = linkedEmployee ? db.shifts.find((s) => s.id === linkedEmployee.shiftId) : null;
+
+  // Keyed on the device's own userId (not the employee id) so history survives
+  // an unlink/relink - it's this device user's punch history either way.
+  const HISTORY_LIMIT = 100;
+  const rawHistory = await prisma.attendanceLog.findMany({
+    where: { deviceUserId: user.userId },
+    orderBy: { timestamp: "desc" },
+    take: HISTORY_LIMIT,
+  });
+  const historyTotal = await prisma.attendanceLog.count({ where: { deviceUserId: user.userId } });
+  const history = rawHistory.map(toAttendanceLog);
 
   return (
     <div className="flex flex-col gap-6">
@@ -59,7 +74,16 @@ export default async function BiometricDeviceUserPage({
         title={user.name}
         description={`UID ${user.uid} · ${t.biometricDevice.deviceUserId} ${user.userId}`}
       />
-      <DeviceUserDetail user={user} linkedEmployee={linkedEmployee} employees={db.employees} />
+      <DeviceUserDetail
+        user={user}
+        linkedEmployee={linkedEmployee}
+        linkedDepartment={linkedDepartment ?? null}
+        linkedShift={linkedShift ?? null}
+        employees={db.employees}
+        history={history}
+        historyTotal={historyTotal}
+        historyLimit={HISTORY_LIMIT}
+      />
     </div>
   );
 }

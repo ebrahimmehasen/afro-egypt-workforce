@@ -766,5 +766,9 @@ export const en: Dictionary = {
     pauseRealtimeConfirm: "This releases the real-time connection so you can use the device's own menu or enroll someone without a conflict. Any punch recorded while paused is still caught when you resume. Continue?",
     pausedDone: "Real-time sync paused - click Resume when you're done",
     resumedDone: "Real-time sync is back on",
+    historyTitle: "Punch history",
+    historyDesc: "Every punch recorded for this device user, newest first.",
+    historyEmpty: "No punches recorded for this user yet",
+    historyShowingLimited: "Showing the last {limit} of {total} punches",
   },
 };
