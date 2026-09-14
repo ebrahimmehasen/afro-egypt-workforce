@@ -200,7 +200,7 @@ export async function linkDeviceUserAction(deviceUserId: string, employeeId: str
 
   await logDeviceAction(t, t.auditActions.linkDeviceUser, `${employee.name} <- ${deviceUserId}`);
   revalidatePath(PATH);
-  revalidatePath(`/employees/${employeeId}`);
+  revalidatePath(`/employees/${employee.employeeNumber}`);
   return { success: true };
 }
 
@@ -215,7 +215,7 @@ export async function unlinkDeviceUserAction(deviceUserId: string) {
   await prisma.employee.update({ where: { id: employee.id }, data: { biometricDeviceUserId: null } });
   await logDeviceAction(t, t.auditActions.unlinkDeviceUser, `${employee.name} (${deviceUserId})`);
   revalidatePath(PATH);
-  revalidatePath(`/employees/${employee.id}`);
+  revalidatePath(`/employees/${employee.employeeNumber}`);
   return { success: true };
 }
 

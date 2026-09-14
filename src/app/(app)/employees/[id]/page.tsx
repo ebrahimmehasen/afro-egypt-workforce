@@ -30,9 +30,9 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   const user = await requireAccess("/employees");
   const t = await getT();
   const locale = await getLocale();
-  const { id } = await params;
-  const employee = db.employees.find((e) => e.id === id);
-  if (!employee || !inScope(viewerScope(user, db.employees), id)) notFound();
+  const { id: employeeNumber } = await params;
+  const employee = db.employees.find((e) => e.employeeNumber === employeeNumber);
+  if (!employee || !inScope(viewerScope(user, db.employees), employee.id)) notFound();
 
   const department = db.departments.find((d) => d.id === employee.departmentId);
   const shift = db.shifts.find((s) => s.id === employee.shiftId);

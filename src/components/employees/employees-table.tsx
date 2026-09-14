@@ -147,7 +147,7 @@ export function EmployeesTable({
                   <TableCell><Badge variant={STATUS_VARIANT[e.status]}>{STATUS_LABEL[e.status]}</Badge></TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
-                      <Link href={`/employees/${e.id}`}>
+                      <Link href={`/employees/${e.employeeNumber}`}>
                         <Button variant="ghost" size="icon" aria-label={t.common.view}>
                           <Eye className="h-4 w-4" />
                         </Button>

@@ -118,7 +118,7 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
   );
 
   revalidatePath("/employees");
-  revalidatePath(`/employees/${id}`);
+  revalidatePath(`/employees/${before.employeeNumber}`);
   return { success: true, message: t.employees.savedEdits };
 }
 

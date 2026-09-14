@@ -81,7 +81,7 @@ export async function correctAttendance(_prev: ActionState, formData: FormData):
 
   revalidatePath("/attendance");
   revalidatePath("/dashboard");
-  revalidatePath(`/employees/${employeeId}`);
+  revalidatePath(`/employees/${employee.employeeNumber}`);
   revalidatePath("/audit-log");
 
   return { success: true, message: t.attendance.correctionSaved };
