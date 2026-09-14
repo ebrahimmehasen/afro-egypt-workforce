@@ -62,7 +62,7 @@ export default async function PayslipPage({ params }: { params: Promise<{ record
 
           <div className="grid grid-cols-2 gap-4 border-b border-border py-6 text-sm">
             <Field label={t.payslip.employeeName} value={employee.name} />
-            <Field label={t.payslip.employeeId} value={employee.id} />
+            <Field label={t.payslip.employeeId} value={employee.employeeNumber} />
             <Field label={t.payslip.department} value={translateLabel(department?.name ?? "-", locale)} />
             <Field label={t.payslip.month} value={translateLabel(period.label, locale)} />
           </div>
