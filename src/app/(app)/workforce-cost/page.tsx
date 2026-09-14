@@ -104,7 +104,7 @@ export default async function WorkforceCostPage() {
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">{i + 1}</span>
                 <div>
                   <p className="text-sm font-medium">{row.employee!.name}</p>
-                  <p className="text-xs text-muted-foreground">{row.employee!.id}</p>
+                  <p dir="ltr" className="text-xs text-muted-foreground">{row.employee!.employeeNumber}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">

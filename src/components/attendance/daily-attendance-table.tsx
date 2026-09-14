@@ -110,7 +110,7 @@ export function DailyAttendanceTable({
                 <TableRow key={record.id}>
                   <TableCell>
                     <div className="font-medium">{employee!.name}</div>
-                    <div className="text-xs text-muted-foreground">{employee!.id}</div>
+                    <div dir="ltr" className="text-xs text-muted-foreground">{employee!.employeeNumber}</div>
                   </TableCell>
                   <TableCell className="tabular-nums" dir="ltr">{fmtTime(record.actualIn)}</TableCell>
                   <TableCell className="tabular-nums" dir="ltr">{fmtTime(record.actualOut)}</TableCell>

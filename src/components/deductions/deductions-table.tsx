@@ -84,7 +84,7 @@ export function DeductionsTable({
               <TableRow key={d.id}>
                 <TableCell>
                   <div className="font-medium">{employee?.name ?? d.employeeId}</div>
-                  <div className="text-xs text-muted-foreground">{d.employeeId}</div>
+                  {employee && <div dir="ltr" className="text-xs text-muted-foreground">{employee.employeeNumber}</div>}
                 </TableCell>
                 <TableCell><Badge variant="destructive">{deductionTypeLabel(d.type, t)}</Badge></TableCell>
                 <TableCell className="tabular-nums font-medium text-destructive">-{formatEGP(d.amount, locale)}</TableCell>

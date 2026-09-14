@@ -56,7 +56,7 @@ export function DeductionFormDialog({ employees }: { employees: Employee[] }) {
             <Select name="employeeId" defaultValue={employees[0]?.id}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.name} — {e.id}</SelectItem>)}
+                {employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.name} — {e.employeeNumber}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

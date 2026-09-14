@@ -33,11 +33,13 @@ export function RawLogsTable({ logs, employees }: { logs: AttendanceLog[]; emplo
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sorted.map((log) => (
+          {sorted.map((log) => {
+            const employee = empMap.get(log.employeeId);
+            return (
             <TableRow key={log.id}>
               <TableCell>
-                <div className="font-medium">{empMap.get(log.employeeId)?.name ?? log.employeeId}</div>
-                <div className="text-xs text-muted-foreground">{log.employeeId}</div>
+                <div className="font-medium">{employee?.name ?? log.employeeId}</div>
+                {employee && <div dir="ltr" className="text-xs text-muted-foreground">{employee.employeeNumber}</div>}
               </TableCell>
               <TableCell dir="ltr" className="font-mono text-xs">{log.deviceId}</TableCell>
               <TableCell dir="ltr" className="tabular-nums text-xs">
@@ -56,7 +58,8 @@ export function RawLogsTable({ logs, employees }: { logs: AttendanceLog[]; emplo
                     : t.attendance.sourceSimulated}
               </TableCell>
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     </div>

@@ -168,7 +168,7 @@ export default async function DashboardPage() {
                 </span>
                 <div>
                   <p className="text-sm font-medium text-foreground">{row.employee!.name}</p>
-                  <p className="text-xs text-muted-foreground">{row.employee!.id}</p>
+                  <p dir="ltr" className="text-xs text-muted-foreground">{row.employee!.employeeNumber}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">

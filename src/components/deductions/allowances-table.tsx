@@ -52,7 +52,7 @@ export function AllowancesTable({
               <TableRow key={a.id}>
                 <TableCell>
                   <div className="font-medium">{employee?.name ?? a.employeeId}</div>
-                  <div className="text-xs text-muted-foreground">{a.employeeId}</div>
+                  {employee && <div dir="ltr" className="text-xs text-muted-foreground">{employee.employeeNumber}</div>}
                 </TableCell>
                 <TableCell><Badge variant="gold">{allowanceTypeLabel(a.type, t)}</Badge></TableCell>
                 <TableCell className="tabular-nums font-medium text-success">+{formatEGP(a.amount, locale)}</TableCell>
