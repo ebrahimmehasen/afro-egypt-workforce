@@ -27,6 +27,20 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Apply database migrations
+        shell: powershell
+        run: |
+          # The workspace checkout has no .env (gitignored) - pull DATABASE_URL
+          # from the canonical secrets file for this step only, so schema
+          # changes (new tables/columns) land in the live DB before the new
+          # code that depends on them goes live.
+          $envFile = "C:\Users\Host\Desktop\main\tools\secrets\afro-egypt.env"
+          $line = Get-Content $envFile | Where-Object { $_ -match '^\uFEFF?DATABASE_URL=' } | Select-Object -First 1
+          if (-not $line) { throw "DATABASE_URL not found in $envFile" }
+          $env:DATABASE_URL = (($line -split '=', 2)[1]).Trim().Trim('"')
+          npx prisma migrate deploy
+          if ($LASTEXITCODE -ne 0) { throw "prisma migrate deploy failed with exit code $LASTEXITCODE" }
+
       - name: Assemble static assets into the standalone build
         shell: powershell
         run: |
