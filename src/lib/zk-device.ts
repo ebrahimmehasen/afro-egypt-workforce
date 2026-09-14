@@ -1,6 +1,6 @@
 // Server-only: talks to hardware over raw TCP via node-zklib — never import from client components.
 const ZKLib = require("node-zklib");
-const { COMMANDS } = require("node-zklib/constants");
+const { COMMANDS, REQUEST_DATA } = require("node-zklib/constants");
 import { prisma } from "@/lib/prisma";
 
 const SINGLETON = "singleton";
@@ -84,12 +84,57 @@ export async function testDeviceConnection(conn: DeviceConnection): Promise<{ ok
   }
 }
 
+interface RawDeviceUser {
+  uid: number;
+  role: number;
+  password: string;
+  name: string;
+  cardno: number;
+  userId: string;
+}
+
+/**
+ * node-zklib's own `zk.getUsers()` decodes the name field with
+ * `Buffer.toString('ascii')`, which only keeps the low 7 bits of every byte -
+ * fine for Latin names, but it silently mangles anything else (Arabic in
+ * particular) into garbage, and the mangling is irreversible once decoded
+ * (the original bytes are gone). This re-reads the exact same raw bytes via
+ * the library's own (public) `zklibTcp.readWithBuffer` — the well-tested
+ * chunked-pull mechanism underneath `getUsers()` — and decodes the name as
+ * UTF-8 instead, which is what ZK firmware with Arabic-language support
+ * actually stores there. Other fields keep the library's own decode logic
+ * (ascii is fine for numeric/Latin content like passwords and userId).
+ */
+async function fetchUsersUtf8(zk: any): Promise<RawDeviceUser[]> {
+  const tcp = zk.zklibTcp;
+  await tcp.freeData().catch(() => {});
+  const res = await tcp.readWithBuffer(REQUEST_DATA.GET_USERS);
+  await tcp.freeData().catch(() => {});
+
+  const RECORD_SIZE = 72;
+  let buf: Buffer = res.data.subarray(4);
+  const users: RawDeviceUser[] = [];
+  while (buf.length >= RECORD_SIZE) {
+    const rec = buf.subarray(0, RECORD_SIZE);
+    users.push({
+      uid: rec.readUIntLE(0, 2),
+      role: rec.readUIntLE(2, 1),
+      password: rec.subarray(3, 11).toString("ascii").split("\0")[0],
+      name: rec.subarray(11, 35).toString("utf8").split("\0")[0],
+      cardno: rec.readUIntLE(35, 4),
+      userId: rec.subarray(48, 57).toString("ascii").split("\0")[0],
+    });
+    buf = buf.subarray(RECORD_SIZE);
+  }
+  return users;
+}
+
 export async function getDeviceSnapshot(): Promise<DeviceSnapshot> {
   try {
     return await withDevice(async (zk) => {
       const info = await zk.getInfo();
-      const usersRes = await zk.getUsers();
-      const users: DeviceUser[] = (usersRes?.data ?? []).map((u: any) => ({
+      const rawUsers = await fetchUsersUtf8(zk);
+      const users: DeviceUser[] = rawUsers.map((u) => ({
         uid: u.uid,
         userId: String(u.userId ?? u.uid),
         name: u.name || `#${u.uid}`,
@@ -149,7 +194,12 @@ function encodeUserData72(user: { uid: number; role: number; password: string; n
   buf.writeUIntLE(user.uid, 0, 2);
   buf.writeUIntLE(user.role, 2, 1);
   buf.write(user.password.slice(0, 8), 3, 8, "ascii");
-  buf.write(user.name.slice(0, 23), 11, 24, "ascii");
+  // "ascii" masks every UTF-16 code unit down to 7 bits (val & 0x7F) - fine for
+  // latin names, but it silently mangles anything outside that range (Arabic,
+  // any other non-ASCII script) into near-random bytes. The name field is a
+  // raw byte buffer, not a char array, and ZK firmware with Arabic-language
+  // support stores/reads it as UTF-8, so encode it as UTF-8 here to match.
+  buf.write(user.name, 11, 24, "utf8");
   buf.writeUIntLE(user.cardno, 35, 4);
   buf.write(user.userId.slice(0, 8), 48, 9, "ascii");
   return buf;
@@ -165,16 +215,16 @@ function encodeUserData72(user: { uid: number; role: number; password: string; n
  */
 export async function updateDeviceUserName(uid: number, newName: string): Promise<void> {
   await withDevice(async (zk) => {
-    const usersRes = await zk.getUsers();
-    const current = (usersRes?.data ?? []).find((u: any) => u.uid === uid);
+    const users = await fetchUsersUtf8(zk);
+    const current = users.find((u) => u.uid === uid);
     if (!current) throw new Error(`Device user uid=${uid} not found`);
     const payload = encodeUserData72({
       uid: current.uid,
-      role: current.role ?? 0,
-      password: current.password ?? "",
+      role: current.role,
+      password: current.password,
       name: newName,
-      cardno: current.cardno ?? 0,
-      userId: String(current.userId ?? current.uid),
+      cardno: current.cardno,
+      userId: current.userId,
     });
     await zk.executeCmd(COMMANDS.CMD_USER_WRQ, payload);
   });
