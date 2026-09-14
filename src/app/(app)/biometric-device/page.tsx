@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DeviceConnectionForm } from "@/components/biometric-device/connection-form";
 import { DeviceActions } from "@/components/biometric-device/device-actions";
 import { DeviceUsersTable } from "@/components/biometric-device/users-table";
+import { SyncAttendanceCard } from "@/components/biometric-device/sync-attendance-card";
 
 export default async function BiometricDevicePage() {
   await requireAccess("/biometric-device");
@@ -55,6 +56,7 @@ export default async function BiometricDevicePage() {
         </Card>
       )}
 
+      <SyncAttendanceCard />
       <DeviceConnectionForm connection={connection} />
       <DeviceActions />
 

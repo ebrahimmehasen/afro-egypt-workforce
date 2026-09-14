@@ -671,6 +671,7 @@ export const ar: Dictionary = {
     linkDeviceUser: "ربط مستخدم جهاز البصمة بموظف",
     unlinkDeviceUser: "إلغاء ربط مستخدم جهاز البصمة",
     renameDeviceUser: "تعديل اسم مستخدم على جهاز البصمة",
+    syncAttendance: "مزامنة الحضور من جهاز البصمة",
     system: "النظام",
   },
   biometricDevice: {
@@ -748,5 +749,12 @@ export const ar: Dictionary = {
     editNameLabel: "الاسم على الجهاز",
     saveName: "حفظ الاسم",
     nameSaved: "تم تعديل الاسم على الجهاز",
+    syncSectionTitle: "مزامنة الحضور",
+    syncSectionDesc: "الجهاز مايبعتش البصمات للنظام تلقائيًا — لازم تدوس هنا كل شوية عشان تسحب البصمات المسجّلة على الجهاز وتحدّث الحضور في النظام.",
+    syncNow: "مزامنة الآن",
+    syncImported: "بصمة جديدة اتسجّلت",
+    syncUnlinked: "بصمة من مستخدم غير مربوط بموظف",
+    syncDuplicate: "بصمة كانت مسجّلة بالفعل",
+    syncDone: "تمت المزامنة",
   },
 };

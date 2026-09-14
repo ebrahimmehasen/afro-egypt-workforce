@@ -7,6 +7,7 @@ import { auditActor } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
 import { canManageBiometricDevice } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
+import { syncDeviceAttendance } from "@/lib/attendance-sync";
 import { ActionState } from "@/hooks/use-action-feedback";
 import {
   cancelDeviceCapture,
@@ -232,6 +233,33 @@ export async function clearDeviceLogAction(confirmText: string) {
     await logDeviceAction(t, t.auditActions.clearDeviceLog, "-");
     revalidatePath(PATH);
     return { success: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : t.biometricDevice.deviceUnreachable };
+  }
+}
+
+/**
+ * Pulls whatever punches are sitting in the device's log into AttendanceLog.
+ * There is no automatic ingestion path otherwise: /api/punch only receives
+ * anything if the device itself is configured to push to it (a device-side
+ * ADMS/cloud-server setting this project never set up), so without this
+ * button a real punch on the device never reaches the app no matter how
+ * many times someone scans their finger.
+ */
+export async function syncAttendanceNowAction() {
+  const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
+  try {
+    const result = await syncDeviceAttendance();
+    await logDeviceAction(
+      t,
+      t.auditActions.syncAttendance,
+      `${t.biometricDevice.syncImported}: ${result.imported}, ${t.biometricDevice.syncUnlinked}: ${result.skippedUnlinked}`,
+    );
+    revalidatePath("/attendance");
+    revalidatePath("/dashboard");
+    return { success: true, result };
   } catch (e) {
     return { error: e instanceof Error ? e.message : t.biometricDevice.deviceUnreachable };
   }

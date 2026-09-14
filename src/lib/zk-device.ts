@@ -129,6 +129,23 @@ async function fetchUsersUtf8(zk: any): Promise<RawDeviceUser[]> {
   return users;
 }
 
+export interface RawAttendanceRecord {
+  deviceUserId: string;
+  recordTime: Date;
+}
+
+/** Pulls every punch currently sitting in the device's own log buffer (does
+ * NOT clear it — clearDeviceAttendanceLog is a separate, explicit action). */
+export async function fetchDeviceAttendanceLogs(): Promise<RawAttendanceRecord[]> {
+  return withDevice(async (zk) => {
+    const res = await zk.getAttendances();
+    return (res?.data ?? []).map((r: any) => ({
+      deviceUserId: String(r.deviceUserId),
+      recordTime: r.recordTime instanceof Date ? r.recordTime : new Date(r.recordTime),
+    }));
+  });
+}
+
 export async function getDeviceSnapshot(): Promise<DeviceSnapshot> {
   try {
     return await withDevice(async (zk) => {

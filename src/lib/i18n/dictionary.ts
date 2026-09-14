@@ -669,6 +669,7 @@ export interface Dictionary {
     linkDeviceUser: string;
     unlinkDeviceUser: string;
     renameDeviceUser: string;
+    syncAttendance: string;
     system: string;
   };
   biometricDevice: {
@@ -746,5 +747,12 @@ export interface Dictionary {
     editNameLabel: string;
     saveName: string;
     nameSaved: string;
+    syncSectionTitle: string;
+    syncSectionDesc: string;
+    syncNow: string;
+    syncImported: string;
+    syncUnlinked: string;
+    syncDuplicate: string;
+    syncDone: string;
   };
 }

@@ -671,6 +671,7 @@ export const en: Dictionary = {
     linkDeviceUser: "Link biometric device user to employee",
     unlinkDeviceUser: "Unlink biometric device user",
     renameDeviceUser: "Rename biometric device user",
+    syncAttendance: "Sync attendance from the biometric device",
     system: "System",
   },
   biometricDevice: {
@@ -748,5 +749,12 @@ export const en: Dictionary = {
     editNameLabel: "Name on device",
     saveName: "Save name",
     nameSaved: "Name updated on the device",
+    syncSectionTitle: "Attendance sync",
+    syncSectionDesc: "The device doesn't push punches to the system automatically - click here periodically to pull whatever's on the device and update attendance.",
+    syncNow: "Sync now",
+    syncImported: "New punches imported",
+    syncUnlinked: "Punches from a device user not linked to an employee",
+    syncDuplicate: "Punches already recorded",
+    syncDone: "Sync complete",
   },
 };
