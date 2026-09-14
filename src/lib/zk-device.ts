@@ -49,8 +49,102 @@ export async function saveDeviceConnection(conn: DeviceConnection): Promise<void
   });
 }
 
+// --- Real-time listener state ------------------------------------------
+// The device only tolerates one connected client at a time. The real-time
+// listener (see startRealtimeListener) holds a connection open indefinitely,
+// so every short-lived operation below (withDevice) transparently pauses it
+// first and reconnects it afterward - nobody calling e.g. renameDeviceUser
+// or linkDeviceUserAction needs to know the listener exists at all.
+let realtimeZk: any = null;
+let realtimeCallback: ((r: RawAttendanceRecord) => void) | null = null;
+let realtimeUserPaused = false;
+let realtimeReconnectTimer: NodeJS.Timeout | null = null;
+const REALTIME_RECONNECT_DELAY_MS = 5000;
+
+function attachRealtimeSocketHandlers(zk: any) {
+  const socket = zk?.zklibTcp?.socket;
+  if (!socket) return;
+  const onDrop = () => {
+    if (realtimeZk !== zk) return; // a newer connection already replaced this one
+    realtimeZk = null;
+    if (!realtimeUserPaused && realtimeCallback) scheduleRealtimeReconnect();
+  };
+  socket.once("close", onDrop);
+  socket.once("error", onDrop);
+}
+
+function scheduleRealtimeReconnect() {
+  if (realtimeReconnectTimer) return;
+  realtimeReconnectTimer = setTimeout(async () => {
+    realtimeReconnectTimer = null;
+    if (realtimeUserPaused || !realtimeCallback) return;
+    try {
+      await connectRealtimeNow();
+    } catch (e) {
+      console.error("[attendance-realtime] reconnect failed:", e instanceof Error ? e.message : e);
+      scheduleRealtimeReconnect();
+    }
+  }, REALTIME_RECONNECT_DELAY_MS);
+}
+
+async function connectRealtimeNow(): Promise<void> {
+  const { ip, port } = await getDeviceConnection();
+  const zk = new ZKLib(ip, port, CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
+  await zk.createSocket();
+  await zk.zklibTcp.getRealTimeLogs((raw: { userId: string; attTime: Date }) => {
+    realtimeCallback?.({ deviceUserId: String(raw.userId), recordTime: raw.attTime });
+  });
+  realtimeZk = zk;
+  attachRealtimeSocketHandlers(zk);
+}
+
+/** Starts (or restarts) the persistent real-time punch listener. `onRecord`
+ * fires once per punch, as it happens. */
+export async function startRealtimeListener(onRecord: (r: RawAttendanceRecord) => void): Promise<void> {
+  realtimeCallback = onRecord;
+  realtimeUserPaused = false;
+  if (realtimeReconnectTimer) {
+    clearTimeout(realtimeReconnectTimer);
+    realtimeReconnectTimer = null;
+  }
+  await connectRealtimeNow();
+}
+
+/** Stops the real-time listener. `userInitiated: true` (the manual Pause
+ * button) prevents auto-reconnect until startRealtimeListener/resume is
+ * called again; withDevice's internal pause/resume never sets that flag. */
+export async function stopRealtimeListener(opts: { userInitiated?: boolean } = {}): Promise<void> {
+  if (opts.userInitiated) {
+    realtimeUserPaused = true;
+  }
+  if (realtimeReconnectTimer) {
+    clearTimeout(realtimeReconnectTimer);
+    realtimeReconnectTimer = null;
+  }
+  const zk = realtimeZk;
+  realtimeZk = null;
+  if (zk) {
+    try {
+      await zk.disconnect();
+    } catch {
+      // best-effort close
+    }
+  }
+}
+
+export function isRealtimeListenerActive(): boolean {
+  return realtimeZk !== null;
+}
+
+export function isRealtimeListenerPaused(): boolean {
+  return realtimeUserPaused;
+}
+
 /** Opens a short-lived connection, runs `fn`, always disconnects — the device only tolerates one client at a time. */
 async function withDevice<T>(fn: (zk: any) => Promise<T>): Promise<T> {
+  const wasRealtimeActive = isRealtimeListenerActive();
+  if (wasRealtimeActive) await stopRealtimeListener();
+
   const { ip, port } = await getDeviceConnection();
   const zk = new ZKLib(ip, port, CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
   await zk.createSocket();
@@ -61,6 +155,14 @@ async function withDevice<T>(fn: (zk: any) => Promise<T>): Promise<T> {
       await zk.disconnect();
     } catch {
       // best-effort close
+    }
+    if (wasRealtimeActive && !realtimeUserPaused && realtimeCallback) {
+      try {
+        await connectRealtimeNow();
+      } catch (e) {
+        console.error("[attendance-realtime] resume-after-action failed:", e instanceof Error ? e.message : e);
+        scheduleRealtimeReconnect();
+      }
     }
   }
 }

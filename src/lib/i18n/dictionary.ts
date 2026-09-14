@@ -670,6 +670,8 @@ export interface Dictionary {
     unlinkDeviceUser: string;
     renameDeviceUser: string;
     syncAttendance: string;
+    pauseRealtimeSync: string;
+    resumeRealtimeSync: string;
     system: string;
   };
   biometricDevice: {
@@ -754,5 +756,13 @@ export interface Dictionary {
     syncUnlinked: string;
     syncDuplicate: string;
     syncDone: string;
+    realtimeConnected: string;
+    realtimePaused: string;
+    realtimeReconnecting: string;
+    pauseRealtime: string;
+    resumeRealtime: string;
+    pauseRealtimeConfirm: string;
+    pausedDone: string;
+    resumedDone: string;
   };
 }

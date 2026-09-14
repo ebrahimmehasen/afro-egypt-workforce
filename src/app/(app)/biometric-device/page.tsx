@@ -3,6 +3,7 @@ import { requireAccess } from "@/lib/auth";
 import { getDb } from "@/lib/data";
 import { getT } from "@/lib/i18n";
 import { getDeviceConnection, getDeviceSnapshot } from "@/lib/zk-device";
+import { attendanceRealtimeStatus } from "@/lib/attendance-realtime";
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -56,7 +57,7 @@ export default async function BiometricDevicePage() {
         </Card>
       )}
 
-      <SyncAttendanceCard />
+      <SyncAttendanceCard initialStatus={attendanceRealtimeStatus()} />
       <DeviceConnectionForm connection={connection} />
       <DeviceActions />
 

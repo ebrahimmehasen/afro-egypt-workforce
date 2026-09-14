@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import { canManageBiometricDevice } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { syncDeviceAttendance } from "@/lib/attendance-sync";
+import { pauseAttendanceRealtime, resumeAttendanceRealtime } from "@/lib/attendance-realtime";
 import { ActionState } from "@/hooks/use-action-feedback";
 import {
   cancelDeviceCapture,
@@ -260,6 +261,41 @@ export async function syncAttendanceNowAction() {
     revalidatePath("/attendance");
     revalidatePath("/dashboard");
     return { success: true, result };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : t.biometricDevice.deviceUnreachable };
+  }
+}
+
+/** Manual "Pause" — releases the device so an admin can safely spend time at
+ * the device's own physical menu (enrolling someone, etc.) without the
+ * real-time listener fighting for the connection. */
+export async function pauseRealtimeSyncAction() {
+  const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
+  try {
+    await pauseAttendanceRealtime();
+    await logDeviceAction(t, t.auditActions.pauseRealtimeSync, "-");
+    revalidatePath(PATH);
+    return { success: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : t.biometricDevice.deviceUnreachable };
+  }
+}
+
+/** Manual "Resume" — catches up on anything that happened while paused,
+ * then restarts real-time listening. */
+export async function resumeRealtimeSyncAction() {
+  const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
+  try {
+    await resumeAttendanceRealtime();
+    await logDeviceAction(t, t.auditActions.resumeRealtimeSync, "-");
+    revalidatePath(PATH);
+    revalidatePath("/attendance");
+    revalidatePath("/dashboard");
+    return { success: true };
   } catch (e) {
     return { error: e instanceof Error ? e.message : t.biometricDevice.deviceUnreachable };
   }
