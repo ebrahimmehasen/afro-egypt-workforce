@@ -65,6 +65,25 @@ async function withDevice<T>(fn: (zk: any) => Promise<T>): Promise<T> {
   }
 }
 
+/** Tests a connection against arbitrary (possibly unsaved) settings — used by the
+ * "Test connection" button before the user commits new IP/port/password. */
+export async function testDeviceConnection(conn: DeviceConnection): Promise<{ ok: true } | { ok: false; error: string }> {
+  const zk = new ZKLib(conn.ip, conn.port, CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
+  try {
+    await zk.createSocket();
+    await zk.getInfo();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  } finally {
+    try {
+      await zk.disconnect();
+    } catch {
+      // best-effort close
+    }
+  }
+}
+
 export async function getDeviceSnapshot(): Promise<DeviceSnapshot> {
   try {
     return await withDevice(async (zk) => {

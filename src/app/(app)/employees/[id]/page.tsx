@@ -88,7 +88,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
             </div>
           </div>
           <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5"><IdCard className="h-4 w-4" />{employee.id}</span>
+            <span dir="ltr" className="flex items-center gap-1.5"><IdCard className="h-4 w-4" />{employee.employeeNumber}</span>
             <span className="flex items-center gap-1.5"><Building2 className="h-4 w-4" />{translateLabel(department?.name ?? "", locale)}</span>
             <span className="flex items-center gap-1.5"><Clock className="h-4 w-4" />{translateLabel(shift?.name ?? "", locale)}</span>
             <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4" />{employee.hireDate}</span>
@@ -118,14 +118,14 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
         <TabsContent value="basic">
           <Card>
             <CardContent className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
-              <Field label={t.employees.colId} value={employee.id} />
+              <Field label={t.employees.colId} value={employee.employeeNumber} />
               <Field label={t.employees.colDepartment} value={translateLabel(department?.name ?? "-", locale)} />
               <Field label={t.employees.colJobTitle} value={translateLabel(employee.jobTitle, locale)} />
               <Field label={t.employees.colShift} value={translateLabel(shift?.name ?? "-", locale)} />
               <Field label={t.employees.formHireDate} value={employee.hireDate} />
               <Field label={t.employees.colBasicSalary} value={formatEGP(employee.basicSalary, locale)} />
               <Field label={t.employees.formAllowances} value={formatEGP(employee.allowances, locale)} />
-              <Field label={t.employees.formBiometricId} value={employee.biometricDeviceUserId} />
+              <Field label={t.employees.formBiometricId} value={employee.biometricDeviceUserId ?? t.biometricDevice.notLinked} />
               <Field
                 label={t.employees.colStatus}
                 value={

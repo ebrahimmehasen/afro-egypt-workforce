@@ -4,6 +4,8 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auditActor } from "@/lib/audit";
+import { getSession } from "@/lib/auth";
+import { canManageBiometricDevice } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { ActionState } from "@/hooks/use-action-feedback";
 import {
@@ -15,9 +17,22 @@ import {
   saveDeviceConnection,
   setDeviceEnabled,
   startDeviceEnroll,
+  testDeviceConnection,
 } from "@/lib/zk-device";
 
 const PATH = "/biometric-device";
+
+/**
+ * Server Actions are directly callable HTTP endpoints regardless of what the
+ * UI shows — the page's requireAccess() check alone doesn't stop a request
+ * crafted straight at one of these, so every exported action here re-checks
+ * the role itself before touching the device or the DB.
+ */
+async function guard(t: Awaited<ReturnType<typeof getT>>) {
+  const user = await getSession();
+  if (!user || !canManageBiometricDevice(user.role)) return { error: t.validation.invalidData };
+  return null;
+}
 
 /** Every device action logs its own audit row directly — there's no Prisma write to
  * bundle it with (the mutation happens on the hardware, not in our database), so
@@ -35,8 +50,23 @@ const connectionSchema = z.object({
   commPassword: z.coerce.number().int().min(0).default(0),
 });
 
+/** Tests connectivity with the (possibly unsaved) form values, without writing anything. */
+export async function testDeviceConnectionAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
+  const parsed = connectionSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: t.validation.invalidData };
+
+  const result = await testDeviceConnection(parsed.data);
+  if (!result.ok) return { error: `${t.biometricDevice.testConnectionFailed} — ${result.error}` };
+  return { success: true, message: t.biometricDevice.testConnectionOk };
+}
+
 export async function updateDeviceConnection(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
   const parsed = connectionSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   await saveDeviceConnection(parsed.data);
@@ -47,6 +77,8 @@ export async function updateDeviceConnection(_prev: ActionState, formData: FormD
 
 export async function deleteDeviceUserAction(uid: number, displayName: string) {
   const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
   try {
     await deleteDeviceUser(uid);
     await logDeviceAction(t, t.auditActions.deleteDeviceUser, displayName);
@@ -59,6 +91,8 @@ export async function deleteDeviceUserAction(uid: number, displayName: string) {
 
 export async function deleteDeviceFingerprintAction(uid: number, fingerIndex: number, displayName: string) {
   const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
   try {
     await deleteDeviceFingerprint(uid, fingerIndex);
     await logDeviceAction(t, t.auditActions.deleteDeviceFingerprint, `${displayName} — ${t.biometricDevice.finger} ${fingerIndex}`);
@@ -71,6 +105,8 @@ export async function deleteDeviceFingerprintAction(uid: number, fingerIndex: nu
 
 export async function startDeviceEnrollAction(uid: number, fingerIndex: number, displayName: string) {
   const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
   try {
     await startDeviceEnroll(uid, fingerIndex);
     await logDeviceAction(t, t.auditActions.startDeviceEnroll, `${displayName} — ${t.biometricDevice.finger} ${fingerIndex}`);
@@ -82,6 +118,8 @@ export async function startDeviceEnrollAction(uid: number, fingerIndex: number, 
 
 export async function cancelDeviceCaptureAction() {
   const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
   try {
     await cancelDeviceCapture();
     return { success: true };
@@ -92,6 +130,8 @@ export async function cancelDeviceCaptureAction() {
 
 export async function restartDeviceAction() {
   const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
   try {
     await restartDevice();
     await logDeviceAction(t, t.auditActions.restartDevice, "-");
@@ -103,6 +143,8 @@ export async function restartDeviceAction() {
 
 export async function setDeviceEnabledAction(enabled: boolean) {
   const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
   try {
     await setDeviceEnabled(enabled);
     await logDeviceAction(t, enabled ? t.auditActions.enableDevice : t.auditActions.disableDevice, "-");
@@ -113,9 +155,56 @@ export async function setDeviceEnabledAction(enabled: boolean) {
   }
 }
 
+/** Links a device user to an employee. If the device user was already linked to a
+ * different employee, that link is cleared first (in the same transaction) so the
+ * unique constraint on biometricDeviceUserId is never violated mid-swap. */
+export async function linkDeviceUserAction(deviceUserId: string, employeeId: string) {
+  const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
+  const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });
+  if (!employee) return { error: t.validation.employeeNotFound };
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const conflict = await tx.employee.findFirst({
+        where: { biometricDeviceUserId: deviceUserId, id: { not: employeeId }, deletedAt: null },
+      });
+      if (conflict) {
+        await tx.employee.update({ where: { id: conflict.id }, data: { biometricDeviceUserId: null } });
+      }
+      await tx.employee.update({ where: { id: employeeId }, data: { biometricDeviceUserId: deviceUserId } });
+    });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : t.biometricDevice.deviceUnreachable };
+  }
+
+  await logDeviceAction(t, t.auditActions.linkDeviceUser, `${employee.name} <- ${deviceUserId}`);
+  revalidatePath(PATH);
+  revalidatePath(`/employees/${employeeId}`);
+  return { success: true };
+}
+
+/** Clears the link without touching the employee record otherwise. */
+export async function unlinkDeviceUserAction(deviceUserId: string) {
+  const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
+  const employee = await prisma.employee.findFirst({ where: { biometricDeviceUserId: deviceUserId, deletedAt: null } });
+  if (!employee) return { error: t.validation.employeeNotFound };
+
+  await prisma.employee.update({ where: { id: employee.id }, data: { biometricDeviceUserId: null } });
+  await logDeviceAction(t, t.auditActions.unlinkDeviceUser, `${employee.name} (${deviceUserId})`);
+  revalidatePath(PATH);
+  revalidatePath(`/employees/${employee.id}`);
+  return { success: true };
+}
+
 /** Wipes the device's own log buffer permanently — gated by a typed confirmation phrase, checked here too (not just in the UI). */
 export async function clearDeviceLogAction(confirmText: string) {
   const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
   if (confirmText.trim() !== t.biometricDevice.clearLogConfirmWord) {
     return { error: t.validation.invalidData };
   }

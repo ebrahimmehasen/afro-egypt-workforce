@@ -65,6 +65,7 @@ describe.skipIf(!sampleLoaded)("sample-seeded database", () => {
     const record = calculatePayrollRecord("PP-TEST", {
       employee: {
         id: employee.id,
+        employeeNumber: employee.employeeNumber,
         name: employee.name,
         departmentId: employee.departmentId,
         jobTitle: employee.jobTitle,
@@ -75,7 +76,7 @@ describe.skipIf(!sampleLoaded)("sample-seeded database", () => {
         dailyRate: employee.dailyRate ?? undefined,
         dailyWorkingHours: employee.dailyWorkingHours,
         allowances: employee.allowancesTotal,
-        biometricDeviceUserId: employee.biometricDeviceUserId,
+        biometricDeviceUserId: employee.biometricDeviceUserId ?? undefined,
         status: employee.status,
       },
       allowancesTotal,

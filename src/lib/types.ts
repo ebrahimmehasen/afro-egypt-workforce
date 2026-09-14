@@ -17,6 +17,7 @@ export type MilitaryStatus = "completed" | "exempted" | "postponed" | "not_appli
 
 export interface Employee {
   id: string; // EMP-1001
+  employeeNumber: string; // "<DEPT_CODE>-<seq>", e.g. ACC-001 — display-facing, distinct from id and biometricDeviceUserId
   name: string;
   departmentId: string;
   jobTitle: string;
@@ -27,7 +28,7 @@ export interface Employee {
   dailyRate?: number; // set when salaryType === "daily"
   dailyWorkingHours: number; // contracted daily hours
   allowances: number; // fixed monthly allowances total (for quick display; itemized in Allowance[])
-  biometricDeviceUserId: string;
+  biometricDeviceUserId?: string; // linked from /biometric-device, not the employee form
   status: EmployeeStatus;
   phone?: string;
   address?: string;
@@ -54,7 +55,7 @@ export interface Shift {
 }
 
 export type PunchType = "in" | "out";
-export type PunchSource = "simulated" | "manual_correction";
+export type PunchSource = "biometric" | "manual_correction" | "simulated";
 
 /** Immutable raw biometric record. Never edited or deleted. */
 export interface AttendanceLog {

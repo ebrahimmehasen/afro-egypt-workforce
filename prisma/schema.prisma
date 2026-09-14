@@ -158,6 +158,16 @@ model Department {
   users     User[]
 }
 
+/// Per-department atomic counter backing Employee.employeeNumber generation
+/// (see generateEmployeeNumber in src/lib/employee-number.ts). `code` is the
+/// short department code (e.g. "ACC"), not the Department id.
+model DepartmentNumberSequence {
+  code      String @id
+  /// The last sequence value issued for this code (not the next one to hand
+  /// out) — see generateEmployeeNumber in src/lib/employee-number.ts.
+  lastValue Int    @default(0)
+}
+
 model Shift {
   id                 String    @id @default(cuid())
   name               String
@@ -176,6 +186,10 @@ model Shift {
 
 model Employee {
   id                    String         @id @default(cuid())
+  /// Human-facing employee number, "<DEPT_CODE>-<seq>" (e.g. ACC-001). Auto-generated
+  /// on creation from DepartmentNumberSequence — distinct from `id` (internal PK) and
+  /// from `biometricDeviceUserId` (the fingerprint device's own user id). Never edited.
+  employeeNumber        String         @unique
   name                  String
   departmentId          String
   department            Department     @relation(fields: [departmentId], references: [id])
@@ -188,7 +202,12 @@ model Employee {
   dailyRate             Int?           // required when salaryType = daily — pay for one worked day
   dailyWorkingHours     Float          @default(8) // this employee's contracted daily hours (for hourly rate)
   allowancesTotal       Int            @default(0) // quick-display fixed monthly allowances; itemised in Allowance[]
-  biometricDeviceUserId String
+  /// The linked ZKTeco device user's own "User ID" (see BiometricDeviceSettings) -
+  /// null when the employee hasn't been linked to a device user yet. Linking/
+  /// unlinking happens from /biometric-device, not the employee form (see
+  /// linkDeviceUserAction in src/lib/actions/biometric-device.ts). Unique so one
+  /// device user can never be linked to two employees at once.
+  biometricDeviceUserId String?        @unique
   status                EmployeeStatus @default(active)
   phone                 String?
   address               String?         @db.Text

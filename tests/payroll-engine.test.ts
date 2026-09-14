@@ -4,6 +4,7 @@ import { Deduction, Employee } from "@/lib/types";
 
 const AHMED: Employee = {
   id: "EMP-1001",
+  employeeNumber: "PROD-001",
   name: "أحمد علي",
   departmentId: "DEP-1",
   jobTitle: "عامل خط تعبئة",

@@ -11,43 +11,6 @@ import { ActionState } from "@/hooks/use-action-feedback";
 import { getT, intlLocale } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
 
-const punchSchema = z.object({
-  employeeId: z.string().min(1),
-  punchType: z.enum(["in", "out"]),
-  date: z.string().min(1),
-  time: z.string().min(1),
-  deviceId: z.string().min(1),
-});
-
-export async function simulatePunch(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = await getT();
-  const parsed = punchSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: t.validation.invalidData };
-
-  const { employeeId, punchType, date, time, deviceId } = parsed.data;
-  const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });
-  if (!employee) return { error: t.validation.employeeNotFound };
-
-  const device = await prisma.device.findUnique({ where: { id: deviceId } });
-
-  await prisma.attendanceLog.create({
-    data: {
-      employeeId,
-      deviceId: device ? deviceId : null,
-      timestamp: new Date(`${date}T${time}:00`),
-      punchType,
-      source: "simulated",
-    },
-  });
-
-  await recalculateDailyAttendance(employeeId, date);
-  revalidatePath("/attendance");
-  revalidatePath("/dashboard");
-  revalidatePath(`/employees/${employeeId}`);
-
-  return { success: true, message: t.attendance.punchSuccess };
-}
-
 const correctionSchema = z.object({
   employeeId: z.string().min(1),
   date: z.string().min(1),

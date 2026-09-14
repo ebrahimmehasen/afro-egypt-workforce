@@ -49,7 +49,11 @@ export function RawLogsTable({ logs, employees }: { logs: AttendanceLog[]; emplo
                 </Badge>
               </TableCell>
               <TableCell className="text-xs text-muted-foreground">
-                {log.source === "simulated" ? t.attendance.sourceSimulated : t.attendance.sourceManual}
+                {log.source === "biometric"
+                  ? t.attendance.sourceBiometric
+                  : log.source === "manual_correction"
+                    ? t.attendance.sourceManual
+                    : t.attendance.sourceSimulated}
               </TableCell>
             </TableRow>
           ))}

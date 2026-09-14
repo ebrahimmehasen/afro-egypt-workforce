@@ -71,7 +71,7 @@ export function EmployeesTable({
       const matchesSearch =
         !search ||
         e.name.toLowerCase().includes(search.toLowerCase()) ||
-        e.id.toLowerCase().includes(search.toLowerCase());
+        e.employeeNumber.toLowerCase().includes(search.toLowerCase());
       const matchesDept = deptFilter === "all" || e.departmentId === deptFilter;
       const matchesStatus = statusFilter === "all" || e.status === statusFilter;
       return matchesSearch && matchesDept && matchesStatus;
@@ -131,7 +131,7 @@ export function EmployeesTable({
             <TableBody>
               {filtered.map((e) => (
                 <TableRow key={e.id}>
-                  <TableCell className="font-mono text-xs tabular-nums">{e.id}</TableCell>
+                  <TableCell dir="ltr" className="font-mono text-xs tabular-nums">{e.employeeNumber}</TableCell>
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-1.5">
                       {e.name}

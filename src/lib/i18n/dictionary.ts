@@ -228,7 +228,6 @@ export interface Dictionary {
   attendance: {
     title: string;
     description: string;
-    simulatePunch: string;
     dailyTab: string;
     rawTab: string;
     present: string;
@@ -247,16 +246,8 @@ export interface Dictionary {
     noRecordsTodayDesc: string;
     prevDay: string;
     nextDay: string;
-    simulateDialogTitle: string;
-    simulateDialogDesc: string;
-    selectEmployee: string;
-    punchType: string;
     punchIn: string;
     punchOut: string;
-    device: string;
-    submitPunch: string;
-    submitting: string;
-    punchSuccess: string;
     correctDialogTitle: string;
     correctDialogDesc: string;
     correctedIn: string;
@@ -268,6 +259,7 @@ export interface Dictionary {
     rawColTimestamp: string;
     rawColType: string;
     rawColSource: string;
+    sourceBiometric: string;
     sourceSimulated: string;
     sourceManual: string;
     noRawLogs: string;
@@ -674,6 +666,8 @@ export interface Dictionary {
     enableDevice: string;
     disableDevice: string;
     clearDeviceLog: string;
+    linkDeviceUser: string;
+    unlinkDeviceUser: string;
     system: string;
   };
   biometricDevice: {
@@ -727,5 +721,26 @@ export interface Dictionary {
     clearLogDone: string;
     deviceEnabled: string;
     deviceDisabled: string;
+    editConnection: string;
+    connectionSummary: string;
+    testConnection: string;
+    testConnectionOk: string;
+    testConnectionFailed: string;
+    userDetailTitle: string;
+    linkEmployeeLabel: string;
+    linkEmployeeSelectPlaceholder: string;
+    linkEmployeeAction: string;
+    changeLinkAction: string;
+    unlinkAction: string;
+    unlinkConfirm: string;
+    linkSaved: string;
+    unlinkSaved: string;
+    fingerprintsTitle: string;
+    fingerprintsDesc: string;
+    cardTitle: string;
+    cardUnsupported: string;
+    faceTitle: string;
+    faceUnsupported: string;
+    backToList: string;
   };
 }

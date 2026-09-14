@@ -14,6 +14,7 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { computeDailyAttendance, getShiftWindow } from "../src/lib/attendance-engine";
 import { mulberry32 } from "../src/lib/id";
+import { departmentCode } from "../src/lib/department-codes";
 import type { AttendanceLog, Shift } from "../src/lib/types";
 
 const prisma = new PrismaClient();
@@ -91,6 +92,7 @@ function dateOnly(iso: string) {
 
 type EmployeeSeed = {
   id: string;
+  employeeNumber: string;
   name: string;
   departmentId: string;
   jobTitle: string;
@@ -161,6 +163,13 @@ function buildEmployees(): EmployeeSeed[] {
     for (let i = 0; i < count; i++) deptQueue.push(name);
   });
 
+  const numberSeq: Record<string, number> = {};
+  function nextEmployeeNumber(deptName: string): string {
+    const code = departmentCode(deptName);
+    numberSeq[code] = (numberSeq[code] ?? 0) + 1;
+    return `${code}-${String(numberSeq[code]).padStart(3, "0")}`;
+  }
+
   const usedNames = new Set<string>();
   function uniqueName(): string {
     let name = "";
@@ -196,6 +205,7 @@ function buildEmployees(): EmployeeSeed[] {
     const isFemale = FEMALE_FIRST.includes(s.name.split(" ")[0]);
     employees.push({
       ...s,
+      employeeNumber: nextEmployeeNumber(deptName),
       salaryType: daily ? "daily" : "monthly",
       dailyRate: daily ? Math.round(s.basicSalary / 26) : null,
       hireDate: isoDate(addDays(DEMO_DATE, -(400 + idx * 37))),
@@ -222,6 +232,7 @@ function buildEmployees(): EmployeeSeed[] {
     const isFemale = FEMALE_FIRST.includes(name.split(" ")[0]);
     employees.push({
       id: `EMP-${seq}`,
+      employeeNumber: nextEmployeeNumber(deptName),
       name,
       departmentId: dept.id,
       jobTitle: pick(JOB_TITLES[deptName], rng),

@@ -16,10 +16,6 @@ export default async function BiometricDevicePage() {
   const t = await getT();
   const [connection, snapshot, db] = await Promise.all([getDeviceConnection(), getDeviceSnapshot(), getDb()]);
 
-  const employeesByDeviceUserId = Object.fromEntries(
-    db.employees.filter((e) => e.biometricDeviceUserId).map((e) => [e.biometricDeviceUserId, e.name]),
-  );
-
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={t.biometricDevice.title} description={t.biometricDevice.description} />
@@ -69,7 +65,7 @@ export default async function BiometricDevicePage() {
               <h2 className="text-base font-semibold text-foreground">{t.biometricDevice.usersTitle}</h2>
               <p className="text-sm text-muted-foreground">{t.biometricDevice.usersDesc}</p>
             </div>
-            <DeviceUsersTable users={snapshot.users} employeesByDeviceUserId={employeesByDeviceUserId} />
+            <DeviceUsersTable users={snapshot.users} employees={db.employees} />
           </CardContent>
         </Card>
       )}

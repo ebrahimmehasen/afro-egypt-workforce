@@ -75,7 +75,7 @@ export async function recalculateDailyAttendance(
       deviceId: l.deviceId ?? "",
       timestamp: l.timestamp.toISOString(),
       punchType: l.punchType,
-      source: l.source === "biometric" ? "simulated" : l.source,
+      source: l.source,
     })),
     isOnApprovedLeave: Boolean(leave),
     leaveType:

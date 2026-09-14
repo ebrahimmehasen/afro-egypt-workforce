@@ -6,7 +6,6 @@ import { today } from "@/lib/today";
 import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SimulatePunchDialog } from "@/components/attendance/simulate-punch-dialog";
 import { DailyAttendanceTable } from "@/components/attendance/daily-attendance-table";
 import { RawLogsTable } from "@/components/attendance/raw-logs-table";
 import { DateNav } from "@/components/attendance/date-nav";
@@ -30,7 +29,6 @@ export default async function AttendancePage({
   const scope = viewerScope(user, db.employees);
   const employees = employeesInScope(scope, db.employees).filter((e) => e.status === "active");
   const employeeIds = new Set(employees.map((e) => e.id));
-  const canSimulate = user.role !== "employee";
 
   const records = db.dailyAttendance.filter((a) => a.date === date && employeeIds.has(a.employeeId));
   const logs = await getAttendanceLogsForDate(date, employeeIds);
@@ -38,11 +36,7 @@ export default async function AttendancePage({
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={t.attendance.title}
-        description={t.attendance.description}
-        actions={canSimulate ? <SimulatePunchDialog employees={employees} /> : null}
-      />
+      <PageHeader title={t.attendance.title} description={t.attendance.description} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <DateNav date={date} />

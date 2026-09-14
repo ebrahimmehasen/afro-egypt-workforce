@@ -105,6 +105,7 @@ export async function calculatePayroll(periodId: string) {
       const result = calculatePayrollRecord(periodId, {
         employee: {
           id: employee.id,
+          employeeNumber: employee.employeeNumber,
           name: employee.name,
           departmentId: employee.departmentId,
           jobTitle: employee.jobTitle,
@@ -115,7 +116,7 @@ export async function calculatePayroll(periodId: string) {
           dailyRate: employee.dailyRate ?? undefined,
           dailyWorkingHours: employee.dailyWorkingHours,
           allowances: employee.allowancesTotal,
-          biometricDeviceUserId: employee.biometricDeviceUserId,
+          biometricDeviceUserId: employee.biometricDeviceUserId ?? undefined,
           status: employee.status,
         },
         allowancesTotal,

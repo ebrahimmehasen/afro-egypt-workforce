@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { recordChange } from "@/lib/audit";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
+import { generateEmployeeNumber } from "@/lib/employee-number";
 
 const employeeSchema = z
   .object({
@@ -19,7 +20,6 @@ const employeeSchema = z
     dailyRate: z.coerce.number().min(0).optional(),
     dailyWorkingHours: z.coerce.number().positive().default(8),
     allowances: z.coerce.number().min(0).default(0),
-    biometricDeviceUserId: z.string().min(1),
     status: z.enum(["active", "on_leave", "suspended", "terminated"]),
     phone: z.string().min(6),
     address: z.string().min(3),
@@ -52,16 +52,21 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
     return { error: t.validation.nationalIdTaken };
   }
 
+  const department = await prisma.department.findUnique({ where: { id: rest.departmentId } });
+  if (!department) return { error: t.validation.invalidData };
+
   await recordChange(
     {
       module: t.nav.employees,
       action: t.auditActions.addEmployee,
       newValue: `${parsed.data.name} (${id})`,
     },
-    (tx) =>
-      tx.employee.create({
+    async (tx) => {
+      const employeeNumber = await generateEmployeeNumber(tx, department.name);
+      return tx.employee.create({
         data: {
           id,
+          employeeNumber,
           ...rest,
           nationalId,
           salaryType,
@@ -69,7 +74,8 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
           hireDate: new Date(`${hireDate}T00:00:00.000Z`),
           allowancesTotal: allowances,
         },
-      }),
+      });
+    },
   );
 
   revalidatePath("/employees");
