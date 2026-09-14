@@ -483,3 +483,14 @@ model PayrollSettings {
   workingDaysPerMonth      Int    @default(26)
   workingHoursPerDay       Int    @default(8)
 }
+
+/// Connection settings for the ZKTeco biometric device managed from /biometric-device.
+/// Distinct from PUNCH_API_KEY (which authenticates the device's own push-protocol
+/// POSTs to /api/punch) — this is the app acting as a client of the device's SDK port.
+model BiometricDeviceSettings {
+  id           String   @id @default("singleton")
+  ip           String
+  port         Int      @default(4370)
+  commPassword Int      @default(0)
+  updatedAt    DateTime @updatedAt
+}

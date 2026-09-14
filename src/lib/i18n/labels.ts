@@ -114,6 +114,7 @@ export const NAV_ITEMS = [
   { href: "/workforce-cost", key: "workforceCost", icon: "TrendingUp" },
   { href: "/audit-log", key: "auditLog", icon: "History" },
   { href: "/users", key: "users", icon: "ShieldCheck" },
+  { href: "/biometric-device", key: "biometricDevice", icon: "ScanFace" },
   { href: "/settings", key: "settings", icon: "Settings" },
 ] as const;
 

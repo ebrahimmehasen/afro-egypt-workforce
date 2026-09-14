@@ -4,6 +4,7 @@ const NAV_BY_ROLE: Record<Role, string[]> = {
   admin: [
     "/dashboard", "/employees", "/departments", "/shifts", "/attendance", "/leaves",
     "/overtime", "/deductions", "/payroll", "/reports", "/workforce-cost", "/audit-log", "/users", "/settings",
+    "/biometric-device",
   ],
   hr: [
     "/dashboard", "/employees", "/departments", "/shifts", "/attendance", "/leaves",
@@ -36,6 +37,10 @@ export function canManageSettings(role: Role): boolean {
 }
 
 export function canManageUsers(role: Role): boolean {
+  return role === "admin";
+}
+
+export function canManageBiometricDevice(role: Role): boolean {
   return role === "admin";
 }
 
