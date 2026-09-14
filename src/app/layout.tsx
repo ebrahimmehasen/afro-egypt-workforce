@@ -5,6 +5,7 @@ import { LocaleProvider } from "@/components/providers/locale-provider";
 import { ChunkReloadOnDeploy } from "@/components/providers/chunk-reload-on-deploy";
 import { getDictionary } from "@/lib/i18n";
 import { dir, getLocale } from "@/lib/i18n/locale";
+import "@/lib/startup";
 import "./globals.css";
 
 const cairo = Cairo({

@@ -750,7 +750,7 @@ export const en: Dictionary = {
     saveName: "Save name",
     nameSaved: "Name updated on the device",
     syncSectionTitle: "Attendance sync",
-    syncSectionDesc: "The device doesn't push punches to the system automatically - click here periodically to pull whatever's on the device and update attendance.",
+    syncSectionDesc: "The system pulls punches from the device automatically every 5 minutes. Click here if you want a punch to show up right now instead of waiting.",
     syncNow: "Sync now",
     syncImported: "New punches imported",
     syncUnlinked: "Punches from a device user not linked to an employee",

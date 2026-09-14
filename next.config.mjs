@@ -11,6 +11,11 @@ const nextConfig = {
   outputFileTracingRoot: __dirname,
   // Self-contained build (server + only the deps it needs) for the Docker image.
   output: "standalone",
+  // node-zklib talks to hardware over raw TCP/UDP (net/dgram/fs) - keep it a
+  // plain runtime require() instead of letting webpack try to bundle it, or
+  // the build fails wherever it's reachable from an edge-candidate entry
+  // point like instrumentation.ts ("Module not found: Can't resolve 'net'").
+  serverExternalPackages: ["node-zklib"],
 };
 
 export default nextConfig;

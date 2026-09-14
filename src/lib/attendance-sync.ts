@@ -97,3 +97,33 @@ export async function syncDeviceAttendance(): Promise<AttendanceSyncResult> {
     unlinkedDeviceUserIds: [...unlinkedDeviceUserIds],
   };
 }
+
+const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+let autoSyncStarted = false;
+
+/**
+ * Runs syncDeviceAttendance() on a timer for the lifetime of the server
+ * process. Safe to call more than once (e.g. hot reload in dev) - only the
+ * first call actually schedules anything. Meant to be started once from
+ * instrumentation.ts when the server boots; this app runs as a persistent
+ * Windows Service (not serverless), so a plain setInterval lives as long as
+ * the process does, which is what we want here.
+ */
+export function startAttendanceAutoSync() {
+  if (autoSyncStarted) return;
+  autoSyncStarted = true;
+
+  const tick = async () => {
+    try {
+      const result = await syncDeviceAttendance();
+      if (result.imported > 0) {
+        console.log(`[attendance-auto-sync] imported ${result.imported} punch(es), ${result.skippedUnlinked} from unlinked device user(s)`);
+      }
+    } catch (e) {
+      console.error("[attendance-auto-sync] sync failed:", e instanceof Error ? e.message : e);
+    }
+  };
+
+  setInterval(tick, AUTO_SYNC_INTERVAL_MS);
+  console.log(`[attendance-auto-sync] started, syncing every ${AUTO_SYNC_INTERVAL_MS / 60000} minute(s)`);
+}
