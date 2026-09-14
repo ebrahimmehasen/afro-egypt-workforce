@@ -767,6 +767,5 @@ export interface Dictionary {
     historyTitle: string;
     historyDesc: string;
     historyEmpty: string;
-    historyShowingLimited: string;
   };
 }

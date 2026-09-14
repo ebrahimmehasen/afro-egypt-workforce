@@ -252,9 +252,7 @@ function FingerprintsSection({ user }: { user: DeviceUser }) {
   );
 }
 
-function HistorySection({
-  history, historyTotal, historyLimit,
-}: { history: AttendanceLog[]; historyTotal: number; historyLimit: number }) {
+function HistorySection({ history }: { history: AttendanceLog[] }) {
   const t = useT();
   const locale = useLocale();
 
@@ -263,9 +261,6 @@ function HistorySection({
       <CardContent className="flex flex-col gap-2 p-4">
         <div className="text-sm font-medium">{t.biometricDevice.historyTitle}</div>
         <p className="text-xs text-muted-foreground">{t.biometricDevice.historyDesc}</p>
-        {historyTotal > historyLimit && (
-          <p className="text-xs text-muted-foreground">{format(t.biometricDevice.historyShowingLimited, { limit: historyLimit, total: historyTotal })}</p>
-        )}
         {history.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground">{t.biometricDevice.historyEmpty}</p>
         ) : (
@@ -300,7 +295,7 @@ function HistorySection({
 }
 
 export function DeviceUserDetail({
-  user, linkedEmployee, linkedDepartment, linkedShift, employees, history, historyTotal, historyLimit,
+  user, linkedEmployee, linkedDepartment, linkedShift, employees, history,
 }: {
   user: DeviceUser;
   linkedEmployee: Employee | null;
@@ -308,8 +303,6 @@ export function DeviceUserDetail({
   linkedShift: Shift | null;
   employees: Employee[];
   history: AttendanceLog[];
-  historyTotal: number;
-  historyLimit: number;
 }) {
   const t = useT();
   const router = useRouter();
@@ -327,7 +320,7 @@ export function DeviceUserDetail({
           employees={employees}
         />
         <FingerprintsSection user={user} />
-        <HistorySection history={history} historyTotal={historyTotal} historyLimit={historyLimit} />
+        <HistorySection history={history} />
 
         <Card className="border-dashed">
           <CardContent className="flex flex-col gap-1 p-4 text-xs text-muted-foreground">

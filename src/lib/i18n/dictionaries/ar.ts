@@ -769,6 +769,5 @@ export const ar: Dictionary = {
     historyTitle: "سجل البصمات",
     historyDesc: "كل البصمات المسجّلة لصاحب اليوزر ده على الجهاز، من الأحدث للأقدم.",
     historyEmpty: "مفيش بصمات مسجّلة لليوزر ده لحد دلوقتي",
-    historyShowingLimited: "بيعرض آخر {limit} بصمة من إجمالي {total}",
   },
 };

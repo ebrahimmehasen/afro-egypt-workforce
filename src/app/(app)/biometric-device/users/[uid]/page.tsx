@@ -57,14 +57,13 @@ export default async function BiometricDeviceUserPage({
   const linkedShift = linkedEmployee ? db.shifts.find((s) => s.id === linkedEmployee.shiftId) : null;
 
   // Keyed on the device's own userId (not the employee id) so history survives
-  // an unlink/relink - it's this device user's punch history either way.
-  const HISTORY_LIMIT = 100;
+  // an unlink/relink - it's this device user's punch history either way. No
+  // cap: the user explicitly wants everything the device has ever recorded
+  // for this person, not a recent slice of it.
   const rawHistory = await prisma.attendanceLog.findMany({
     where: { deviceUserId: user.userId },
     orderBy: { timestamp: "desc" },
-    take: HISTORY_LIMIT,
   });
-  const historyTotal = await prisma.attendanceLog.count({ where: { deviceUserId: user.userId } });
   const history = rawHistory.map(toAttendanceLog);
 
   return (
@@ -81,8 +80,6 @@ export default async function BiometricDeviceUserPage({
         linkedShift={linkedShift ?? null}
         employees={db.employees}
         history={history}
-        historyTotal={historyTotal}
-        historyLimit={HISTORY_LIMIT}
       />
     </div>
   );

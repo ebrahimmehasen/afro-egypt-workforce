@@ -769,6 +769,5 @@ export const en: Dictionary = {
     historyTitle: "Punch history",
     historyDesc: "Every punch recorded for this device user, newest first.",
     historyEmpty: "No punches recorded for this user yet",
-    historyShowingLimited: "Showing the last {limit} of {total} punches",
   },
 };
