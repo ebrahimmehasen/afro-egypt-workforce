@@ -1,7 +1,5 @@
 // Server-only: talks to hardware over raw TCP via node-zklib — never import from client components.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const ZKLib = require("node-zklib");
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { COMMANDS } = require("node-zklib/constants");
 import { prisma } from "@/lib/prisma";
 
