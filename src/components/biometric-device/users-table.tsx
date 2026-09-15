@@ -9,7 +9,13 @@ import { useT } from "@/components/providers/locale-provider";
 import { DeviceUser } from "@/lib/zk-device";
 import { Employee } from "@/lib/types";
 
-export function DeviceUsersTable({ users, employees }: { users: DeviceUser[]; employees: Employee[] }) {
+export function DeviceUsersTable({
+  users, employees, punchCounts,
+}: {
+  users: DeviceUser[];
+  employees: Employee[];
+  punchCounts: Record<string, number>;
+}) {
   const t = useT();
   const router = useRouter();
   const employeesByDeviceUserId = new Map(employees.filter((e) => e.biometricDeviceUserId).map((e) => [e.biometricDeviceUserId!, e]));
@@ -23,6 +29,7 @@ export function DeviceUsersTable({ users, employees }: { users: DeviceUser[]; em
             <TableHead>{t.biometricDevice.deviceUserId}</TableHead>
             <TableHead>{t.biometricDevice.name}</TableHead>
             <TableHead>{t.biometricDevice.linkedEmployee}</TableHead>
+            <TableHead>{t.biometricDevice.punchCount}</TableHead>
             <TableHead>{t.biometricDevice.card}</TableHead>
           </TableRow>
         </TableHeader>
@@ -45,6 +52,7 @@ export function DeviceUsersTable({ users, employees }: { users: DeviceUser[]; em
                     <Badge variant="outline">{t.biometricDevice.notLinked}</Badge>
                   )}
                 </TableCell>
+                <TableCell dir="ltr" className="tabular-nums">{(punchCounts[u.userId] ?? 0).toLocaleString()}</TableCell>
                 <TableCell dir="ltr">{u.cardno || "—"}</TableCell>
               </TableRow>
             );

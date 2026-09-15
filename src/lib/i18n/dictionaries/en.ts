@@ -682,6 +682,8 @@ export const en: Dictionary = {
     statusConnected: "Connected",
     statusOffline: "Offline",
     usersOnDevice: "Users on device",
+    punchedToday: "Punched Today",
+    punchCount: "Total Punches",
     logsStored: "Stored attendance logs",
     logCapacity: "Max capacity",
     connectionTitle: "Connection settings",

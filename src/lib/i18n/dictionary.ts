@@ -680,6 +680,8 @@ export interface Dictionary {
     statusConnected: string;
     statusOffline: string;
     usersOnDevice: string;
+    punchedToday: string;
+    punchCount: string;
     logsStored: string;
     logCapacity: string;
     connectionTitle: string;
