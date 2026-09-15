@@ -681,6 +681,8 @@ export interface Dictionary {
     statusOffline: string;
     usersOnDevice: string;
     punchedToday: string;
+    punchedTodayListDesc: string;
+    punchedTodayEmpty: string;
     punchCount: string;
     logsStored: string;
     logCapacity: string;

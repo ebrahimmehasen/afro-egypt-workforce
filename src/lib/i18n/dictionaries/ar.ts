@@ -683,6 +683,8 @@ export const ar: Dictionary = {
     statusOffline: "غير متصل",
     usersOnDevice: "المستخدمون على الجهاز",
     punchedToday: "بصموا النهاردة",
+    punchedTodayListDesc: "كل الناس اللي بصمت على الجهاز النهاردة، من واقع الجهاز نفسه.",
+    punchedTodayEmpty: "لسه محدش بصم النهاردة",
     punchCount: "عدد مرات الحضور",
     logsStored: "سجلات الحضور المخزّنة",
     logCapacity: "السعة القصوى",

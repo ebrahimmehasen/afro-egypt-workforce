@@ -683,6 +683,8 @@ export const en: Dictionary = {
     statusOffline: "Offline",
     usersOnDevice: "Users on device",
     punchedToday: "Punched Today",
+    punchedTodayListDesc: "Everyone who punched on the device today, straight from the device itself.",
+    punchedTodayEmpty: "No one has punched yet today",
     punchCount: "Total Punches",
     logsStored: "Stored attendance logs",
     logCapacity: "Max capacity",

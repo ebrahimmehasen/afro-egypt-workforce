@@ -1,4 +1,4 @@
-import { CalendarCheck2, CircleCheck, CircleX, HardDrive, ListOrdered, Users } from "lucide-react";
+import { CircleCheck, CircleX, HardDrive, ListOrdered, Users } from "lucide-react";
 import { requireAccess } from "@/lib/auth";
 import { getDb } from "@/lib/data";
 import { getT } from "@/lib/i18n";
@@ -11,6 +11,7 @@ import { DeviceConnectionForm } from "@/components/biometric-device/connection-f
 import { DeviceActions } from "@/components/biometric-device/device-actions";
 import { DeviceUsersTable } from "@/components/biometric-device/users-table";
 import { SyncAttendanceCard } from "@/components/biometric-device/sync-attendance-card";
+import { PunchedTodayCard } from "@/components/biometric-device/punched-today-card";
 
 export default async function BiometricDevicePage() {
   await requireAccess("/biometric-device");
@@ -33,6 +34,24 @@ export default async function BiometricDevicePage() {
     punchCounts[r.deviceUserId] = (punchCounts[r.deviceUserId] ?? 0) + 1;
   }
 
+  const deviceUserById = new Map(snapshot.online ? snapshot.users.map((u) => [u.userId, u]) : []);
+  const employeeByDeviceUserId = new Map(db.employees.filter((e) => e.biometricDeviceUserId).map((e) => [e.biometricDeviceUserId!, e]));
+  const todayList = [...todayPunchedUserIds]
+    .map((deviceUserId) => {
+      const todayRecords = rawAttendance.filter((r) => r.deviceUserId === deviceUserId && isToday(r.recordTime));
+      const times = todayRecords.map((r) => r.recordTime.getTime()).sort((a, b) => a - b);
+      return {
+        deviceUserId,
+        uid: deviceUserById.get(deviceUserId)?.uid ?? 0,
+        name: deviceUserById.get(deviceUserId)?.name ?? deviceUserId,
+        linkedEmployeeName: employeeByDeviceUserId.get(deviceUserId)?.name ?? null,
+        firstPunch: new Date(times[0]).toISOString(),
+        lastPunch: new Date(times[times.length - 1]).toISOString(),
+        punchCount: times.length,
+      };
+    })
+    .sort((a, b) => a.firstPunch.localeCompare(b.firstPunch));
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={t.biometricDevice.title} description={t.biometricDevice.description} />
@@ -50,12 +69,7 @@ export default async function BiometricDevicePage() {
           icon={Users}
           tone="primary"
         />
-        <KpiCard
-          label={t.biometricDevice.punchedToday}
-          value={snapshot.online ? todayPunchedUserIds.size : "—"}
-          icon={CalendarCheck2}
-          tone="success"
-        />
+        <PunchedTodayCard count={snapshot.online ? todayPunchedUserIds.size : null} people={todayList} />
         <KpiCard
           label={t.biometricDevice.logsStored}
           value={snapshot.online ? snapshot.info.logCounts.toLocaleString() : "—"}
