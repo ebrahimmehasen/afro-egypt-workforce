@@ -132,7 +132,7 @@ export async function deleteEmployee(id: string) {
     {
       module: t.nav.employees,
       action: t.auditActions.deleteEmployee,
-      oldValue: `${removed.name} (${removed.id})`,
+      oldValue: `${removed.name} (${removed.employeeNumber})`,
     },
     (tx) => tx.employee.update({ where: { id }, data: { deletedAt: new Date(), status: "terminated" } }),
   );
