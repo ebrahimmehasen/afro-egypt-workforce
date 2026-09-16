@@ -760,6 +760,9 @@ export interface Dictionary {
     syncUnlinked: string;
     syncDuplicate: string;
     syncDone: string;
+    recordsRemoved: string;
+    linkBackfillDone: string;
+    unlinkRemovalDone: string;
     realtimeConnected: string;
     realtimePaused: string;
     realtimeReconnecting: string;

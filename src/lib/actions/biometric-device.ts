@@ -7,7 +7,8 @@ import { auditActor } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
 import { canManageBiometricDevice } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
-import { syncDeviceAttendance } from "@/lib/attendance-sync";
+import { syncDeviceAttendance, backfillDeviceUser } from "@/lib/attendance-sync";
+import { removeDeviceUserAttendance } from "@/lib/attendance-ingest";
 import { pauseAttendanceRealtime, resumeAttendanceRealtime } from "@/lib/attendance-realtime";
 import { ActionState } from "@/hooks/use-action-feedback";
 import {
@@ -200,13 +201,31 @@ export async function linkDeviceUserAction(deviceUserId: string, employeeId: str
     return { error: e instanceof Error ? e.message : t.biometricDevice.deviceUnreachable };
   }
 
-  await logDeviceAction(t, t.auditActions.linkDeviceUser, `${employee.name} <- ${deviceUserId}`);
+  // Linking means "this person's whole device history is now theirs" - back
+  // it all in immediately rather than waiting for the next real-time punch
+  // or safety-net poll to happen to notice the link exists.
+  let imported = 0;
+  try {
+    ({ imported } = await backfillDeviceUser(deviceUserId));
+  } catch (e) {
+    // The link itself already succeeded; a failed backfill just means the
+    // history will catch up on the next sync instead of right now.
+    console.error("[biometric-device] backfill after link failed:", e instanceof Error ? e.message : e);
+  }
+
+  await logDeviceAction(t, t.auditActions.linkDeviceUser, `${employee.name} <- ${deviceUserId} (${imported} ${t.biometricDevice.syncImported.toLowerCase()})`);
   revalidatePath(PATH);
   revalidatePath(`/employees/${employee.employeeNumber}`);
-  return { success: true };
+  revalidatePath("/attendance");
+  revalidatePath("/dashboard");
+  return { success: true, imported };
 }
 
-/** Clears the link without touching the employee record otherwise. */
+/** Clears the link AND removes the attendance this employee only has because
+ * of it (source: "biometric" rows tied to this deviceUserId) - an unlink
+ * means "this wasn't actually them", so their record shouldn't keep saying
+ * otherwise. Manual HR corrections are untouched (they're not stored as
+ * AttendanceLog rows at all). */
 export async function unlinkDeviceUserAction(deviceUserId: string) {
   const t = await getT();
   const denied = await guard(t);
@@ -214,11 +233,14 @@ export async function unlinkDeviceUserAction(deviceUserId: string) {
   const employee = await prisma.employee.findFirst({ where: { biometricDeviceUserId: deviceUserId, deletedAt: null } });
   if (!employee) return { error: t.validation.employeeNotFound };
 
+  const { deleted } = await removeDeviceUserAttendance(employee.id, deviceUserId);
   await prisma.employee.update({ where: { id: employee.id }, data: { biometricDeviceUserId: null } });
-  await logDeviceAction(t, t.auditActions.unlinkDeviceUser, `${employee.name} (${deviceUserId})`);
+  await logDeviceAction(t, t.auditActions.unlinkDeviceUser, `${employee.name} (${deviceUserId}) — ${deleted} ${t.biometricDevice.recordsRemoved}`);
   revalidatePath(PATH);
   revalidatePath(`/employees/${employee.employeeNumber}`);
-  return { success: true };
+  revalidatePath("/attendance");
+  revalidatePath("/dashboard");
+  return { success: true, deleted };
 }
 
 /** Wipes the device's own log buffer permanently — gated by a typed confirmation phrase, checked here too (not just in the UI). */

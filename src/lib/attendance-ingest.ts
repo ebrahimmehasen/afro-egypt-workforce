@@ -50,3 +50,33 @@ export async function ingestOneRecord(deviceUserId: string, recordTime: Date): P
   await recalculateDailyAttendance(employee.id, dateStr);
   return { imported: true };
 }
+
+/**
+ * Undoes what ingestOneRecord built up for one employee/device-user pair -
+ * used when a link is removed on /biometric-device, since those punches
+ * were only ever attributable to this employee because of that link. Only
+ * touches source: "biometric" rows (a manual HR correction lives on
+ * DailyAttendance.correctionReason, not as an AttendanceLog row, so there's
+ * nothing here that could delete one), and recomputes every day it
+ * affected so DailyAttendance doesn't keep showing stale "present" rows
+ * for punches that no longer exist for this employee.
+ */
+export async function removeDeviceUserAttendance(employeeId: string, deviceUserId: string): Promise<{ deleted: number; daysRecalculated: number }> {
+  const rows = await prisma.attendanceLog.findMany({
+    where: { employeeId, deviceUserId, source: "biometric" },
+    select: { timestamp: true },
+  });
+  if (rows.length === 0) return { deleted: 0, daysRecalculated: 0 };
+
+  const dates = new Set(rows.map((r) => r.timestamp.toISOString().slice(0, 10)));
+
+  const { count } = await prisma.attendanceLog.deleteMany({
+    where: { employeeId, deviceUserId, source: "biometric" },
+  });
+
+  for (const date of dates) {
+    await recalculateDailyAttendance(employeeId, date);
+  }
+
+  return { deleted: count, daysRecalculated: dates.size };
+}

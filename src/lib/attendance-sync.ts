@@ -42,3 +42,23 @@ export async function syncDeviceAttendance(): Promise<AttendanceSyncResult> {
     unlinkedDeviceUserIds: [...unlinkedDeviceUserIds],
   };
 }
+
+/**
+ * Imports one device user's entire punch history — called right after
+ * linkDeviceUserAction commits, so "link this person" means their whole
+ * attendance record actually lands in the system immediately, not just
+ * whatever punches happen to come in from now on.
+ */
+export async function backfillDeviceUser(deviceUserId: string): Promise<{ imported: number }> {
+  const rawLogs = await fetchDeviceAttendanceLogs();
+  const forThisUser = rawLogs
+    .filter((r) => r.deviceUserId === deviceUserId)
+    .sort((a, b) => a.recordTime.getTime() - b.recordTime.getTime());
+
+  let imported = 0;
+  for (const log of forThisUser) {
+    const outcome = await ingestOneRecord(log.deviceUserId, log.recordTime);
+    if (outcome.imported) imported++;
+  }
+  return { imported };
+}

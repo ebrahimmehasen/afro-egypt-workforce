@@ -169,7 +169,7 @@ function LinkEmployeeSection({
               size="sm"
               disabled={pending || !selectedId}
               className="gap-1.5"
-              onClick={() => run(() => linkDeviceUserAction(user.userId, selectedId), t.biometricDevice.linkSaved)}
+              onClick={() => run(() => linkDeviceUserAction(user.userId, selectedId), t.biometricDevice.linkBackfillDone)}
             >
               <Link2 className="h-4 w-4" />
               {linkedEmployee ? t.biometricDevice.changeLinkAction : t.biometricDevice.linkEmployeeAction}
@@ -188,7 +188,7 @@ function LinkEmployeeSection({
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => run(() => unlinkDeviceUserAction(user.userId), t.biometricDevice.unlinkSaved)}>
+                    <AlertDialogAction onClick={() => run(() => unlinkDeviceUserAction(user.userId), t.biometricDevice.unlinkRemovalDone)}>
                       {t.biometricDevice.unlinkAction}
                     </AlertDialogAction>
                   </AlertDialogFooter>
