@@ -39,7 +39,7 @@ export async function createOvertime(_prev: ActionState, formData: FormData): Pr
 export async function decideOvertime(id: string, decision: "approved" | "rejected") {
   const t = await getT();
   const actor = await auditActor();
-  const overtime = await prisma.overtime.findUnique({ where: { id } });
+  const overtime = await prisma.overtime.findUnique({ where: { id }, include: { employee: true } });
   if (!overtime) return { error: t.validation.requestNotFound };
 
   await recordChange(
@@ -48,7 +48,7 @@ export async function decideOvertime(id: string, decision: "approved" | "rejecte
       action: decision === "approved" ? t.auditActions.approveOvertime : t.auditActions.rejectOvertime,
       oldValue: t.statuses.pending,
       newValue: decision === "approved" ? t.statuses.approved : t.statuses.rejected,
-      reason: `${overtime.employeeId} — ${overtime.hours} ${t.common.hours}`,
+      reason: `${overtime.employee.employeeNumber} — ${overtime.hours} ${t.common.hours}`,
     },
     (tx) => tx.overtime.update({ where: { id }, data: { status: decision, approvedBy: actor } }),
   );

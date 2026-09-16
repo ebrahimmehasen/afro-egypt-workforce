@@ -83,7 +83,7 @@ export function DeductionsTable({
             return (
               <TableRow key={d.id}>
                 <TableCell>
-                  <div className="font-medium">{employee?.name ?? d.employeeId}</div>
+                  <div className="font-medium">{employee?.name ?? "-"}</div>
                   {employee && <div dir="ltr" className="text-xs text-muted-foreground">{employee.employeeNumber}</div>}
                 </TableCell>
                 <TableCell><Badge variant="destructive">{deductionTypeLabel(d.type, t)}</Badge></TableCell>

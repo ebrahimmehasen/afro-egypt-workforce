@@ -42,7 +42,7 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
 export async function decideLeave(id: string, decision: "approved" | "rejected") {
   const t = await getT();
   const actor = await auditActor();
-  const leave = await prisma.leave.findUnique({ where: { id } });
+  const leave = await prisma.leave.findUnique({ where: { id }, include: { employee: true } });
   if (!leave) return { error: t.validation.requestNotFound };
 
   await recordChange(
@@ -51,7 +51,7 @@ export async function decideLeave(id: string, decision: "approved" | "rejected")
       action: decision === "approved" ? t.auditActions.approveLeave : t.auditActions.rejectLeave,
       oldValue: t.statuses.pending,
       newValue: decision === "approved" ? t.statuses.approved : t.statuses.rejected,
-      reason: `${leaveTypeLabel(leave.type, t)} — ${leave.employeeId}`,
+      reason: `${leaveTypeLabel(leave.type, t)} — ${leave.employee.employeeNumber}`,
     },
     (tx) => tx.leave.update({ where: { id }, data: { status: decision, approvedBy: actor } }),
   );

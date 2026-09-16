@@ -31,7 +31,7 @@ export function OvertimeReport({ records, employees }: { records: Overtime[]; em
   );
 
   const exportRows = rows.map((o) => [
-    empMap.get(o.employeeId)?.name ?? o.employeeId,
+    empMap.get(o.employeeId)?.name ?? "-",
     o.date,
     o.hours,
     o.hourlyRate,
@@ -79,7 +79,7 @@ export function OvertimeReport({ records, employees }: { records: Overtime[]; em
             <TableBody>
               {rows.map((o) => (
                 <TableRow key={o.id}>
-                  <TableCell className="font-medium">{empMap.get(o.employeeId)?.name ?? o.employeeId}</TableCell>
+                  <TableCell className="font-medium">{empMap.get(o.employeeId)?.name ?? "-"}</TableCell>
                   <TableCell>{o.date}</TableCell>
                   <TableCell className="tabular-nums">{o.hours}</TableCell>
                   <TableCell className="tabular-nums">{formatEGP(o.hourlyRate, locale)}</TableCell>

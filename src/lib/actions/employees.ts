@@ -59,7 +59,7 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
     {
       module: t.nav.employees,
       action: t.auditActions.addEmployee,
-      newValue: `${parsed.data.name} (${id})`,
+      newValue: parsed.data.name,
     },
     async (tx) => {
       const employeeNumber = await generateEmployeeNumber(tx, department.name);

@@ -51,7 +51,7 @@ export function AllowancesTable({
             return (
               <TableRow key={a.id}>
                 <TableCell>
-                  <div className="font-medium">{employee?.name ?? a.employeeId}</div>
+                  <div className="font-medium">{employee?.name ?? "-"}</div>
                   {employee && <div dir="ltr" className="text-xs text-muted-foreground">{employee.employeeNumber}</div>}
                 </TableCell>
                 <TableCell><Badge variant="gold">{allowanceTypeLabel(a.type, t)}</Badge></TableCell>

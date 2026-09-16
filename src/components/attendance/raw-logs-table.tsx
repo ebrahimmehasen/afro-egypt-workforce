@@ -38,7 +38,7 @@ export function RawLogsTable({ logs, employees }: { logs: AttendanceLog[]; emplo
             return (
             <TableRow key={log.id}>
               <TableCell>
-                <div className="font-medium">{employee?.name ?? log.employeeId}</div>
+                <div className="font-medium">{employee?.name ?? "-"}</div>
                 {employee && <div dir="ltr" className="text-xs text-muted-foreground">{employee.employeeNumber}</div>}
               </TableCell>
               <TableCell dir="ltr" className="font-mono text-xs">{log.deviceId}</TableCell>

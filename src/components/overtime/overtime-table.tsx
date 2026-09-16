@@ -87,7 +87,7 @@ export function OvertimeTable({
             return (
               <TableRow key={o.id}>
                 <TableCell>
-                  <div className="font-medium">{employee?.name ?? o.employeeId}</div>
+                  <div className="font-medium">{employee?.name ?? "-"}</div>
                   {employee && <div dir="ltr" className="text-xs text-muted-foreground">{employee.employeeNumber}</div>}
                 </TableCell>
                 <TableCell>{o.date}</TableCell>
