@@ -35,7 +35,15 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { DeviceUser } from "@/lib/zk-device";
-import { AttendanceLog, Department, Employee, Shift } from "@/lib/types";
+import { Department, Employee, Shift } from "@/lib/types";
+
+/** A single punch straight from the device's own log — not our DB's
+ * AttendanceLog, which only has rows for device users that were linked to an
+ * employee at sync time. See device-user-detail-dialog's HistorySection. */
+export interface DevicePunchEntry {
+  timestamp: string;
+  punchType: "in" | "out";
+}
 
 const FINGER_SLOTS = Array.from({ length: 10 }, (_, i) => i);
 
@@ -252,7 +260,7 @@ function FingerprintsSection({ user }: { user: DeviceUser }) {
   );
 }
 
-function HistorySection({ history }: { history: AttendanceLog[] }) {
+function HistorySection({ history }: { history: DevicePunchEntry[] }) {
   const t = useT();
   const locale = useLocale();
 
@@ -273,8 +281,8 @@ function HistorySection({ history }: { history: AttendanceLog[] }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {history.map((log) => (
-                  <TableRow key={log.id}>
+                {history.map((log, i) => (
+                  <TableRow key={`${log.timestamp}-${i}`}>
                     <TableCell dir="ltr" className="tabular-nums text-xs">
                       {new Date(log.timestamp).toLocaleString(intlLocale(locale))}
                     </TableCell>
@@ -302,7 +310,7 @@ export function DeviceUserDetail({
   linkedDepartment: Department | null;
   linkedShift: Shift | null;
   employees: Employee[];
-  history: AttendanceLog[];
+  history: DevicePunchEntry[];
 }) {
   const t = useT();
   const router = useRouter();
