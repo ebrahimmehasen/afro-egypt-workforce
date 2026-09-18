@@ -38,6 +38,9 @@ jobs:
           $line = Get-Content $envFile | Where-Object { $_ -match '^\uFEFF?DATABASE_URL=' } | Select-Object -First 1
           if (-not $line) { throw "DATABASE_URL not found in $envFile" }
           $env:DATABASE_URL = (($line -split '=', 2)[1]).Trim().Trim('"')
+          # No-op unless the 2026-09-18 migration is stuck in a failed state (see the script header).
+          node scripts/repair-failed-migration.mjs
+          if ($LASTEXITCODE -ne 0) { throw "repair-failed-migration failed with exit code $LASTEXITCODE" }
           npx prisma migrate deploy
           if ($LASTEXITCODE -ne 0) { throw "prisma migrate deploy failed with exit code $LASTEXITCODE" }
 
