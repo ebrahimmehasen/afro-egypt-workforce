@@ -100,6 +100,18 @@ export const ar: Dictionary = {
     logout: "تسجيل الخروج",
     language: "English",
   },
+  notifications: {
+    title: "الإشعارات",
+    empty: "لا توجد إشعارات جديدة",
+    leavePending: "طلب إجازة جديد ينتظر القرار",
+    overtimePending: "طلب إضافي جديد ينتظر القرار",
+    changePending: "طلب تعديل ينتظر موافقتك",
+    leaveApproved: "تمت الموافقة على طلب إجازتك",
+    leaveRejected: "تم رفض طلب إجازتك",
+    changeApproved: "تمت الموافقة على طلبك",
+    changeRejected: "تم رفض طلبك",
+    hours: "ساعة",
+  },
   dashboard: {
     welcome: "أهلاً بك،",
     overview: "نظرة عامة على الحضور والرواتب وتكلفة العمالة اليوم",

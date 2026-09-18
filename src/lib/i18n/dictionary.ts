@@ -98,6 +98,18 @@ export interface Dictionary {
     logout: string;
     language: string;
   };
+  notifications: {
+    title: string;
+    empty: string;
+    leavePending: string;
+    overtimePending: string;
+    changePending: string;
+    leaveApproved: string;
+    leaveRejected: string;
+    changeApproved: string;
+    changeRejected: string;
+    hours: string;
+  };
   dashboard: {
     welcome: string;
     overview: string;

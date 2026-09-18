@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
+export const DATA_CHANGED_EVENT = "afro:data-changed";
+
 /**
  * Listens for server-side data changes (via /api/events, an SSE stream) and
  * refreshes the current page's server-rendered data — so an edit anywhere in
@@ -22,7 +24,11 @@ export function LiveRefresh() {
     source.onmessage = (event) => {
       if (event.data !== "changed") return;
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => router.refresh(), 400);
+      debounceRef.current = setTimeout(() => {
+        router.refresh();
+        // Lets client-fetched widgets (the notification bell) refresh too.
+        window.dispatchEvent(new Event(DATA_CHANGED_EVENT));
+      }, 400);
     };
 
     return () => {

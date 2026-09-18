@@ -100,6 +100,18 @@ export const en: Dictionary = {
     logout: "Log out",
     language: "العربية",
   },
+  notifications: {
+    title: "Notifications",
+    empty: "No new notifications",
+    leavePending: "New leave request awaiting a decision",
+    overtimePending: "New overtime request awaiting a decision",
+    changePending: "Change request awaiting your approval",
+    leaveApproved: "Your leave request was approved",
+    leaveRejected: "Your leave request was rejected",
+    changeApproved: "Your request was approved",
+    changeRejected: "Your request was rejected",
+    hours: "h",
+  },
   dashboard: {
     welcome: "Welcome,",
     overview: "Overview of today's attendance, payroll and workforce cost",
