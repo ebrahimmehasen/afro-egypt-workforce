@@ -7,7 +7,6 @@ import { getT, format } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmployeesTable } from "@/components/employees/employees-table";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
-import { StaffAccountFormDialog } from "@/components/employees/staff-account-form-dialog";
 
 export default async function EmployeesPage() {
   const db = await getDb();
@@ -26,14 +25,7 @@ export default async function EmployeesPage() {
       <PageHeader
         title={t.employees.title}
         description={format(t.employees.totalCount, { count: employees.length })}
-        actions={
-          canEdit ? (
-            <div className="flex items-center gap-2">
-              <StaffAccountFormDialog />
-              <EmployeeFormDialog departments={db.departments} shifts={db.shifts} />
-            </div>
-          ) : null
-        }
+        actions={canEdit ? <EmployeeFormDialog departments={db.departments} shifts={db.shifts} /> : null}
       />
       <EmployeesTable
         employees={employees}

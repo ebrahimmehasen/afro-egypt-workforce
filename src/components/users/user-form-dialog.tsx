@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import type { Role } from "@/lib/types";
 
-type Opt = { id: string; name: string };
+type Opt = { id: string; name: string; label: string };
 type ExistingUser = {
   id: string;
   name: string;
@@ -22,7 +22,6 @@ type ExistingUser = {
   role: Role;
   active: boolean;
   employeeId: string | null;
-  departmentId: string | null;
 };
 
 const selectCls = "h-10 rounded-md border border-input bg-background px-3 text-sm";
@@ -36,11 +35,9 @@ function SubmitButton({ label }: { label: string }) {
 export function UserFormDialog({
   user,
   employees,
-  departments,
 }: {
   user?: ExistingUser;
   employees: Opt[];
-  departments: Opt[];
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -49,6 +46,15 @@ export function UserFormDialog({
   useActionFeedback(state, () => setOpen(false));
 
   const roles: Role[] = ["admin", "hr", "supervisor", "employee"];
+  const [name, setName] = useState(user?.name ?? "");
+  const [employeeId, setEmployeeId] = useState(user?.employeeId ?? "");
+
+  // Picking an employee fills the account name from the employee record.
+  function pickEmployee(id: string) {
+    setEmployeeId(id);
+    const emp = employees.find((e) => e.id === id);
+    if (emp && !user) setName(emp.name);
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -67,8 +73,25 @@ export function UserFormDialog({
           {user && <input type="hidden" name="id" value={user.id} />}
 
           <div className="flex flex-col gap-1.5">
+            <Label htmlFor="u-emp">{user ? t.users.linkedEmployee : t.users.selectEmployee}</Label>
+            <select
+              id="u-emp"
+              name="employeeId"
+              value={employeeId}
+              onChange={(e) => pickEmployee(e.target.value)}
+              className={selectCls}
+              required={!user}
+            >
+              <option value="">{user ? "—" : `— ${t.users.selectEmployee} —`}</option>
+              {employees.map((e) => (
+                <option key={e.id} value={e.id}>{e.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="u-name">{t.users.name}</Label>
-            <Input id="u-name" name="name" defaultValue={user?.name} required />
+            <Input id="u-name" name="name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
 
           {!user && (
@@ -104,28 +127,7 @@ export function UserFormDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="u-emp">{t.users.linkedEmployee}</Label>
-              <select id="u-emp" name="employeeId" defaultValue={user?.employeeId ?? "none"} className={selectCls}>
-                <option value="none">— {t.common.all} —</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>{e.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="u-dep">{t.users.linkedDepartment}</Label>
-              <select id="u-dep" name="departmentId" defaultValue={user?.departmentId ?? "none"} className={selectCls}>
-                <option value="none">— {t.common.all} —</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <p className="text-xs text-muted-foreground">{t.users.scopingHint}</p>
+          <p className="text-xs text-muted-foreground">{user ? t.users.scopingHint : t.users.createFromEmployeeHint}</p>
 
           <DialogFooter>
             <SubmitButton label={user ? t.common.save : t.common.add} />

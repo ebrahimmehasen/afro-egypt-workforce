@@ -20,12 +20,12 @@ export default async function UsersPage() {
   const db = await getDb();
 
   const users = await prisma.user.findMany({ orderBy: { createdAt: "asc" } });
-  const empName = new Map(db.employees.map((e) => [e.id, e.name]));
   const empNumber = new Map(db.employees.map((e) => [e.id, e.employeeNumber]));
   const depName = new Map(db.departments.map((d) => [d.id, translateLabel(d.name, locale)]));
 
-  const employeeOpts = db.employees.map((e) => ({ id: e.id, name: `${e.name} (${e.employeeNumber})` }));
-  const departmentOpts = db.departments.map((d) => ({ id: d.id, name: translateLabel(d.name, locale) }));
+  const employeeOpts = db.employees.map((e) => ({ id: e.id, name: e.name, label: `${e.name} (${e.employeeNumber})` }));
+  const linkedEmployeeIds = new Set(users.map((u) => u.employeeId).filter(Boolean));
+  const availableEmployeeOpts = employeeOpts.filter((e) => !linkedEmployeeIds.has(e.id));
 
   const roleVariant: Record<string, "default" | "secondary" | "warning" | "success"> = {
     admin: "warning",
@@ -39,7 +39,7 @@ export default async function UsersPage() {
       <PageHeader
         title={t.nav.users}
         description={t.users.description}
-        actions={<UserFormDialog employees={employeeOpts} departments={departmentOpts} />}
+        actions={<UserFormDialog employees={availableEmployeeOpts} />}
       />
 
       <div className="overflow-hidden rounded-xl border border-border">
@@ -62,10 +62,16 @@ export default async function UsersPage() {
                 <TableCell dir="ltr">{u.email}</TableCell>
                 <TableCell><Badge variant={roleVariant[u.role]}>{t.roles[u.role]}</Badge></TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {u.employeeId ? empName.get(u.employeeId) ?? empNumber.get(u.employeeId) ?? "" : ""}
-                  {u.employeeId && u.departmentId ? " · " : ""}
-                  {u.departmentId ? depName.get(u.departmentId) ?? u.departmentId : ""}
-                  {!u.employeeId && !u.departmentId ? "—" : ""}
+                  {(() => {
+                    const ids = Array.isArray(u.departmentIds) ? (u.departmentIds as string[]) : [];
+                    const parts = [
+                      u.employeeId ? empNumber.get(u.employeeId) ?? "" : "",
+                      u.role === "hr" || u.role === "supervisor"
+                        ? ids.length === 0 ? t.common.allDepartments : ids.map((id) => depName.get(id) ?? id).join("، ")
+                        : "",
+                    ].filter(Boolean);
+                    return parts.length ? parts.join(" · ") : "—";
+                  })()}
                 </TableCell>
                 <TableCell>
                   <Badge variant={u.active ? "success" : "destructive"}>
@@ -86,10 +92,8 @@ export default async function UsersPage() {
                         role: u.role,
                         active: u.active,
                         employeeId: u.employeeId,
-                        departmentId: u.departmentId,
                       }}
-                      employees={employeeOpts}
-                      departments={departmentOpts}
+                      employees={employeeOpts.filter((e) => e.id === u.employeeId || !linkedEmployeeIds.has(e.id))}
                     />
                   </div>
                 </TableCell>

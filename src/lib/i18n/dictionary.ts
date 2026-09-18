@@ -532,12 +532,10 @@ export interface Dictionary {
     auditCreate: string;
     auditUpdate: string;
     auditResetPassword: string;
-    addPerson: string;
-    addWorker: string;
-    addStaff: string;
-    staffAccount: string;
-    staffAccountCreatedPendingPermissions: string;
-    staffDescription: string;
+    selectEmployee: string;
+    employeeHasUser: string;
+    employeeRequired: string;
+    createFromEmployeeHint: string;
   };
   permissions: {
     title: string;
