@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import type { Role } from "@/lib/types";
 
-type Opt = { id: string; name: string; label: string };
+type Opt = { id: string; name: string; jobTitle: string; label: string };
+const NEW_TITLE = "__new__";
 type ExistingUser = {
   id: string;
   name: string;
@@ -35,9 +36,11 @@ function SubmitButton({ label }: { label: string }) {
 export function UserFormDialog({
   user,
   employees,
+  jobTitles = [],
 }: {
   user?: ExistingUser;
   employees: Opt[];
+  jobTitles?: string[];
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -48,12 +51,18 @@ export function UserFormDialog({
   const roles: Role[] = ["admin", "hr", "supervisor", "employee"];
   const [name, setName] = useState(user?.name ?? "");
   const [employeeId, setEmployeeId] = useState(user?.employeeId ?? "");
+  const [titleChoice, setTitleChoice] = useState("");
+  const [newTitle, setNewTitle] = useState("");
+  const jobTitle = titleChoice === NEW_TITLE ? newTitle.trim() : titleChoice;
 
   // Picking an employee fills the account name from the employee record.
   function pickEmployee(id: string) {
     setEmployeeId(id);
     const emp = employees.find((e) => e.id === id);
-    if (emp && !user) setName(emp.name);
+    if (emp && !user) {
+      setName(emp.name);
+      setTitleChoice(emp.jobTitle);
+    }
   }
 
   return (
@@ -88,6 +97,35 @@ export function UserFormDialog({
               ))}
             </select>
           </div>
+
+          {!user && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="u-title">{t.users.jobTitle}</Label>
+              <select
+                id="u-title"
+                value={titleChoice}
+                onChange={(e) => setTitleChoice(e.target.value)}
+                className={selectCls}
+                disabled={!employeeId}
+              >
+                <option value="">—</option>
+                {jobTitles.map((j) => (
+                  <option key={j} value={j}>{j}</option>
+                ))}
+                <option value={NEW_TITLE}>{t.users.newJobTitle}</option>
+              </select>
+              {titleChoice === NEW_TITLE && (
+                <Input
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder={t.users.newJobTitlePlaceholder}
+                  required
+                  autoFocus
+                />
+              )}
+              <input type="hidden" name="jobTitle" value={jobTitle} />
+            </div>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="u-name">{t.users.name}</Label>

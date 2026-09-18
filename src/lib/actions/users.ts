@@ -25,6 +25,7 @@ const createSchema = z.object({
   password: z.string().min(8),
   role: roleEnum,
   employeeId: z.string().optional(),
+  jobTitle: z.string().trim().max(100).optional(),
 });
 
 const updateSchema = z.object({
@@ -46,12 +47,15 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
   if (!parsed.success) return { error: t.validation.invalidData };
   const { name, email, password, role } = parsed.data;
   const employeeId = clean(parsed.data.employeeId);
+  const jobTitle = parsed.data.jobTitle || null;
+  let currentJobTitle: string | null = null;
 
   // Every non-admin account is made from an existing employee record.
   if (role !== "admin" && !employeeId) return { error: t.users.employeeRequired };
   if (employeeId) {
     const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });
     if (!employee) return { error: t.validation.employeeNotFound };
+    currentJobTitle = employee.jobTitle;
     if (await prisma.user.findFirst({ where: { employeeId } })) return { error: t.users.employeeHasUser };
   }
 
@@ -63,10 +67,14 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
     {
       module: t.nav.users,
       action: t.users.auditCreate,
-      newValue: `${name} <${email}> — ${role}`,
+      newValue: `${name} <${email}> — ${role}${employeeId && jobTitle && jobTitle !== currentJobTitle ? ` — ${jobTitle}` : ""}`,
     },
-    (tx) =>
-      tx.user.create({
+    async (tx) => {
+      // A job title typed here (new or existing) is saved on the linked employee record.
+      if (employeeId && jobTitle && jobTitle !== currentJobTitle) {
+        await tx.employee.update({ where: { id: employeeId }, data: { jobTitle } });
+      }
+      return tx.user.create({
         data: {
           name,
           email: email.toLowerCase(),
@@ -76,11 +84,13 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
           permissions: [], // granted from /permissions right after creation (n/a for role=admin/employee)
           departmentIds: [],
         },
-      }),
+      });
+    },
   );
 
   revalidatePath("/users");
   revalidatePath("/permissions");
+  revalidatePath("/employees");
   // hr/supervisor start with zero access — send the admin straight to set it.
   if (role === "hr" || role === "supervisor") redirect(`/permissions?u=${created.id}`);
   return { success: true, message: t.users.saved };

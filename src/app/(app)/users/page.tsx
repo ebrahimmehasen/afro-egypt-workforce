@@ -23,7 +23,8 @@ export default async function UsersPage() {
   const empNumber = new Map(db.employees.map((e) => [e.id, e.employeeNumber]));
   const depName = new Map(db.departments.map((d) => [d.id, translateLabel(d.name, locale)]));
 
-  const employeeOpts = db.employees.map((e) => ({ id: e.id, name: e.name, label: `${e.name} (${e.employeeNumber})` }));
+  const employeeOpts = db.employees.map((e) => ({ id: e.id, name: e.name, jobTitle: e.jobTitle, label: `${e.name} (${e.employeeNumber})` }));
+  const jobTitles = Array.from(new Set(db.employees.map((e) => e.jobTitle.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ar"));
   const linkedEmployeeIds = new Set(users.map((u) => u.employeeId).filter(Boolean));
   const availableEmployeeOpts = employeeOpts.filter((e) => !linkedEmployeeIds.has(e.id));
 
@@ -39,7 +40,7 @@ export default async function UsersPage() {
       <PageHeader
         title={t.nav.users}
         description={t.users.description}
-        actions={<UserFormDialog employees={availableEmployeeOpts} />}
+        actions={<UserFormDialog employees={availableEmployeeOpts} jobTitles={jobTitles} />}
       />
 
       <div className="overflow-hidden rounded-xl border border-border">

@@ -532,6 +532,9 @@ export interface Dictionary {
     auditCreate: string;
     auditUpdate: string;
     auditResetPassword: string;
+    jobTitle: string;
+    newJobTitle: string;
+    newJobTitlePlaceholder: string;
     selectEmployee: string;
     employeeHasUser: string;
     employeeRequired: string;
