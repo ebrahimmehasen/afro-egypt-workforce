@@ -23,7 +23,11 @@ export const PERMISSION_DEFS = [
 export type PermissionKey = (typeof PERMISSION_DEFS)[number]["key"];
 export const PERMISSION_KEYS: PermissionKey[] = PERMISSION_DEFS.map((p) => p.key);
 
-const ADMIN_NAV = ["/dashboard", ...PERMISSION_DEFS.map((p) => p.path), "/users", "/permissions", "/change-requests"];
+// /biometric-device is never grantable — same tier as /users and /permissions.
+const ADMIN_NAV = [
+  "/dashboard", ...PERMISSION_DEFS.map((p) => p.path),
+  "/users", "/permissions", "/change-requests", "/biometric-device",
+];
 const EMPLOYEE_NAV = ["/dashboard", "/attendance", "/leaves", "/payroll"];
 
 type SessionLike = Pick<User, "role" | "permissions">;
@@ -52,6 +56,10 @@ export function canManageUsers(role: Role): boolean {
 }
 
 export function canManagePermissions(role: Role): boolean {
+  return role === "admin";
+}
+
+export function canManageBiometricDevice(role: Role): boolean {
   return role === "admin";
 }
 

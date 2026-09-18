@@ -1,0 +1,115 @@
+name: Deploy to Afro Egypt server
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: afro-egypt-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Windows, afro-egypt]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add portable Node to PATH
+        run: echo "C:\Users\Host\Desktop\main\tools\node-v20.18.1-win-x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Apply database migrations
+        shell: powershell
+        run: |
+          # The workspace checkout has no .env (gitignored) - pull DATABASE_URL
+          # from the canonical secrets file for this step only, so schema
+          # changes (new tables/columns) land in the live DB before the new
+          # code that depends on them goes live.
+          $envFile = "C:\Users\Host\Desktop\main\tools\secrets\afro-egypt.env"
+          $line = Get-Content $envFile | Where-Object { $_ -match '^\uFEFF?DATABASE_URL=' } | Select-Object -First 1
+          if (-not $line) { throw "DATABASE_URL not found in $envFile" }
+          $env:DATABASE_URL = (($line -split '=', 2)[1]).Trim().Trim('"')
+          npx prisma migrate deploy
+          if ($LASTEXITCODE -ne 0) { throw "prisma migrate deploy failed with exit code $LASTEXITCODE" }
+
+      - name: Assemble static assets into the standalone build
+        shell: powershell
+        run: |
+          # Next's standalone output doesn't include .next/static or public/ -
+          # they have to be copied in by hand or the deployed app serves HTML
+          # with no CSS/JS/images.
+          robocopy ".next\static" ".next\standalone\.next\static" /E /NFL /NDL /NJH /NJS /R:3 /W:5
+          if ($LASTEXITCODE -ge 8) { throw "robocopy (.next/static) failed with exit code $LASTEXITCODE" }
+          robocopy "public" ".next\standalone\public" /E /NFL /NDL /NJH /NJS /R:3 /W:5
+          if ($LASTEXITCODE -ge 8) { throw "robocopy (public) failed with exit code $LASTEXITCODE" }
+          exit 0
+
+      - name: Stop app service
+        shell: powershell
+        run: |
+          Stop-Service -Name AfroEgyptApp -ErrorAction SilentlyContinue
+          # give node.exe a moment to actually release its file handles after
+          # the service reports Stopped — this is what made robocopy hang
+          # (default /R:1000000 /W:30) instead of just failing fast.
+          Start-Sleep -Seconds 3
+
+      - name: Sync build output to the live app directory
+        shell: powershell
+        run: |
+          $liveDir = "C:\Users\Host\Desktop\main\afro-egypt-workforce\.next\standalone"
+          robocopy ".next\standalone" $liveDir /E /XF ".env" /XD "uploads" /NFL /NDL /NJH /NJS /R:3 /W:5
+          $rc = $LASTEXITCODE
+          if ($rc -ge 8) { throw "robocopy failed with exit code $rc" }
+          # robocopy uses 0-7 for success (e.g. 1 = files copied OK), not just 0 -
+          # exit cleanly so the runner doesn't treat that as a step failure.
+          exit 0
+
+      - name: Restore .env from the canonical backup
+        shell: powershell
+        run: |
+          # .env is deliberately excluded from the sync above (it holds live
+          # secrets, not something the repo/build should ever overwrite). But
+          # that only works if it's already sitting in the live directory - if
+          # that directory is ever emptied by something outside this pipeline
+          # (as happened once), the app silently loses DATABASE_URL and every
+          # page 500s. Always restore from a copy kept outside .next entirely,
+          # so a wiped live dir self-heals on the next deploy instead of
+          # needing someone to notice and fix it by hand.
+          $canonical = "C:\Users\Host\Desktop\main\tools\secrets\afro-egypt.env"
+          $liveEnv = "C:\Users\Host\Desktop\main\afro-egypt-workforce\.next\standalone\.env"
+          if (-not (Test-Path $canonical)) { throw "Canonical .env backup missing at $canonical - cannot proceed" }
+          Copy-Item $canonical $liveEnv -Force
+
+      - name: Verify required runtime files exist
+        shell: powershell
+        run: |
+          $liveDir = "C:\Users\Host\Desktop\main\afro-egypt-workforce\.next\standalone"
+          $required = @("server.js", ".env", ".next\static")
+          foreach ($f in $required) {
+            $p = Join-Path $liveDir $f
+            if (-not (Test-Path $p)) { throw "Missing required runtime path after sync: $p" }
+          }
+          Write-Host "All required runtime files present."
+
+      - name: Start app service
+        if: always()
+        shell: powershell
+        run: Start-Service -Name AfroEgyptApp
+
+      - name: Health check
+        shell: powershell
+        run: |
+          Start-Sleep -Seconds 5
+          $resp = Invoke-WebRequest -Uri "http://localhost/login" -UseBasicParsing -TimeoutSec 20
+          if ($resp.StatusCode -ne 200) { throw "Health check failed: HTTP $($resp.StatusCode)" }
+          if ($resp.Content -match "Application error") { throw "Health check failed: login page rendered an application error" }
+          Write-Host "Health check passed (HTTP $($resp.StatusCode))."

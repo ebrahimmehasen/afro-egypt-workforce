@@ -159,11 +159,6 @@ export function EmployeeFormDialog({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="biometricDeviceUserId">{t.employees.formBiometricId}</Label>
-            <Input id="biometricDeviceUserId" name="biometricDeviceUserId" defaultValue={employee?.biometricDeviceUserId} required />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
             <Label>{t.employees.formStatus}</Label>
             <Select name="status" defaultValue={employee?.status ?? "active"}>
               <SelectTrigger><SelectValue /></SelectTrigger>

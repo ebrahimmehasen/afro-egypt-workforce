@@ -60,8 +60,8 @@ export function LeavesTable({
             return (
               <TableRow key={l.id}>
                 <TableCell>
-                  <div className="font-medium">{employee?.name ?? l.employeeId}</div>
-                  <div className="text-xs text-muted-foreground">{l.employeeId}</div>
+                  <div className="font-medium">{employee?.name ?? "-"}</div>
+                  {employee && <div dir="ltr" className="text-xs text-muted-foreground">{employee.employeeNumber}</div>}
                 </TableCell>
                 <TableCell>{leaveTypeLabel(l.type, t)}</TableCell>
                 <TableCell>{l.from}</TableCell>

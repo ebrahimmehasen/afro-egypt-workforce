@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import { gate } from "@/lib/change-requests";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
+import { generateEmployeeNumber } from "@/lib/employee-number";
 
 const employeeSchema = z
   .object({
@@ -21,7 +22,6 @@ const employeeSchema = z
     dailyRate: z.coerce.number().min(0).optional(),
     dailyWorkingHours: z.coerce.number().positive().default(8),
     allowances: z.coerce.number().min(0).default(0),
-    biometricDeviceUserId: z.string().min(1),
     status: z.enum(["active", "on_leave", "terminated"]),
     phone: z.string().min(6),
     address: z.string().min(3),
@@ -63,7 +63,7 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
       actionKey: "employees.create",
       module: t.nav.employees,
       actionLabel: t.auditActions.addEmployee,
-      summary: `${payload.name} (${id})`,
+      summary: payload.name,
     },
     payload,
     () => applyCreateEmployee(payload, actor?.name ?? t.auditActions.system),
@@ -77,13 +77,18 @@ export async function applyCreateEmployee(payload: EmployeePayload, actorName: s
   }
   const { id, allowances, hireDate, dailyRate, salaryType, nationalId, ...rest } = payload;
 
+  const department = await prisma.department.findUnique({ where: { id: rest.departmentId } });
+  if (!department) return { error: t.validation.invalidData };
+
   await recordChangeAs(
     actorName,
-    { module: t.nav.employees, action: t.auditActions.addEmployee, newValue: `${payload.name} (${id})` },
-    (tx) =>
-      tx.employee.create({
+    { module: t.nav.employees, action: t.auditActions.addEmployee, newValue: payload.name },
+    async (tx) => {
+      const employeeNumber = await generateEmployeeNumber(tx, department.name);
+      return tx.employee.create({
         data: {
           id,
+          employeeNumber,
           ...rest,
           nationalId,
           salaryType,
@@ -91,7 +96,8 @@ export async function applyCreateEmployee(payload: EmployeePayload, actorName: s
           hireDate: new Date(`${hireDate}T00:00:00.000Z`),
           allowancesTotal: allowances,
         },
-      }),
+      });
+    },
   );
 
   revalidatePath("/employees");
@@ -161,7 +167,7 @@ export async function applyUpdateEmployee(payload: EmployeePayload, actorName: s
   );
 
   revalidatePath("/employees");
-  revalidatePath(`/employees/${id}`);
+  revalidatePath(`/employees/${before.employeeNumber}`);
   return { success: true, message: t.employees.savedEdits };
 }
 
@@ -191,7 +197,7 @@ export async function deleteEmployee(id: string): Promise<ActionState> {
       actionKey: "employees.delete",
       module: t.nav.employees,
       actionLabel: t.auditActions.deleteEmployee,
-      summary: `${removed.name} (${removed.id})`,
+      summary: `${removed.name} (${removed.employeeNumber})`,
       targetId: id,
     },
     { id },
@@ -206,7 +212,7 @@ export async function applyDeleteEmployee(payload: { id: string }, actorName: st
 
   await recordChangeAs(
     actorName,
-    { module: t.nav.employees, action: t.auditActions.deleteEmployee, oldValue: `${removed.name} (${removed.id})` },
+    { module: t.nav.employees, action: t.auditActions.deleteEmployee, oldValue: `${removed.name} (${removed.employeeNumber})` },
     async (tx) => {
       const updated = await tx.employee.update({ where: { id: payload.id }, data: { deletedAt: new Date(), status: "terminated" } });
       await freezeLinkedAccountIfInactive(tx, payload.id, updated.status);

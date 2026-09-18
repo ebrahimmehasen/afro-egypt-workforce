@@ -4,6 +4,7 @@ import type { Employee, User } from "@/lib/types";
 
 const emp = (id: string, departmentId: string): Employee => ({
   id,
+  employeeNumber: id,
   name: id,
   departmentId,
   jobTitle: "worker",

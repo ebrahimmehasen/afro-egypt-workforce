@@ -116,6 +116,7 @@ export const NAV_ITEMS = [
   { href: "/users", key: "users", icon: "ShieldCheck" },
   { href: "/permissions", key: "permissions", icon: "KeyRound" },
   { href: "/change-requests", key: "changeRequests", icon: "ClipboardCheck" },
+  { href: "/biometric-device", key: "biometricDevice", icon: "ScanFace" },
   { href: "/settings", key: "settings", icon: "Settings" },
 ] as const;
 

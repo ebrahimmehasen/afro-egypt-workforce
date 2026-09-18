@@ -45,7 +45,7 @@ type LeaveDecisionPayload = { id: string; decision: "approved" | "rejected" };
 
 export async function decideLeave(id: string, decision: "approved" | "rejected"): Promise<ActionState> {
   const t = await getT();
-  const leave = await prisma.leave.findUnique({ where: { id } });
+  const leave = await prisma.leave.findUnique({ where: { id }, include: { employee: true } });
   if (!leave) return { error: t.validation.requestNotFound };
   const actor = await getSession();
 
@@ -54,7 +54,7 @@ export async function decideLeave(id: string, decision: "approved" | "rejected")
       actionKey: "leaves.decide",
       module: t.nav.leaves,
       actionLabel: decision === "approved" ? t.auditActions.approveLeave : t.auditActions.rejectLeave,
-      summary: `${leaveTypeLabel(leave.type, t)} — ${leave.employeeId} — ${decision === "approved" ? t.statuses.approved : t.statuses.rejected}`,
+      summary: `${leaveTypeLabel(leave.type, t)} — ${leave.employee.employeeNumber} — ${decision === "approved" ? t.statuses.approved : t.statuses.rejected}`,
       targetId: id,
     },
     { id, decision } satisfies LeaveDecisionPayload,
@@ -65,7 +65,7 @@ export async function decideLeave(id: string, decision: "approved" | "rejected")
 export async function applyDecideLeave(payload: LeaveDecisionPayload, actorName: string): Promise<ActionState> {
   const t = await getT();
   const { id, decision } = payload;
-  const leave = await prisma.leave.findUnique({ where: { id } });
+  const leave = await prisma.leave.findUnique({ where: { id }, include: { employee: true } });
   if (!leave) return { error: t.validation.requestNotFound };
 
   await recordChangeAs(
@@ -75,7 +75,7 @@ export async function applyDecideLeave(payload: LeaveDecisionPayload, actorName:
       action: decision === "approved" ? t.auditActions.approveLeave : t.auditActions.rejectLeave,
       oldValue: t.statuses.pending,
       newValue: decision === "approved" ? t.statuses.approved : t.statuses.rejected,
-      reason: `${leaveTypeLabel(leave.type, t)} — ${leave.employeeId}`,
+      reason: `${leaveTypeLabel(leave.type, t)} — ${leave.employee.employeeNumber}`,
     },
     (tx) => tx.leave.update({ where: { id }, data: { status: decision, approvedBy: actorName } }),
   );

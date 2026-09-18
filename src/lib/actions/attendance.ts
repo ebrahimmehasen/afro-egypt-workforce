@@ -6,79 +6,11 @@ import { prisma } from "@/lib/prisma";
 import { recordChangeAs } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
 import { gate } from "@/lib/change-requests";
-import { recalculateDailyAttendance } from "@/lib/attendance-service";
 import { computeFromActuals } from "@/lib/attendance-engine";
 import { toShift } from "@/lib/serialize";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT, intlLocale } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
-
-const punchSchema = z.object({
-  employeeId: z.string().min(1),
-  punchType: z.enum(["in", "out"]),
-  date: z.string().min(1),
-  time: z.string().min(1),
-  deviceId: z.string().min(1),
-});
-
-type PunchPayload = z.infer<typeof punchSchema>;
-
-export async function simulatePunch(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const t = await getT();
-  const parsed = punchSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: t.validation.invalidData };
-
-  const employee = await prisma.employee.findFirst({ where: { id: parsed.data.employeeId, deletedAt: null } });
-  if (!employee) return { error: t.validation.employeeNotFound };
-
-  const actor = await getSession();
-
-  return gate(
-    {
-      actionKey: "attendance.simulatePunch",
-      module: t.nav.attendance,
-      actionLabel: t.auditActions.simulatePunch,
-      summary: `${employee.name} — ${parsed.data.punchType} — ${parsed.data.date} ${parsed.data.time}`,
-    },
-    parsed.data,
-    () => applySimulatePunch(parsed.data, actor?.name ?? t.auditActions.system),
-  );
-}
-
-export async function applySimulatePunch(payload: PunchPayload, actorName: string): Promise<ActionState> {
-  const t = await getT();
-  const { employeeId, punchType, date, time, deviceId } = payload;
-  const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });
-  if (!employee) return { error: t.validation.employeeNotFound };
-
-  const device = await prisma.device.findUnique({ where: { id: deviceId } });
-
-  await recordChangeAs(
-    actorName,
-    {
-      module: t.nav.attendance,
-      action: t.auditActions.simulatePunch,
-      newValue: `${employee.name} — ${punchType} — ${date} ${time}`,
-    },
-    (tx) =>
-      tx.attendanceLog.create({
-        data: {
-          employeeId,
-          deviceId: device ? deviceId : null,
-          timestamp: new Date(`${date}T${time}:00`),
-          punchType,
-          source: "simulated",
-        },
-      }),
-  );
-
-  await recalculateDailyAttendance(employeeId, date);
-  revalidatePath("/attendance");
-  revalidatePath("/dashboard");
-  revalidatePath(`/employees/${employeeId}`);
-
-  return { success: true, message: t.attendance.punchSuccess };
-}
 
 const correctionSchema = z.object({
   employeeId: z.string().min(1),
@@ -177,7 +109,7 @@ export async function applyCorrectAttendance(payload: CorrectionPayload, actorNa
 
   revalidatePath("/attendance");
   revalidatePath("/dashboard");
-  revalidatePath(`/employees/${employeeId}`);
+  revalidatePath(`/employees/${employee.employeeNumber}`);
   revalidatePath("/audit-log");
 
   return { success: true, message: t.attendance.correctionSaved };

@@ -29,7 +29,7 @@ export function DeductionsReport({ deductions, employees }: { deductions: Deduct
   );
 
   const exportRows = rows.map((d) => [
-    empMap.get(d.employeeId)?.name ?? d.employeeId,
+    empMap.get(d.employeeId)?.name ?? "-",
     deductionTypeLabel(d.type, t),
     d.amount,
     d.date,
@@ -76,7 +76,7 @@ export function DeductionsReport({ deductions, employees }: { deductions: Deduct
               <TableBody>
                 {rows.map((d) => (
                   <TableRow key={d.id}>
-                    <TableCell className="font-medium">{empMap.get(d.employeeId)?.name ?? d.employeeId}</TableCell>
+                    <TableCell className="font-medium">{empMap.get(d.employeeId)?.name ?? "-"}</TableCell>
                     <TableCell><Badge variant="destructive">{deductionTypeLabel(d.type, t)}</Badge></TableCell>
                     <TableCell className="tabular-nums text-destructive">-{formatEGP(d.amount, locale)}</TableCell>
                     <TableCell>{d.date}</TableCell>

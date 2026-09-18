@@ -42,7 +42,7 @@ type OvertimeDecisionPayload = { id: string; decision: "approved" | "rejected" }
 
 export async function decideOvertime(id: string, decision: "approved" | "rejected"): Promise<ActionState> {
   const t = await getT();
-  const overtime = await prisma.overtime.findUnique({ where: { id } });
+  const overtime = await prisma.overtime.findUnique({ where: { id }, include: { employee: true } });
   if (!overtime) return { error: t.validation.requestNotFound };
   const actor = await getSession();
 
@@ -51,7 +51,7 @@ export async function decideOvertime(id: string, decision: "approved" | "rejecte
       actionKey: "overtime.decide",
       module: t.nav.overtime,
       actionLabel: decision === "approved" ? t.auditActions.approveOvertime : t.auditActions.rejectOvertime,
-      summary: `${overtime.employeeId} — ${overtime.hours} ${t.common.hours} — ${decision === "approved" ? t.statuses.approved : t.statuses.rejected}`,
+      summary: `${overtime.employee.employeeNumber} — ${overtime.hours} ${t.common.hours} — ${decision === "approved" ? t.statuses.approved : t.statuses.rejected}`,
       targetId: id,
     },
     { id, decision } satisfies OvertimeDecisionPayload,
@@ -62,7 +62,7 @@ export async function decideOvertime(id: string, decision: "approved" | "rejecte
 export async function applyDecideOvertime(payload: OvertimeDecisionPayload, actorName: string): Promise<ActionState> {
   const t = await getT();
   const { id, decision } = payload;
-  const overtime = await prisma.overtime.findUnique({ where: { id } });
+  const overtime = await prisma.overtime.findUnique({ where: { id }, include: { employee: true } });
   if (!overtime) return { error: t.validation.requestNotFound };
 
   await recordChangeAs(
@@ -72,7 +72,7 @@ export async function applyDecideOvertime(payload: OvertimeDecisionPayload, acto
       action: decision === "approved" ? t.auditActions.approveOvertime : t.auditActions.rejectOvertime,
       oldValue: t.statuses.pending,
       newValue: decision === "approved" ? t.statuses.approved : t.statuses.rejected,
-      reason: `${overtime.employeeId} — ${overtime.hours} ${t.common.hours}`,
+      reason: `${overtime.employee.employeeNumber} — ${overtime.hours} ${t.common.hours}`,
     },
     (tx) => tx.overtime.update({ where: { id }, data: { status: decision, approvedBy: actorName } }),
   );

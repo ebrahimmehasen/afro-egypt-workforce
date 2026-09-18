@@ -63,7 +63,7 @@ export function EmployeesTable({
       const matchesSearch =
         !search ||
         e.name.toLowerCase().includes(search.toLowerCase()) ||
-        e.id.toLowerCase().includes(search.toLowerCase());
+        e.employeeNumber.toLowerCase().includes(search.toLowerCase());
       const matchesDept = deptFilter.length === 0 || deptFilter.includes(e.departmentId);
       const matchesStatus = statusFilter.length === 0 || statusFilter.includes(e.status);
       return matchesSearch && matchesDept && matchesStatus;
@@ -122,7 +122,7 @@ export function EmployeesTable({
             <TableBody>
               {filtered.map((e) => (
                 <TableRow key={e.id}>
-                  <TableCell className="font-mono text-xs tabular-nums">{e.id}</TableCell>
+                  <TableCell dir="ltr" className="font-mono text-xs tabular-nums">{e.employeeNumber}</TableCell>
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-1.5">
                       {e.name}
@@ -138,7 +138,7 @@ export function EmployeesTable({
                   <TableCell><Badge variant={STATUS_VARIANT[e.status]}>{STATUS_LABEL[e.status]}</Badge></TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
-                      <Link href={`/employees/${e.id}`}>
+                      <Link href={`/employees/${e.employeeNumber}`}>
                         <Button variant="ghost" size="icon" aria-label={t.common.view}>
                           <Eye className="h-4 w-4" />
                         </Button>

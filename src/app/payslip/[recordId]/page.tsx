@@ -36,7 +36,7 @@ export default async function PayslipPage({ params }: { params: Promise<{ record
     <div className="min-h-screen bg-muted/30 py-8">
       <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4">
         <div className="flex items-center justify-between no-print">
-          <Link href={`/employees/${employee.id}`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+          <Link href={`/employees/${employee.employeeNumber}`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
             <ArrowRight className="h-4 w-4 rtl:rotate-180" />
             {t.payslip.back}
           </Link>
@@ -62,7 +62,7 @@ export default async function PayslipPage({ params }: { params: Promise<{ record
 
           <div className="grid grid-cols-2 gap-4 border-b border-border py-6 text-sm">
             <Field label={t.payslip.employeeName} value={employee.name} />
-            <Field label={t.payslip.employeeId} value={employee.id} />
+            <Field label={t.payslip.employeeId} value={employee.employeeNumber} />
             <Field label={t.payslip.department} value={translateLabel(department?.name ?? "-", locale)} />
             <Field label={t.payslip.month} value={translateLabel(period.label, locale)} />
           </div>

@@ -47,7 +47,7 @@ export function OvertimeFormDialog({ employees }: { employees: Employee[] }) {
             <Select name="employeeId" value={employeeId} onValueChange={setEmployeeId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.name} — {e.id}</SelectItem>)}
+                {employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.name} — {e.employeeNumber}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

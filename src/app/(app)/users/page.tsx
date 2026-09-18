@@ -21,9 +21,10 @@ export default async function UsersPage() {
 
   const users = await prisma.user.findMany({ orderBy: { createdAt: "asc" } });
   const empName = new Map(db.employees.map((e) => [e.id, e.name]));
+  const empNumber = new Map(db.employees.map((e) => [e.id, e.employeeNumber]));
   const depName = new Map(db.departments.map((d) => [d.id, translateLabel(d.name, locale)]));
 
-  const employeeOpts = db.employees.map((e) => ({ id: e.id, name: `${e.name} (${e.id})` }));
+  const employeeOpts = db.employees.map((e) => ({ id: e.id, name: `${e.name} (${e.employeeNumber})` }));
   const departmentOpts = db.departments.map((d) => ({ id: d.id, name: translateLabel(d.name, locale) }));
 
   const roleVariant: Record<string, "default" | "secondary" | "warning" | "success"> = {
@@ -61,7 +62,7 @@ export default async function UsersPage() {
                 <TableCell dir="ltr">{u.email}</TableCell>
                 <TableCell><Badge variant={roleVariant[u.role]}>{t.roles[u.role]}</Badge></TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {u.employeeId ? empName.get(u.employeeId) ?? u.employeeId : ""}
+                  {u.employeeId ? empName.get(u.employeeId) ?? empNumber.get(u.employeeId) ?? "" : ""}
                   {u.employeeId && u.departmentId ? " · " : ""}
                   {u.departmentId ? depName.get(u.departmentId) ?? u.departmentId : ""}
                   {!u.employeeId && !u.departmentId ? "—" : ""}

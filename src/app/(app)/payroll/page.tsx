@@ -117,7 +117,7 @@ export default async function PayrollPage({
                   <TableCell>
                     <div className="font-medium">{employee!.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {employee!.id}
+                      {employee!.employeeNumber}
                       {record.paidDaysCount != null && (
                         <span className="ms-1.5 text-primary">
                           · {t.employees.salaryDaily} ({record.paidDaysCount} {t.common.days})

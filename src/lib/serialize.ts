@@ -43,6 +43,7 @@ const isoOrNull = (d: Date | null): string | null => (d ? d.toISOString() : null
 export function toEmployee(e: PEmployee): Employee {
   return {
     id: e.id,
+    employeeNumber: e.employeeNumber,
     name: e.name,
     departmentId: e.departmentId,
     jobTitle: e.jobTitle,
@@ -53,7 +54,7 @@ export function toEmployee(e: PEmployee): Employee {
     dailyRate: e.dailyRate ?? undefined,
     dailyWorkingHours: e.dailyWorkingHours,
     allowances: e.allowancesTotal,
-    biometricDeviceUserId: e.biometricDeviceUserId,
+    biometricDeviceUserId: e.biometricDeviceUserId ?? undefined,
     status: e.status,
     phone: e.phone ?? undefined,
     address: e.address ?? undefined,
@@ -117,7 +118,7 @@ export function toAttendanceLog(l: PAttendanceLog): AttendanceLog {
     deviceId: l.deviceId ?? "",
     timestamp: iso(l.timestamp),
     punchType: l.punchType,
-    source: l.source === "biometric" ? "simulated" : l.source,
+    source: l.source,
   };
 }
 

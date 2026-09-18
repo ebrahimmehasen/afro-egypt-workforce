@@ -27,7 +27,7 @@ export function PayrollReport({
   );
 
   const exportRows = rows.map((r) => [
-    empMap.get(r.employeeId)?.name ?? r.employeeId,
+    empMap.get(r.employeeId)?.name ?? "-",
     r.basicSalary,
     r.allowances,
     r.overtimeAmount,
@@ -69,7 +69,7 @@ export function PayrollReport({
           <TableBody>
             {rows.map((r) => (
               <TableRow key={r.id}>
-                <TableCell className="font-medium">{empMap.get(r.employeeId)?.name ?? r.employeeId}</TableCell>
+                <TableCell className="font-medium">{empMap.get(r.employeeId)?.name ?? "-"}</TableCell>
                 <TableCell className="tabular-nums">{formatEGP(r.basicSalary, locale)}</TableCell>
                 <TableCell className="tabular-nums">{formatEGP(r.allowances, locale)}</TableCell>
                 <TableCell className="tabular-nums">{formatEGP(r.overtimeAmount, locale)}</TableCell>

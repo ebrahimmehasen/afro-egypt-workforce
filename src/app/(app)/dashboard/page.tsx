@@ -168,7 +168,7 @@ export default async function DashboardPage() {
                 </span>
                 <div>
                   <p className="text-sm font-medium text-foreground">{row.employee!.name}</p>
-                  <p className="text-xs text-muted-foreground">{row.employee!.id}</p>
+                  <p dir="ltr" className="text-xs text-muted-foreground">{row.employee!.employeeNumber}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -256,7 +256,7 @@ async function EmployeeDashboard({ employeeId, userName }: { employeeId: string;
           <CardTitle>{t.dashboard.basicInfo}</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Field label={t.dashboard.employeeId} value={employee?.id ?? "-"} />
+          <Field label={t.dashboard.employeeId} value={employee?.employeeNumber ?? "-"} />
           <Field label={t.employees.formJobTitle} value={employee ? translateLabel(employee.jobTitle, locale) : "-"} />
           <Field label={t.dashboard.basicSalary} value={employee ? formatEGP(employee.basicSalary, locale) : "-"} />
           <Field label={t.dashboard.hireDate} value={employee?.hireDate ?? "-"} />
