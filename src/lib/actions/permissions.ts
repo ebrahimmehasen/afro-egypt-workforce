@@ -18,6 +18,7 @@ async function guard() {
 const schema = z.object({
   id: z.string().min(1),
   active: z.coerce.boolean(),
+  directEdit: z.boolean().default(false),
   permissions: z.array(z.enum(PERMISSION_KEYS as [string, ...string[]])).default([]),
   departmentIds: z.array(z.string()).default([]),
 });
@@ -34,11 +35,12 @@ export async function updateUserPermissions(_prev: ActionState, formData: FormDa
 
   const id = String(formData.get("id") ?? "");
   const active = formData.get("active") === "on" || formData.get("active") === "true";
+  const directEdit = formData.get("directEdit") != null;
   const permissions = PERMISSION_KEYS.filter((k) => formData.get(`perm_${k}`) != null);
   const allDepartments = await prisma.department.findMany({ where: { deletedAt: null }, select: { id: true } });
   const departmentIds = allDepartments.map((d) => d.id).filter((depId) => formData.get(`dept_${depId}`) != null);
 
-  const parsed = schema.safeParse({ id, active, permissions, departmentIds });
+  const parsed = schema.safeParse({ id, active, directEdit, permissions, departmentIds });
   if (!parsed.success) return { error: t.validation.invalidData };
 
   const target = await prisma.user.findUnique({ where: { id: parsed.data.id } });
@@ -52,13 +54,13 @@ export async function updateUserPermissions(_prev: ActionState, formData: FormDa
     {
       module: t.nav.permissions,
       action: t.users.auditUpdate,
-      oldValue: `${target.name} — ${(target.permissions as string[] | null)?.join(", ") || "-"} — ${scopeLabel((target.departmentIds as string[] | null) ?? [])} — ${target.active ? t.users.active : t.users.inactive}`,
-      newValue: `${target.name} — ${parsed.data.permissions.join(", ") || "-"} — ${scopeLabel(parsed.data.departmentIds)} — ${parsed.data.active ? t.users.active : t.users.inactive}`,
+      oldValue: `${target.name} — ${(target.permissions as string[] | null)?.join(", ") || "-"} — ${scopeLabel((target.departmentIds as string[] | null) ?? [])} — ${target.active ? t.users.active : t.users.inactive}${target.directEdit ? ` — ${t.permissions.directEditShort}` : ""}`,
+      newValue: `${target.name} — ${parsed.data.permissions.join(", ") || "-"} — ${scopeLabel(parsed.data.departmentIds)} — ${parsed.data.active ? t.users.active : t.users.inactive}${parsed.data.directEdit ? ` — ${t.permissions.directEditShort}` : ""}`,
     },
     (tx) =>
       tx.user.update({
         where: { id: parsed.data.id },
-        data: { permissions: parsed.data.permissions, departmentIds: parsed.data.departmentIds, active: parsed.data.active },
+        data: { permissions: parsed.data.permissions, departmentIds: parsed.data.departmentIds, directEdit: parsed.data.directEdit, active: parsed.data.active },
       }),
   );
 

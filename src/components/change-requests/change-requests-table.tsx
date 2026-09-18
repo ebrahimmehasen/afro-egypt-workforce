@@ -27,6 +27,7 @@ interface ChangeRequestRow {
   actionLabel: string;
   summary: string;
   status: Status;
+  direct: boolean;
   reviewedBy: string | null;
   reviewNote: string | null;
   createdAt: string;
@@ -111,13 +112,16 @@ export function ChangeRequestsTable({ requests }: { requests: ChangeRequestRow[]
                       <TableCell className="font-medium">{r.requestedBy}</TableCell>
                       <TableCell className="text-muted-foreground">{r.module}</TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANT[r.status]}>{r.actionLabel}</Badge>
+                        <div className="flex flex-col items-start gap-1">
+                          <Badge variant={STATUS_VARIANT[r.status]}>{r.actionLabel}</Badge>
+                          {r.direct && <Badge variant="secondary">{t.changeRequests.directBadge}</Badge>}
+                        </div>
                       </TableCell>
                       <TableCell className="max-w-[320px] truncate">{r.summary}</TableCell>
                       <TableCell dir="ltr" className="tabular-nums text-xs text-muted-foreground">{fmt(r.createdAt)}</TableCell>
                       {tab !== "pending" && (
                         <TableCell className="text-xs text-muted-foreground">
-                          {r.reviewedBy}
+                          {r.direct ? t.changeRequests.directNoReview : r.reviewedBy}
                           {r.reviewNote && <div className="italic">{r.reviewNote}</div>}
                         </TableCell>
                       )}

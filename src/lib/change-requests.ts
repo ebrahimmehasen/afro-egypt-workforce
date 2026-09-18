@@ -40,6 +40,36 @@ export async function gate(
 
   if (actor.role === "admin") return apply();
 
+  // "All permissions" accounts skip the queue for everything except deletes:
+  // the action runs now and is only logged on /change-requests for the admin.
+  const isDelete = meta.actionKey.endsWith(".delete");
+  if (!isDelete) {
+    const account = await prisma.user.findUnique({ where: { id: actor.id }, select: { directEdit: true, active: true } });
+    if (account?.active && account.directEdit) {
+      const result = await apply();
+      if (!result.error) {
+        await prisma.changeRequest.create({
+          data: {
+            requestedById: actor.id,
+            requestedBy: actor.name,
+            module: meta.module,
+            actionLabel: meta.actionLabel,
+            actionKey: meta.actionKey,
+            targetId: meta.targetId ?? null,
+            summary: meta.summary,
+            payload: payload as Prisma.InputJsonValue,
+            status: "approved",
+            direct: true,
+            reviewedBy: actor.name,
+            reviewedAt: new Date(),
+          },
+        });
+        revalidatePath("/change-requests");
+      }
+      return result;
+    }
+  }
+
   await prisma.changeRequest.create({
     data: {
       requestedById: actor.id,

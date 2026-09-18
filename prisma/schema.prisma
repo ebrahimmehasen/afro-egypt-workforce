@@ -138,6 +138,10 @@ model User {
   /// admin always has full access regardless of this list; employee ignores it.
   /// Empty until an admin grants access via /permissions.
   permissions  Json        @default("[]")
+  /// "All permissions": this اداري may add/edit/approve without waiting for an admin
+  /// (each such action is still logged on /change-requests as a direct execution).
+  /// Deletes always still need approval. Ignored for admin/employee.
+  directEdit   Boolean     @default(false)
   active       Boolean     @default(true)
   employeeId   String?
   employee     Employee?   @relation(fields: [employeeId], references: [id])
@@ -511,6 +515,8 @@ model ChangeRequest {
   summary       String              @db.Text // human-readable old → new, for the review screen
   payload       Json // validated data to re-run the write on approval
   status        ChangeRequestStatus @default(pending)
+  /// true = executed immediately by a `directEdit` user (recorded here for the admin, never pending)
+  direct        Boolean             @default(false)
   reviewedBy    String?
   reviewNote    String?             @db.Text
   createdAt     DateTime            @default(now())

@@ -36,13 +36,14 @@ export default async function PermissionsPage() {
                 // remount when the server data actually changes (e.g. right after this
                 // card's own save) — local checkbox state is seeded once on mount and
                 // would otherwise keep showing what was on screen before the save.
-                key={`${u.id}:${u.active}:${permissions.join(",")}:${departmentIds.join(",")}`}
+                key={`${u.id}:${u.active}:${u.directEdit}:${permissions.join(",")}:${departmentIds.join(",")}`}
                 user={{
                   id: u.id,
                   name: u.name,
                   email: u.email,
                   role: u.role,
                   active: u.active,
+                  directEdit: u.directEdit,
                   permissions,
                   departmentIds,
                 }}

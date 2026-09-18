@@ -43,7 +43,7 @@ export function DeleteEmployeeButton({ id, name }: { id: string; name: string })
               startTransition(async () => {
                 const res = await deleteEmployee(id);
                 if (res?.error) toast.error(res.error);
-                else toast.success(t.employees.deletedEmployee);
+                else toast.success(res?.message ?? t.employees.deletedEmployee);
               });
             }}
           >

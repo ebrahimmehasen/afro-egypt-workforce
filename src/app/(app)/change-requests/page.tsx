@@ -21,6 +21,7 @@ export default async function ChangeRequestsPage() {
           actionLabel: r.actionLabel,
           summary: r.summary,
           status: r.status,
+          direct: r.direct,
           reviewedBy: r.reviewedBy,
           reviewNote: r.reviewNote,
           createdAt: r.createdAt.toISOString(),

@@ -101,7 +101,7 @@ export function DeductionsTable({
                         startTransition(async () => {
                           const res = await deleteDeduction(d.id);
                           if (res?.error) toast.error(res.error);
-                          else toast.success(t.deductions.deletedDeduction);
+                          else toast.success(res?.message ?? t.deductions.deletedDeduction);
                         })
                       }
                     >

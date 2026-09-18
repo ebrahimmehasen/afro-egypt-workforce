@@ -553,6 +553,9 @@ export interface Dictionary {
     save: string;
     saved: string;
     grantHint: string;
+    directEditLabel: string;
+    directEditHint: string;
+    directEditShort: string;
     pagesLabel: string;
     departmentsLabel: string;
     allDepartmentsHint: string;
@@ -587,6 +590,8 @@ export interface Dictionary {
     colReviewedBy: string;
     approve: string;
     reject: string;
+    directBadge: string;
+    directNoReview: string;
     approvedMessage: string;
     rejectedMessage: string;
     rejectReasonLabel: string;
