@@ -80,6 +80,7 @@ export interface Dictionary {
     admin: string;
     hr: string;
     supervisor: string;
+    staff: string;
     employee: string;
   };
   login: {

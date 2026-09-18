@@ -82,6 +82,7 @@ export const en: Dictionary = {
     admin: "Administrator",
     hr: "HR",
     supervisor: "Supervisor",
+    staff: "Administrative",
     employee: "Employee",
   },
   login: {

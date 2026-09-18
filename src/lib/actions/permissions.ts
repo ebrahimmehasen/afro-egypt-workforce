@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recordChange } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
-import { canManagePermissions, PERMISSION_KEYS } from "@/lib/permissions";
+import { canManagePermissions, isStaffRole, PERMISSION_KEYS } from "@/lib/permissions";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
 
@@ -44,7 +44,7 @@ export async function updateUserPermissions(_prev: ActionState, formData: FormDa
   if (!parsed.success) return { error: t.validation.invalidData };
 
   const target = await prisma.user.findUnique({ where: { id: parsed.data.id } });
-  if (!target || (target.role !== "hr" && target.role !== "supervisor")) {
+  if (!target || !isStaffRole(target.role)) {
     return { error: t.validation.notFound };
   }
 

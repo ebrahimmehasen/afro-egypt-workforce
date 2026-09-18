@@ -7,7 +7,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recordChange } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
-import { canManageUsers } from "@/lib/permissions";
+import { canManageUsers, isStaffRole } from "@/lib/permissions";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
 
@@ -17,7 +17,7 @@ async function guard() {
   return user;
 }
 
-const roleEnum = z.enum(["admin", "hr", "supervisor", "employee"]);
+const roleEnum = z.enum(["admin", "hr", "supervisor", "staff", "employee"]);
 
 const createSchema = z.object({
   name: z.string().min(2),
@@ -91,8 +91,8 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
   revalidatePath("/users");
   revalidatePath("/permissions");
   revalidatePath("/employees");
-  // hr/supervisor start with zero access — send the admin straight to set it.
-  if (role === "hr" || role === "supervisor") redirect(`/permissions?u=${created.id}`);
+  // hr/supervisor/staff start with zero access — send the admin straight to set it.
+  if (isStaffRole(role)) redirect(`/permissions?u=${created.id}`);
   return { success: true, message: t.users.saved };
 }
 

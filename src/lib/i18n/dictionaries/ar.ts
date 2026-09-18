@@ -82,6 +82,7 @@ export const ar: Dictionary = {
     admin: "مدير النظام",
     hr: "الموارد البشرية",
     supervisor: "مشرف",
+    staff: "اداري",
     employee: "موظف",
   },
   login: {
@@ -529,7 +530,7 @@ export const ar: Dictionary = {
     lastLogin: "آخر دخول",
     linkedEmployee: "مرتبط بموظف",
     linkedDepartment: "مرتبط بقسم",
-    scopingHint: "الموظف يشوف بياناته فقط. لتحديد نطاق الأقسام لحساب اداري (HR/مشرف)، استخدم صفحة الصلاحيات.",
+    scopingHint: "الموظف يشوف بياناته فقط. لتحديد نطاق الأقسام لحساب اداري (HR/مشرف/اداري)، استخدم صفحة الصلاحيات.",
     resetPassword: "إعادة تعيين كلمة المرور",
     passwordReset: "تم إعادة تعيين كلمة المرور",
     saved: "تم حفظ المستخدم",
@@ -548,7 +549,7 @@ export const ar: Dictionary = {
   },
   permissions: {
     title: "الصلاحيات",
-    description: "تحديد صفحات النظام اللي كل اداري (HR / مشرف) يقدر يوصلها — وتجميد الوصول لما يتوقف نشاطه.",
+    description: "تحديد صفحات النظام اللي كل اداري (HR / مشرف / اداري) يقدر يوصلها — وتجميد الوصول لما يتوقف نشاطه.",
     noStaffAccounts: "لا يوجد حسابات إدارية حاليًا",
     pendingBadge: "بانتظار الصلاحيات",
     activeToggle: "الحساب مفعّل",

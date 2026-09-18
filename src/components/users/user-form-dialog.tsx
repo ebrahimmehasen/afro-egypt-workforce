@@ -48,7 +48,7 @@ export function UserFormDialog({
   const [state, formAction] = useActionState(action, {});
   useActionFeedback(state, () => setOpen(false));
 
-  const roles: Role[] = ["admin", "hr", "supervisor", "employee"];
+  const roles: Role[] = ["admin", "hr", "supervisor", "staff", "employee"];
   const [name, setName] = useState(user?.name ?? "");
   const [employeeId, setEmployeeId] = useState(user?.employeeId ?? "");
   const [titleChoice, setTitleChoice] = useState("");

@@ -63,9 +63,14 @@ export function canManageBiometricDevice(role: Role): boolean {
   return role === "admin";
 }
 
-/** hr/supervisor with no grants yet, and not the admin role itself. */
+/** Roles whose access is governed by the per-user permissions checklist. */
+export function isStaffRole(role: Role): boolean {
+  return role === "hr" || role === "supervisor" || role === "staff";
+}
+
+/** hr/supervisor/staff with no grants yet, and not the admin role itself. */
 export function isPendingStaffAccount(user: SessionLike): boolean {
-  return (user.role === "hr" || user.role === "supervisor") && (!Array.isArray(user.permissions) || user.permissions.length === 0);
+  return isStaffRole(user.role) && (!Array.isArray(user.permissions) || user.permissions.length === 0);
 }
 
 /**

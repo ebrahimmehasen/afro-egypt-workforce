@@ -95,6 +95,7 @@ export function roleLabel(role: Role, t: Dictionary): string {
     admin: t.roles.admin,
     hr: t.roles.hr,
     supervisor: t.roles.supervisor,
+    staff: t.roles.staff,
     employee: t.roles.employee,
   };
   return map[role];

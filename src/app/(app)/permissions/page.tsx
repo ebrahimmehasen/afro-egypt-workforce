@@ -15,7 +15,7 @@ export default async function PermissionsPage() {
   const locale = await getLocale();
 
   const [staff, departments] = await Promise.all([
-    prisma.user.findMany({ where: { role: { in: ["hr", "supervisor"] } }, orderBy: { createdAt: "asc" } }),
+    prisma.user.findMany({ where: { role: { in: ["hr", "supervisor", "staff"] } }, orderBy: { createdAt: "asc" } }),
     prisma.department.findMany({ where: { deletedAt: null }, orderBy: { name: "asc" } }),
   ]);
   const departmentOpts = departments.map((d) => ({ id: d.id, name: translateLabel(d.name, locale) }));

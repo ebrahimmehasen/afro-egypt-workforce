@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { UserFormDialog } from "@/components/users/user-form-dialog";
 import { ResetPasswordDialog } from "@/components/users/reset-password-dialog";
+import { isStaffRole } from "@/lib/permissions";
 
 export default async function UsersPage() {
   await requireAccess("/users");
@@ -32,6 +33,7 @@ export default async function UsersPage() {
     admin: "warning",
     hr: "success",
     supervisor: "default",
+    staff: "default",
     employee: "secondary",
   };
 
@@ -67,7 +69,7 @@ export default async function UsersPage() {
                     const ids = Array.isArray(u.departmentIds) ? (u.departmentIds as string[]) : [];
                     const parts = [
                       u.employeeId ? empNumber.get(u.employeeId) ?? "" : "",
-                      u.role === "hr" || u.role === "supervisor"
+                      isStaffRole(u.role)
                         ? ids.length === 0 ? t.common.allDepartments : ids.map((id) => depName.get(id) ?? id).join("، ")
                         : "",
                     ].filter(Boolean);
