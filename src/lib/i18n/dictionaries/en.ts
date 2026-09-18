@@ -310,6 +310,9 @@ export const en: Dictionary = {
     noRequests: "No leave or excuse requests",
     approved: "Leave approved",
     rejected: "Request rejected",
+    deleteTitle: "Delete leave request",
+    deleteConfirm: "Delete the request for {name}? If it was approved, its effect on attendance is removed.",
+    deleted: "Leave request deleted",
   },
   overtime: {
     title: "Overtime",
@@ -740,6 +743,7 @@ export const en: Dictionary = {
     editShift: "Edit Shift",
     simulatePunch: "Simulate Punch",
     correctAttendance: "Correct Attendance",
+    deleteLeave: "Delete Leave Request",
     approveLeave: "Approve Leave",
     rejectLeave: "Reject Leave",
     approveOvertime: "Approve Overtime",

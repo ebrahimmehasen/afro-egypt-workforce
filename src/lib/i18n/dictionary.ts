@@ -308,6 +308,9 @@ export interface Dictionary {
     noRequests: string;
     approved: string;
     rejected: string;
+    deleteTitle: string;
+    deleteConfirm: string;
+    deleted: string;
   };
   overtime: {
     title: string;
@@ -738,6 +741,7 @@ export interface Dictionary {
     editShift: string;
     simulatePunch: string;
     correctAttendance: string;
+    deleteLeave: string;
     approveLeave: string;
     rejectLeave: string;
     approveOvertime: string;

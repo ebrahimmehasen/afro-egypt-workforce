@@ -107,3 +107,42 @@ export async function applyDecideLeave(payload: LeaveDecisionPayload, actorName:
   revalidatePath("/audit-log");
   return { success: true };
 }
+
+/**
+ * Admin-only: remove a leave request after it has been decided. Not routed
+ * through `gate` — nobody else may delete these, not even by request. An
+ * approved leave had already been folded into attendance, so its days are
+ * recomputed once it's gone.
+ */
+export async function deleteLeave(id: string): Promise<ActionState> {
+  const t = await getT();
+  const actor = await getSession();
+  if (!actor || actor.role !== "admin") return { error: t.validation.notAllowed };
+
+  const leave = await prisma.leave.findUnique({ where: { id }, include: { employee: true } });
+  if (!leave) return { error: t.validation.requestNotFound };
+
+  await recordChangeAs(
+    actor.name,
+    {
+      module: t.nav.leaves,
+      action: t.auditActions.deleteLeave,
+      oldValue: `${leaveTypeLabel(leave.type, t)} — ${leave.employee.employeeNumber} — ${leave.from.toISOString().slice(0, 10)} → ${leave.to.toISOString().slice(0, 10)} — ${leave.status === "approved" ? t.statuses.approved : leave.status === "rejected" ? t.statuses.rejected : t.statuses.pending}`,
+    },
+    (tx) => tx.leave.delete({ where: { id } }),
+  );
+
+  if (leave.status === "approved") {
+    await recalculateRange(
+      leave.employeeId,
+      leave.from.toISOString().slice(0, 10),
+      leave.to.toISOString().slice(0, 10),
+    );
+  }
+
+  revalidatePath("/leaves");
+  revalidatePath("/attendance");
+  revalidatePath("/dashboard");
+  revalidatePath("/audit-log");
+  return { success: true, message: t.leaves.deleted };
+}

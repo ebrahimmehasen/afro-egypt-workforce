@@ -310,6 +310,9 @@ export const ar: Dictionary = {
     noRequests: "لا يوجد طلبات إجازات أو أعذار",
     approved: "تم اعتماد الإجازة",
     rejected: "تم رفض الطلب",
+    deleteTitle: "حذف طلب الإجازة",
+    deleteConfirm: "هل أنت متأكد من حذف طلب {name}؟ لو كان معتمدًا هيتم إلغاء أثره على الحضور.",
+    deleted: "تم حذف طلب الإجازة",
   },
   overtime: {
     title: "الإضافي",
@@ -740,6 +743,7 @@ export const ar: Dictionary = {
     editShift: "تعديل وردية",
     simulatePunch: "محاكاة بصمة",
     correctAttendance: "تعديل حضور",
+    deleteLeave: "حذف طلب إجازة",
     approveLeave: "اعتماد إجازة",
     rejectLeave: "رفض إجازة",
     approveOvertime: "اعتماد إضافي",

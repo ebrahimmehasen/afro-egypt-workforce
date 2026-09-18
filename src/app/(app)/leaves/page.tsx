@@ -25,7 +25,7 @@ export default async function LeavesPage() {
         description={t.leaves.description}
         actions={<LeaveFormDialog employees={employees} />}
       />
-      <LeavesTable leaves={sorted} employees={db.employees} canApprove={hasPermission(user, "leaves")} />
+      <LeavesTable leaves={sorted} employees={db.employees} canApprove={hasPermission(user, "leaves")} canDelete={user.role === "admin"} />
     </div>
   );
 }
