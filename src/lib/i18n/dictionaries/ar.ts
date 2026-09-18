@@ -693,6 +693,7 @@ export const ar: Dictionary = {
   },
   validation: {
     invalidData: "بيانات غير صحيحة",
+    notAllowed: "غير مسموح لك بتنفيذ هذا الإجراء — حسابك للعرض فقط",
     notFound: "غير موجود",
     selectEmployee: "اختر الموظف",
     positiveAmount: "القيمة يجب أن تكون رقمًا موجبًا",

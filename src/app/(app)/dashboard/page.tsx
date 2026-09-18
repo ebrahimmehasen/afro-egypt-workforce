@@ -6,6 +6,7 @@ import {
 import { requireSession } from "@/lib/auth";
 import { getDb } from "@/lib/data";
 import { viewerScope } from "@/lib/scope";
+import { isSelfService } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
 import { today as todayDate, currentYearMonth } from "@/lib/today";
 import { getT, format } from "@/lib/i18n";
@@ -32,7 +33,7 @@ export default async function DashboardPage() {
   const t = await getT();
   const locale = await getLocale();
 
-  if (user.role === "employee" && user.employeeId) {
+  if (isSelfService(user) && user.employeeId) {
     return <EmployeeDashboard employeeId={user.employeeId} userName={displayUserName(user, t)} />;
   }
 

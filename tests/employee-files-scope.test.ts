@@ -33,7 +33,7 @@ afterAll(async () => {
 });
 
 const user = (over: Partial<User>): User => ({
-  id: "U", name: "U", email: "u@x.com", role: "employee", ...over,
+  id: "U", name: "U", email: "u@x.com", role: "employee", permissions: ["employees"], ...over,
 });
 
 describe.skipIf(!sampleLoaded)("canViewEmployee", () => {

@@ -693,6 +693,7 @@ export const en: Dictionary = {
   },
   validation: {
     invalidData: "Invalid data",
+    notAllowed: "You are not allowed to do this — your account is view-only",
     notFound: "Not found",
     selectEmployee: "Select an employee",
     positiveAmount: "Amount must be a positive number",

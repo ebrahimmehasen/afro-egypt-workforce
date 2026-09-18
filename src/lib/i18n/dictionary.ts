@@ -691,6 +691,7 @@ export interface Dictionary {
   };
   validation: {
     invalidData: string;
+    notAllowed: string;
     notFound: string;
     selectEmployee: string;
     positiveAmount: string;

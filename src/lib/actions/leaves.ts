@@ -5,6 +5,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recordChangeAs } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
+import { isSelfService } from "@/lib/permissions";
+import { canViewEmployee } from "@/lib/scope";
 import { gate } from "@/lib/change-requests";
 import { nextId } from "@/lib/id";
 import { recalculateRange } from "@/lib/attendance-service";
@@ -26,6 +28,17 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
   const t = await getT();
   const parsed = leaveSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
+
+  // A self-service account may only file for itself; anyone else only within
+  // the employees they can see. (Server actions are callable directly, so the
+  // dialog's employee list is not enough.)
+  const actor = await getSession();
+  if (!actor) return { error: t.validation.invalidData };
+  if (actor.role !== "admin") {
+    const own = isSelfService(actor) ? actor.employeeId === parsed.data.employeeId : await canViewEmployee(actor, parsed.data.employeeId);
+    if (!own) return { error: t.validation.notAllowed };
+  }
+
   await prisma.leave.create({
     data: {
       id: nextId("LV"),

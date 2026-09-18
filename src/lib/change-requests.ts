@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { isSelfService } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { ActionState } from "@/hooks/use-action-feedback";
 
@@ -39,6 +40,10 @@ export async function gate(
   if (!actor) return { error: t.validation.invalidData };
 
   if (actor.role === "admin") return apply();
+
+  // Self-service accounts (employees, and staff with no grants) are read-only:
+  // they can't even queue a change for approval.
+  if (isSelfService(actor)) return { error: t.validation.notAllowed };
 
   // "All permissions" accounts skip the queue for everything except deletes:
   // the action runs now and is only logged on /change-requests for the admin.

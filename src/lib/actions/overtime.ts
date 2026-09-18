@@ -5,6 +5,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recordChangeAs } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
+import { isSelfService } from "@/lib/permissions";
+import { canViewEmployee } from "@/lib/scope";
 import { gate } from "@/lib/change-requests";
 import { nextId } from "@/lib/id";
 import { ActionState } from "@/hooks/use-action-feedback";
@@ -22,6 +24,13 @@ export async function createOvertime(_prev: ActionState, formData: FormData): Pr
   const t = await getT();
   const parsed = overtimeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
+
+  const actor = await getSession();
+  if (!actor) return { error: t.validation.invalidData };
+  if (actor.role !== "admin" && (isSelfService(actor) || !(await canViewEmployee(actor, parsed.data.employeeId)))) {
+    return { error: t.validation.notAllowed };
+  }
+
   await prisma.overtime.create({
     data: {
       id: nextId("OT"),

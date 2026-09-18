@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermission, isSelfService } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
 import { currentYearMonth } from "@/lib/today";
 import { getT, format } from "@/lib/i18n";
@@ -54,7 +54,7 @@ export default async function PayrollPage({
         .sort((a, b) => a.employee!.name.localeCompare(b.employee!.name, locale === "ar" ? "ar" : "en"))
     : [];
 
-  if (user.role === "employee" && user.employeeId) {
+  if (isSelfService(user) && user.employeeId) {
     records = records.filter((r) => r.employee!.id === user.employeeId);
   }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { employeesInScope, inScope, rowsInScope, viewerScope } from "@/lib/scope";
+import { canAccess, hasPermission, isSelfService } from "@/lib/permissions";
 import type { Employee, User } from "@/lib/types";
 
 const emp = (id: string, departmentId: string): Employee => ({
@@ -25,7 +26,33 @@ const user = (over: Partial<User>): User => ({
   name: "U",
   email: "u@x.com",
   role: "employee",
+  permissions: ["employees"], // a granted اداري; employees ignore this
   ...over,
+});
+
+describe("self-service accounts (no grants)", () => {
+  it("an hr/supervisor/staff account with no permissions sees only their own record", () => {
+    for (const role of ["hr", "supervisor", "staff"] as const) {
+      const scope = viewerScope(user({ role, permissions: [], employeeId: "E3" }), roster);
+      expect(scope.all).toBe(false);
+      expect(employeesInScope(scope, roster).map((e) => e.id)).toEqual(["E3"]);
+    }
+  });
+
+  it("the same account is company-wide once it is granted a permission", () => {
+    expect(viewerScope(user({ role: "staff", permissions: ["leaves"], employeeId: "E3" }), roster).all).toBe(true);
+  });
+
+  it("self-service accounts hold no permission and only get the employee pages", () => {
+    const empty = user({ role: "staff", permissions: [] });
+    expect(isSelfService(empty)).toBe(true);
+    expect(isSelfService(user({ role: "employee" }))).toBe(true);
+    expect(isSelfService(user({ role: "admin", permissions: [] }))).toBe(false);
+    expect(hasPermission(empty, "employees")).toBe(false);
+    expect(canAccess(empty, "/leaves")).toBe(true);
+    expect(canAccess(empty, "/employees")).toBe(false);
+    expect(canAccess(empty, "/permissions")).toBe(false);
+  });
 });
 
 describe("viewerScope", () => {

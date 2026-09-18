@@ -32,16 +32,29 @@ const EMPLOYEE_NAV = ["/dashboard", "/attendance", "/leaves", "/payroll"];
 
 type SessionLike = Pick<User, "role" | "permissions">;
 
-/** Does this user hold the given granular permission? admin: always. employee: never. */
+/**
+ * Self-service accounts see only their own data (own attendance, leaves,
+ * payslip) and can file a leave request: every `employee` account, plus any
+ * hr/supervisor/staff account the admin hasn't granted a single permission yet.
+ * The moment an admin grants something on /permissions, the account leaves
+ * self-service and is governed by its grants (and department scope) instead.
+ */
+export function isSelfService(user: SessionLike): boolean {
+  if (user.role === "admin") return false;
+  if (user.role === "employee") return true;
+  return !Array.isArray(user.permissions) || user.permissions.length === 0;
+}
+
+/** Does this user hold the given granular permission? admin: always. self-service: never. */
 export function hasPermission(user: SessionLike, key: PermissionKey): boolean {
   if (user.role === "admin") return true;
-  if (user.role === "employee") return false;
+  if (isSelfService(user)) return false;
   return Array.isArray(user.permissions) && user.permissions.includes(key);
 }
 
 export function allowedNavPaths(user: SessionLike): string[] {
   if (user.role === "admin") return ADMIN_NAV;
-  if (user.role === "employee") return EMPLOYEE_NAV;
+  if (isSelfService(user)) return EMPLOYEE_NAV;
   const granted = PERMISSION_DEFS.filter((p) => hasPermission(user, p.key)).map((p) => p.path);
   return ["/dashboard", ...granted];
 }
@@ -66,11 +79,6 @@ export function canManageBiometricDevice(role: Role): boolean {
 /** Roles whose access is governed by the per-user permissions checklist. */
 export function isStaffRole(role: Role): boolean {
   return role === "hr" || role === "supervisor" || role === "staff";
-}
-
-/** hr/supervisor/staff with no grants yet, and not the admin role itself. */
-export function isPendingStaffAccount(user: SessionLike): boolean {
-  return isStaffRole(user.role) && (!Array.isArray(user.permissions) || user.permissions.length === 0);
 }
 
 /**
