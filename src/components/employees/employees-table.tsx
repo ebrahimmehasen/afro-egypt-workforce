@@ -22,12 +22,21 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { formatEGP } from "@/lib/constants";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { useLocale, useT } from "@/components/providers/locale-provider";
+import { today } from "@/lib/today";
 
 const STATUS_VARIANT: Record<Employee["status"], "success" | "secondary" | "warning" | "destructive"> = {
   active: "success",
   on_leave: "secondary",
   terminated: "destructive",
 };
+
+/** True while the employee is still inside their first 3 months (hire date + 3 months hasn't arrived yet). */
+function isNewHire(hireDate: string, todayStr: string): boolean {
+  const cutoff = new Date(`${hireDate}T00:00:00Z`);
+  if (Number.isNaN(cutoff.getTime())) return false;
+  cutoff.setUTCMonth(cutoff.getUTCMonth() + 3);
+  return todayStr < cutoff.toISOString().slice(0, 10);
+}
 
 export function EmployeesTable({
   employees,
@@ -45,6 +54,7 @@ export function EmployeesTable({
   const t = useT();
   const locale = useLocale();
   const incompleteDocs = new Set(incompleteDocIds);
+  const todayStr = today();
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -102,6 +112,11 @@ export function EmployeesTable({
         />
       </div>
 
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span className="h-3 w-3 rounded-sm border border-gold-400/50 bg-gold-400/25" />
+        {t.employees.newHireLegend}
+      </div>
+
       {filtered.length === 0 ? (
         <EmptyState icon={Users} title={t.employees.noMatch} description={t.employees.noMatchDesc} />
       ) : (
@@ -121,7 +136,7 @@ export function EmployeesTable({
             </TableHeader>
             <TableBody>
               {filtered.map((e) => (
-                <TableRow key={e.id}>
+                <TableRow key={e.id} className={isNewHire(e.hireDate, todayStr) ? "bg-gold-400/15 hover:bg-gold-400/25" : undefined}>
                   <TableCell dir="ltr" className="font-mono text-xs tabular-nums">{e.employeeNumber}</TableCell>
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-1.5">

@@ -135,6 +135,7 @@ export interface Dictionary {
   employees: {
     title: string;
     totalCount: string;
+    newHireLegend: string;
     addEmployee: string;
     editEmployee: string;
     searchPlaceholder: string;

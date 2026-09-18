@@ -137,6 +137,7 @@ export const ar: Dictionary = {
   employees: {
     title: "الموظفين",
     totalCount: "إجمالي {count} موظف",
+    newHireLegend: "موظف جديد — لسه مكمّلش 3 شهور من تاريخ التعيين",
     addEmployee: "إضافة موظف",
     editEmployee: "تعديل بيانات الموظف",
     searchPlaceholder: "ابحث بالاسم أو الرقم الوظيفي...",
