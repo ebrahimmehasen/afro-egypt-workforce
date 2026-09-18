@@ -137,6 +137,9 @@ export const ar: Dictionary = {
   employees: {
     title: "الموظفين",
     totalCount: "إجمالي {count} موظف",
+    tenureAll: "كل فترات التعيين",
+    tenureNew: "جدد (أقل من 3 شهور)",
+    tenureEstablished: "قدامى (3 شهور أو أكتر)",
     newHireLegend: "موظف جديد — لسه مكمّلش 3 شهور من تاريخ التعيين",
     addEmployee: "إضافة موظف",
     editEmployee: "تعديل بيانات الموظف",

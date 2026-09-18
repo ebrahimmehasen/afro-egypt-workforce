@@ -137,6 +137,9 @@ export const en: Dictionary = {
   employees: {
     title: "Employees",
     totalCount: "Total {count} employees",
+    tenureAll: "All hire periods",
+    tenureNew: "New (under 3 months)",
+    tenureEstablished: "Established (3+ months)",
     newHireLegend: "New hire — under 3 months since hire date",
     addEmployee: "Add Employee",
     editEmployee: "Edit Employee",

@@ -58,6 +58,7 @@ export function EmployeesTable({
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [tenureFilter, setTenureFilter] = useState<string[]>([]);
 
   const STATUS_LABEL: Record<Employee["status"], string> = {
     active: t.employees.statusActive,
@@ -76,9 +77,11 @@ export function EmployeesTable({
         e.employeeNumber.toLowerCase().includes(search.toLowerCase());
       const matchesDept = deptFilter.length === 0 || deptFilter.includes(e.departmentId);
       const matchesStatus = statusFilter.length === 0 || statusFilter.includes(e.status);
-      return matchesSearch && matchesDept && matchesStatus;
+      const matchesTenure =
+        tenureFilter.length === 0 || tenureFilter.includes(isNewHire(e.hireDate, todayStr) ? "new" : "established");
+      return matchesSearch && matchesDept && matchesStatus && matchesTenure;
     });
-  }, [employees, search, deptFilter, statusFilter]);
+  }, [employees, search, deptFilter, statusFilter, tenureFilter, todayStr]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -108,6 +111,16 @@ export function EmployeesTable({
             { value: "active", label: t.employees.statusActive },
             { value: "on_leave", label: t.employees.statusOnLeave },
             { value: "terminated", label: t.employees.statusTerminated },
+          ]}
+        />
+        <MultiSelectFilter
+          className="sm:w-52"
+          placeholder={t.employees.tenureAll}
+          selected={tenureFilter}
+          onChange={setTenureFilter}
+          options={[
+            { value: "new", label: t.employees.tenureNew },
+            { value: "established", label: t.employees.tenureEstablished },
           ]}
         />
       </div>
