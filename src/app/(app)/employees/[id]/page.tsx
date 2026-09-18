@@ -59,7 +59,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   const documents = db.employeeDocuments.filter((d) => d.employeeId === employee.id);
   const acknowledgments = db.employeeAcknowledgments.filter((a) => a.employeeId === employee.id);
   const missingDocs = missingDocumentTypes(documents);
-  const canManageDocs = canManageEmployeeFiles(user.role);
+  const canManageDocs = canManageEmployeeFiles(user);
 
   return (
     <div className="flex flex-col gap-6">
@@ -134,7 +134,6 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
                       {
                         active: t.employees.statusActive,
                         on_leave: t.employees.statusOnLeave,
-                        suspended: t.employees.statusSuspended,
                         terminated: t.employees.statusTerminated,
                       }[employee.status]
                     }

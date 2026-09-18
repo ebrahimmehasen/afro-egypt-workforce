@@ -47,13 +47,14 @@ describe.skipIf(!sampleLoaded)("canViewEmployee", () => {
     expect(await canViewEmployee(user({ role: "employee", employeeId: empInDeptA }), empInOtherDept)).toBe(false);
   });
 
-  it("a supervisor can view their own department but not another", async () => {
-    const supervisor = user({ role: "supervisor", departmentId: deptA });
+  it("an اداري scoped to a department can view it but not another", async () => {
+    const supervisor = user({ role: "supervisor", departmentIds: [deptA] });
     expect(await canViewEmployee(supervisor, empInDeptA)).toBe(true);
     expect(await canViewEmployee(supervisor, empInOtherDept)).toBe(false);
   });
 
-  it("a supervisor with no department, or an unrecognized role, sees nothing", async () => {
-    expect(await canViewEmployee(user({ role: "supervisor" }), empInDeptA)).toBe(false);
+  it("an اداري with no departmentIds is company-wide (the free-list default)", async () => {
+    expect(await canViewEmployee(user({ role: "supervisor" }), empInDeptA)).toBe(true);
+    expect(await canViewEmployee(user({ role: "supervisor" }), empInOtherDept)).toBe(true);
   });
 });

@@ -10,9 +10,7 @@ import { requestStatusLabel } from "@/lib/i18n/labels";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { RequestStatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { MultiSelectFilter } from "@/components/shared/multi-select-filter";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -36,10 +34,10 @@ export function OvertimeTable({
   const locale = useLocale();
   const empMap = new Map(employees.map((e) => [e.id, e]));
   const [pending, startTransition] = useTransition();
-  const [status, setStatus] = useState(initialStatus);
+  const [status, setStatus] = useState<string[]>(initialStatus === "all" ? [] : [initialStatus]);
 
   const rows = useMemo(
-    () => records.filter((o) => status === "all" || o.status === status),
+    () => records.filter((o) => status.length === 0 || status.includes(o.status)),
     [records, status],
   );
 
@@ -54,15 +52,13 @@ export function OvertimeTable({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-end">
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="sm:w-48"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.common.allStatuses}</SelectItem>
-            {STATUS_OPTIONS.map((value) => (
-              <SelectItem key={value} value={value}>{requestStatusLabel(value, t)}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <MultiSelectFilter
+          className="sm:w-48"
+          placeholder={t.common.allStatuses}
+          selected={status}
+          onChange={setStatus}
+          options={STATUS_OPTIONS.map((value) => ({ value, label: requestStatusLabel(value, t) }))}
+        />
       </div>
 
       {rows.length === 0 ? (

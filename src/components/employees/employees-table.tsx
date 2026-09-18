@@ -7,13 +7,7 @@ import { Employee, Department, Shift } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { MultiSelectFilter } from "@/components/shared/multi-select-filter";
 import {
   Table,
   TableBody,
@@ -32,7 +26,6 @@ import { useLocale, useT } from "@/components/providers/locale-provider";
 const STATUS_VARIANT: Record<Employee["status"], "success" | "secondary" | "warning" | "destructive"> = {
   active: "success",
   on_leave: "secondary",
-  suspended: "warning",
   terminated: "destructive",
 };
 
@@ -53,13 +46,12 @@ export function EmployeesTable({
   const locale = useLocale();
   const incompleteDocs = new Set(incompleteDocIds);
   const [search, setSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [deptFilter, setDeptFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
 
   const STATUS_LABEL: Record<Employee["status"], string> = {
     active: t.employees.statusActive,
     on_leave: t.employees.statusOnLeave,
-    suspended: t.employees.statusSuspended,
     terminated: t.employees.statusTerminated,
   };
 
@@ -72,8 +64,8 @@ export function EmployeesTable({
         !search ||
         e.name.toLowerCase().includes(search.toLowerCase()) ||
         e.id.toLowerCase().includes(search.toLowerCase());
-      const matchesDept = deptFilter === "all" || e.departmentId === deptFilter;
-      const matchesStatus = statusFilter === "all" || e.status === statusFilter;
+      const matchesDept = deptFilter.length === 0 || deptFilter.includes(e.departmentId);
+      const matchesStatus = statusFilter.length === 0 || statusFilter.includes(e.status);
       return matchesSearch && matchesDept && matchesStatus;
     });
   }, [employees, search, deptFilter, statusFilter]);
@@ -90,25 +82,24 @@ export function EmployeesTable({
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Select value={deptFilter} onValueChange={setDeptFilter}>
-          <SelectTrigger className="sm:w-48"><SelectValue placeholder={t.common.allDepartments} /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.common.allDepartments}</SelectItem>
-            {departments.map((d) => (
-              <SelectItem key={d.id} value={d.id}>{translateLabel(d.name, locale)}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="sm:w-44"><SelectValue placeholder={t.common.allStatuses} /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.common.allStatuses}</SelectItem>
-            <SelectItem value="active">{t.employees.statusActive}</SelectItem>
-            <SelectItem value="on_leave">{t.employees.statusOnLeave}</SelectItem>
-            <SelectItem value="suspended">{t.employees.statusSuspended}</SelectItem>
-            <SelectItem value="terminated">{t.employees.statusTerminated}</SelectItem>
-          </SelectContent>
-        </Select>
+        <MultiSelectFilter
+          className="sm:w-48"
+          placeholder={t.common.allDepartments}
+          selected={deptFilter}
+          onChange={setDeptFilter}
+          options={departments.map((d) => ({ value: d.id, label: translateLabel(d.name, locale) }))}
+        />
+        <MultiSelectFilter
+          className="sm:w-44"
+          placeholder={t.common.allStatuses}
+          selected={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: "active", label: t.employees.statusActive },
+            { value: "on_leave", label: t.employees.statusOnLeave },
+            { value: "terminated", label: t.employees.statusTerminated },
+          ]}
+        />
       </div>
 
       {filtered.length === 0 ? (

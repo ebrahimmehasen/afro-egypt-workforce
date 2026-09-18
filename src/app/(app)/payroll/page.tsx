@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
-import { canEditPayroll } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
 import { currentYearMonth } from "@/lib/today";
 import { getT, format } from "@/lib/i18n";
@@ -35,7 +35,7 @@ export default async function PayrollPage({
   const user = await requireAccess("/payroll");
   const t = await getT();
   const locale = await getLocale();
-  const canEdit = canEditPayroll(user.role);
+  const canEdit = hasPermission(user, "payroll");
 
   const { period: periodParam } = await searchParams;
   const ym = currentYearMonth();

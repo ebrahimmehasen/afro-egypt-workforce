@@ -10,9 +10,7 @@ import { translateLabel } from "@/lib/i18n/data-labels";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { MultiSelectFilter } from "@/components/shared/multi-select-filter";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -63,9 +61,11 @@ export function AttendanceReport({
   const locale = useLocale();
   const [from, setFrom] = useState(initialFrom ?? addDays(today(), -13));
   const [to, setTo] = useState(initialTo ?? today());
-  const [departmentId, setDepartmentId] = useState("all");
-  const [employeeId, setEmployeeId] = useState("all");
-  const [status, setStatus] = useState(initialStatus ?? "all");
+  const [departmentId, setDepartmentId] = useState<string[]>([]);
+  const [employeeId, setEmployeeId] = useState<string[]>([]);
+  const [status, setStatus] = useState<string[]>(
+    initialStatus && initialStatus !== "all" ? [initialStatus] : [],
+  );
 
   function fmtTime(iso: string | null) {
     if (!iso) return "—";
@@ -79,9 +79,11 @@ export function AttendanceReport({
       .filter((r) => r.date >= from && r.date <= to)
       .map((r) => ({ record: r, employee: empMap.get(r.employeeId) }))
       .filter((x) => x.employee)
-      .filter(({ employee }) => departmentId === "all" || employee!.departmentId === departmentId)
-      .filter(({ employee }) => employeeId === "all" || employee!.id === employeeId)
-      .filter(({ record }) => matchesReportStatus(record.status, status))
+      .filter(({ employee }) => departmentId.length === 0 || departmentId.includes(employee!.departmentId))
+      .filter(({ employee }) => employeeId.length === 0 || employeeId.includes(employee!.id))
+      .filter(
+        ({ record }) => status.length === 0 || status.some((s) => matchesReportStatus(record.status, s)),
+      )
       .sort((a, b) => (a.record.date < b.record.date ? 1 : -1));
   }, [records, empMap, from, to, departmentId, employeeId, status]);
 
@@ -109,36 +111,34 @@ export function AttendanceReport({
         </div>
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs">{t.reports.filterDepartment}</Label>
-          <Select value={departmentId} onValueChange={setDepartmentId}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t.common.all}</SelectItem>
-              {departments.map((d) => <SelectItem key={d.id} value={d.id}>{translateLabel(d.name, locale)}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <MultiSelectFilter
+            placeholder={t.common.all}
+            selected={departmentId}
+            onChange={setDepartmentId}
+            options={departments.map((d) => ({ value: d.id, label: translateLabel(d.name, locale) }))}
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs">{t.reports.filterEmployee}</Label>
-          <Select value={employeeId} onValueChange={setEmployeeId}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t.common.all}</SelectItem>
-              {employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <MultiSelectFilter
+            placeholder={t.common.all}
+            selected={employeeId}
+            onChange={setEmployeeId}
+            searchable
+            options={employees.map((e) => ({ value: e.id, label: e.name }))}
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs">{t.reports.filterStatus}</Label>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t.common.all}</SelectItem>
-              <SelectItem value="absent_late">{t.reports.statusAbsentLate}</SelectItem>
-              {STATUS_OPTIONS.map((value) => (
-                <SelectItem key={value} value={value}>{attendanceStatusLabel(value, t)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelectFilter
+            placeholder={t.common.all}
+            selected={status}
+            onChange={setStatus}
+            options={[
+              { value: "absent_late", label: t.reports.statusAbsentLate },
+              ...STATUS_OPTIONS.map((value) => ({ value, label: attendanceStatusLabel(value, t) })),
+            ]}
+          />
         </div>
       </div>
 

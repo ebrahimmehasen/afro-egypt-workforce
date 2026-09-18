@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { currentYearMonth } from "@/lib/today";
-import { canEditPayroll } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
 import { translateLabel } from "@/lib/i18n/data-labels";
@@ -21,7 +21,7 @@ export default async function DeductionsPage({
   const user = await requireAccess("/deductions");
   const t = await getT();
   const locale = await getLocale();
-  const canManage = canEditPayroll(user.role);
+  const canManage = hasPermission(user, "deductions");
 
   const initialMonth = (await searchParams).month ?? null;
   const monthPeriod = initialMonth

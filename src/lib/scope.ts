@@ -16,17 +16,17 @@ import { prisma } from "@/lib/prisma";
 export type Scope = { all: true } | { all: false; ids: ReadonlySet<string> };
 
 export function viewerScope(user: User, allEmployees: Pick<Employee, "id" | "departmentId">[]): Scope {
-  if (user.role === "admin" || user.role === "hr") return { all: true };
-  if (user.role === "supervisor" && user.departmentId) {
-    const ids = allEmployees
-      .filter((e) => e.departmentId === user.departmentId)
-      .map((e) => e.id);
-    return { all: false, ids: new Set(ids) };
+  if (user.role === "admin") return { all: true };
+  if (user.role === "employee") {
+    return user.employeeId ? { all: false, ids: new Set([user.employeeId]) } : { all: false, ids: new Set() };
   }
-  if (user.role === "employee" && user.employeeId) {
-    return { all: false, ids: new Set([user.employeeId]) };
-  }
-  return { all: false, ids: new Set() };
+  // hr/supervisor "اداري" — scoped by the free department list an admin granted
+  // via /permissions; an empty list means company-wide (the old hr default).
+  const departmentIds = user.departmentIds ?? [];
+  if (departmentIds.length === 0) return { all: true };
+  const deptSet = new Set(departmentIds);
+  const ids = allEmployees.filter((e) => deptSet.has(e.departmentId)).map((e) => e.id);
+  return { all: false, ids: new Set(ids) };
 }
 
 export function inScope(scope: Scope, employeeId: string): boolean {
@@ -40,16 +40,15 @@ export function inScope(scope: Scope, employeeId: string): boolean {
  * supervisor (to read the target's department).
  */
 export async function canViewEmployee(user: User, employeeId: string): Promise<boolean> {
-  if (user.role === "admin" || user.role === "hr") return true;
+  if (user.role === "admin") return true;
   if (user.role === "employee") return user.employeeId === employeeId;
-  if (user.role === "supervisor" && user.departmentId) {
-    const target = await prisma.employee.findFirst({
-      where: { id: employeeId, deletedAt: null },
-      select: { departmentId: true },
-    });
-    return target?.departmentId === user.departmentId;
-  }
-  return false;
+  const departmentIds = user.departmentIds ?? [];
+  if (departmentIds.length === 0) return true; // company-wide اداري
+  const target = await prisma.employee.findFirst({
+    where: { id: employeeId, deletedAt: null },
+    select: { departmentId: true },
+  });
+  return target != null && departmentIds.includes(target.departmentId);
 }
 
 /** Narrow an employee list to the scope. */

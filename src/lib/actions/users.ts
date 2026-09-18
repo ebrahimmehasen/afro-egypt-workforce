@@ -66,6 +66,7 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
           role,
           employeeId: clean(employeeId),
           departmentId: clean(departmentId),
+          permissions: [], // admin grants these later from /permissions (n/a for role=admin/employee)
         },
       }),
   );

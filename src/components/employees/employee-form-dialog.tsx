@@ -170,7 +170,6 @@ export function EmployeeFormDialog({
               <SelectContent>
                 <SelectItem value="active">{t.employees.statusActive}</SelectItem>
                 <SelectItem value="on_leave">{t.employees.statusOnLeave}</SelectItem>
-                <SelectItem value="suspended">{t.employees.statusSuspended}</SelectItem>
                 <SelectItem value="terminated">{t.employees.statusTerminated}</SelectItem>
               </SelectContent>
             </Select>

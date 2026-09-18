@@ -26,10 +26,15 @@ enum Role {
   employee
 }
 
+enum ChangeRequestStatus {
+  pending
+  approved
+  rejected
+}
+
 enum EmployeeStatus {
   active
   on_leave
-  suspended
   terminated
 }
 
@@ -129,11 +134,21 @@ model User {
   email        String      @unique
   passwordHash String
   role         Role
+  /// Granular page permissions for non-admin "اداري" (hr/supervisor) accounts —
+  /// admin always has full access regardless of this list; employee ignores it.
+  /// Empty until an admin grants access via /permissions.
+  permissions  Json        @default("[]")
   active       Boolean     @default(true)
   employeeId   String?
   employee     Employee?   @relation(fields: [employeeId], references: [id])
+  /// Legacy single-department link — superseded by `departmentIds` for scoping
+  /// (kept only so existing rows don't lose the FK; new code reads/writes
+  /// `departmentIds` instead).
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
+  /// Free multi-department scope for hr/supervisor "اداري" accounts — empty
+  /// array means company-wide (all departments), like the old hr role.
+  departmentIds Json       @default("[]")
   lastLoginAt  DateTime?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -458,6 +473,31 @@ model AuditLogEntry {
   timestamp DateTime @default(now())
 
   @@index([timestamp])
+}
+
+/// A write an "اداري" (non-admin) account asked to make — held pending until
+/// an admin approves (then it's actually applied, attributed to the original
+/// requester in AuditLogEntry) or rejects it (never applied). `payload` is the
+/// already-validated data the write needs; `actionKey` identifies which
+/// module/apply-function should run it (see src/lib/change-requests.ts).
+model ChangeRequest {
+  id            String              @id @default(cuid())
+  requestedById String
+  requestedBy   String // display name at request time
+  module        String // localized module label, e.g. "الموظفين"
+  actionLabel   String // localized action label, e.g. "إضافة موظف"
+  actionKey     String // e.g. "employees.create" — dispatch key for the apply function
+  targetId      String? // record being updated/deleted, if any
+  summary       String              @db.Text // human-readable old → new, for the review screen
+  payload       Json // validated data to re-run the write on approval
+  status        ChangeRequestStatus @default(pending)
+  reviewedBy    String?
+  reviewNote    String?             @db.Text
+  createdAt     DateTime            @default(now())
+  reviewedAt    DateTime?
+
+  @@index([status])
+  @@index([requestedById])
 }
 
 /// Single-row settings tables (id is always "singleton").

@@ -7,19 +7,20 @@ const PUBLIC_PATHS = ["/login"];
 const ALWAYS_ALLOWED = ["/dashboard", "/payslip"];
 
 /**
- * Reads the role out of the signed session cookie WITHOUT verifying the
- * signature — this is only a coarse UX redirect. Real enforcement is
+ * Reads role + permissions out of the signed session cookie WITHOUT verifying
+ * the signature — this is only a coarse UX redirect. Real enforcement is
  * `requireAccess()` in each (app) page (see src/lib/auth.ts), which verifies
- * the session signature and checks role-vs-path itself. Employee files
- * (/api/employees/[id]/documents|acknowledgments) are under /api, so this
- * middleware never runs on them at all — they carry their own session +
+ * the session signature and checks role/permissions-vs-path itself. Employee
+ * files (/api/employees/[id]/documents|acknowledgments) are under /api, so
+ * this middleware never runs on them at all — they carry their own session +
  * per-record scope check (canViewEmployee).
  */
-function roleFromCookie(raw: string): Role | null {
+function userFromCookie(raw: string): { role: Role; permissions: string[] } | null {
   try {
     const body = raw.slice(0, raw.lastIndexOf("."));
     const json = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
-    return json?.role ?? null;
+    if (!json?.role) return null;
+    return { role: json.role, permissions: Array.isArray(json.permissions) ? json.permissions : [] };
   } catch {
     return null;
   }
@@ -45,8 +46,8 @@ export function middleware(request: NextRequest) {
   }
 
   if (hasSession && !isPublic && !ALWAYS_ALLOWED.some((p) => pathname.startsWith(p))) {
-    const role = roleFromCookie(sessionRaw!);
-    if (role && !canAccess(role, pathname)) {
+    const user = userFromCookie(sessionRaw!);
+    if (user && !canAccess(user, pathname)) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
       return NextResponse.redirect(url);

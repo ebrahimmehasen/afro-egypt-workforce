@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma, TransactionClient } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 
@@ -46,7 +46,7 @@ function auditData(entry: AuditEntry, userName: string): Prisma.AuditLogEntryCre
 export async function recordChangeAs<T>(
   userName: string,
   entry: AuditEntry,
-  write: (tx: Prisma.TransactionClient) => Promise<T>,
+  write: (tx: TransactionClient) => Promise<T>,
 ): Promise<T> {
   return prisma.$transaction(async (tx) => {
     const result = await write(tx);
@@ -61,7 +61,7 @@ export async function recordChangeAs<T>(
  */
 export async function recordChange<T>(
   entry: AuditEntry,
-  write: (tx: Prisma.TransactionClient) => Promise<T>,
+  write: (tx: TransactionClient) => Promise<T>,
 ): Promise<T> {
   return recordChangeAs(await auditActor(), entry, write);
 }
@@ -72,7 +72,7 @@ export async function recordChange<T>(
  * `auditActor()` *before* opening the transaction.
  */
 export async function writeAudit(
-  tx: Prisma.TransactionClient,
+  tx: TransactionClient,
   entry: AuditEntry,
   userName: string,
 ): Promise<void> {

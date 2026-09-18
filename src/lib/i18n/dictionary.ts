@@ -52,6 +52,10 @@ export interface Dictionary {
     allFieldsRequired: string;
     filteredBy: string;
     clearFilter: string;
+    selectedCount: string;
+    selectAll: string;
+    clearAll: string;
+    noResults: string;
   };
   nav: {
     dashboard: string;
@@ -67,6 +71,8 @@ export interface Dictionary {
     workforceCost: string;
     auditLog: string;
     users: string;
+    permissions: string;
+    changeRequests: string;
     settings: string;
   };
   roles: {
@@ -168,7 +174,6 @@ export interface Dictionary {
     formStatus: string;
     statusActive: string;
     statusOnLeave: string;
-    statusSuspended: string;
     statusTerminated: string;
     deleteTitle: string;
     deleteConfirm: string;
@@ -534,6 +539,63 @@ export interface Dictionary {
     auditCreate: string;
     auditUpdate: string;
     auditResetPassword: string;
+    addPerson: string;
+    addWorker: string;
+    addStaff: string;
+    staffAccount: string;
+    staffAccountCreatedPendingPermissions: string;
+    staffDescription: string;
+  };
+  permissions: {
+    title: string;
+    description: string;
+    noStaffAccounts: string;
+    pendingBadge: string;
+    activeToggle: string;
+    save: string;
+    saved: string;
+    grantHint: string;
+    pagesLabel: string;
+    departmentsLabel: string;
+    allDepartmentsHint: string;
+    keys: {
+      employees: string;
+      departments: string;
+      shifts: string;
+      attendance: string;
+      leaves: string;
+      overtime: string;
+      deductions: string;
+      payroll: string;
+      reports: string;
+      workforce_cost: string;
+      audit_log: string;
+      settings: string;
+    };
+  };
+  changeRequests: {
+    title: string;
+    description: string;
+    submitted: string;
+    noRequests: string;
+    pendingTab: string;
+    approvedTab: string;
+    rejectedTab: string;
+    colRequestedBy: string;
+    colModule: string;
+    colAction: string;
+    colSummary: string;
+    colDate: string;
+    colReviewedBy: string;
+    approve: string;
+    reject: string;
+    approvedMessage: string;
+    rejectedMessage: string;
+    rejectReasonLabel: string;
+    rejectReasonPlaceholder: string;
+    notFound: string;
+    alreadyReviewed: string;
+    applyFailed: string;
   };
   documents: {
     title: string;
@@ -653,16 +715,25 @@ export interface Dictionary {
     editEmployee: string;
     deleteEmployee: string;
     addDepartment: string;
+    editDepartment: string;
+    deleteDepartment: string;
+    addShift: string;
+    editShift: string;
+    simulatePunch: string;
     correctAttendance: string;
     approveLeave: string;
     rejectLeave: string;
     approveOvertime: string;
     rejectOvertime: string;
     addDeduction: string;
+    deleteDeduction: string;
+    addAllowance: string;
+    deleteAllowance: string;
     calculatePayroll: string;
     approvePayroll: string;
     closePayrollPeriod: string;
     openPayrollPeriod: string;
+    editCompanySettings: string;
     editAttendanceSettings: string;
     editPayrollSettings: string;
     system: string;

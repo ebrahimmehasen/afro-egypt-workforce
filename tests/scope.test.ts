@@ -28,20 +28,32 @@ const user = (over: Partial<User>): User => ({
 });
 
 describe("viewerScope", () => {
-  it("admin and hr see the whole company", () => {
-    for (const role of ["admin", "hr"] as const) {
+  it("admin sees the whole company", () => {
+    const scope = viewerScope(user({ role: "admin" }), roster);
+    expect(scope.all).toBe(true);
+    expect(employeesInScope(scope, roster)).toHaveLength(4);
+  });
+
+  it("hr/supervisor with no departmentIds is company-wide (the free-list default)", () => {
+    for (const role of ["hr", "supervisor"] as const) {
       const scope = viewerScope(user({ role }), roster);
       expect(scope.all).toBe(true);
       expect(employeesInScope(scope, roster)).toHaveLength(4);
     }
   });
 
-  it("a supervisor sees only their department", () => {
-    const scope = viewerScope(user({ role: "supervisor", departmentId: "D1" }), roster);
+  it("hr/supervisor scoped to specific departmentIds sees only those departments", () => {
+    const scope = viewerScope(user({ role: "supervisor", departmentIds: ["D1"] }), roster);
     expect(scope.all).toBe(false);
     expect(employeesInScope(scope, roster).map((e) => e.id)).toEqual(["E1", "E2"]);
     expect(inScope(scope, "E1")).toBe(true);
     expect(inScope(scope, "E3")).toBe(false);
+  });
+
+  it("an اداري can be scoped to several departments at once", () => {
+    const scope = viewerScope(user({ role: "hr", departmentIds: ["D1", "D2"] }), roster);
+    expect(scope.all).toBe(false);
+    expect(employeesInScope(scope, roster).map((e) => e.id)).toEqual(["E1", "E2", "E3", "E4"]);
   });
 
   it("an employee sees only themselves", () => {
@@ -52,8 +64,8 @@ describe("viewerScope", () => {
     ]);
   });
 
-  it("a role with no linked department / employee sees nothing", () => {
-    const scope = viewerScope(user({ role: "supervisor" }), roster);
+  it("an employee with no linked employee record sees nothing", () => {
+    const scope = viewerScope(user({ role: "employee" }), roster);
     expect(employeesInScope(scope, roster)).toHaveLength(0);
     expect(inScope(scope, "E1")).toBe(false);
   });

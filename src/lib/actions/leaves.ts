@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { auditActor, recordChange } from "@/lib/audit";
+import { recordChangeAs } from "@/lib/audit";
+import { getSession } from "@/lib/auth";
+import { gate } from "@/lib/change-requests";
 import { nextId } from "@/lib/id";
 import { recalculateRange } from "@/lib/attendance-service";
 import { ActionState } from "@/hooks/use-action-feedback";
@@ -39,13 +41,35 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
   return { success: true, message: t.leaves.submitted };
 }
 
-export async function decideLeave(id: string, decision: "approved" | "rejected") {
+type LeaveDecisionPayload = { id: string; decision: "approved" | "rejected" };
+
+export async function decideLeave(id: string, decision: "approved" | "rejected"): Promise<ActionState> {
   const t = await getT();
-  const actor = await auditActor();
+  const leave = await prisma.leave.findUnique({ where: { id } });
+  if (!leave) return { error: t.validation.requestNotFound };
+  const actor = await getSession();
+
+  return gate(
+    {
+      actionKey: "leaves.decide",
+      module: t.nav.leaves,
+      actionLabel: decision === "approved" ? t.auditActions.approveLeave : t.auditActions.rejectLeave,
+      summary: `${leaveTypeLabel(leave.type, t)} — ${leave.employeeId} — ${decision === "approved" ? t.statuses.approved : t.statuses.rejected}`,
+      targetId: id,
+    },
+    { id, decision } satisfies LeaveDecisionPayload,
+    () => applyDecideLeave({ id, decision }, actor?.name ?? t.auditActions.system),
+  );
+}
+
+export async function applyDecideLeave(payload: LeaveDecisionPayload, actorName: string): Promise<ActionState> {
+  const t = await getT();
+  const { id, decision } = payload;
   const leave = await prisma.leave.findUnique({ where: { id } });
   if (!leave) return { error: t.validation.requestNotFound };
 
-  await recordChange(
+  await recordChangeAs(
+    actorName,
     {
       module: t.nav.leaves,
       action: decision === "approved" ? t.auditActions.approveLeave : t.auditActions.rejectLeave,
@@ -53,7 +77,7 @@ export async function decideLeave(id: string, decision: "approved" | "rejected")
       newValue: decision === "approved" ? t.statuses.approved : t.statuses.rejected,
       reason: `${leaveTypeLabel(leave.type, t)} — ${leave.employeeId}`,
     },
-    (tx) => tx.leave.update({ where: { id }, data: { status: decision, approvedBy: actor } }),
+    (tx) => tx.leave.update({ where: { id }, data: { status: decision, approvedBy: actorName } }),
   );
 
   if (decision === "approved") {

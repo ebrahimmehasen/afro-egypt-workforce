@@ -8,6 +8,7 @@ import { User } from "@/lib/types";
 import { COMPANY } from "@/lib/constants";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { Topbar } from "@/components/layout/topbar";
+import { LiveRefresh } from "@/components/shared/live-refresh";
 import { cn } from "@/lib/utils";
 
 export function AppShell({
@@ -23,6 +24,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-muted/30">
+      <LiveRefresh />
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-e border-border bg-background lg:flex">
         <SidebarBrand />

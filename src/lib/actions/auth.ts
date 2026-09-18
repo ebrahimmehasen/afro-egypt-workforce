@@ -40,6 +40,8 @@ export async function loginAction(_prevState: LoginState, formData: FormData): P
     role: user.role,
     employeeId: user.employeeId ?? undefined,
     departmentId: user.departmentId ?? undefined,
+    departmentIds: Array.isArray(user.departmentIds) ? (user.departmentIds as string[]) : [],
+    permissions: Array.isArray(user.permissions) ? (user.permissions as string[]) : [],
   });
   redirect("/dashboard");
 }

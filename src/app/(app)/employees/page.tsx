@@ -2,17 +2,18 @@ import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { employeesInScope, viewerScope } from "@/lib/scope";
 import { missingDocumentTypes } from "@/lib/documents";
-import { canCorrectAttendance } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { getT, format } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmployeesTable } from "@/components/employees/employees-table";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
+import { StaffAccountFormDialog } from "@/components/employees/staff-account-form-dialog";
 
 export default async function EmployeesPage() {
   const db = await getDb();
   const user = await requireAccess("/employees");
   const t = await getT();
-  const canEdit = canCorrectAttendance(user.role); // admin/hr can manage employee records
+  const canEdit = hasPermission(user, "employees");
 
   const employees = employeesInScope(viewerScope(user, db.employees), db.employees);
 
@@ -25,7 +26,14 @@ export default async function EmployeesPage() {
       <PageHeader
         title={t.employees.title}
         description={format(t.employees.totalCount, { count: employees.length })}
-        actions={canEdit ? <EmployeeFormDialog departments={db.departments} shifts={db.shifts} /> : null}
+        actions={
+          canEdit ? (
+            <div className="flex items-center gap-2">
+              <StaffAccountFormDialog />
+              <EmployeeFormDialog departments={db.departments} shifts={db.shifts} />
+            </div>
+          ) : null
+        }
       />
       <EmployeesTable
         employees={employees}

@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
-import { canManageSettings } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
 import { translateLabel } from "@/lib/i18n/data-labels";
@@ -15,7 +15,7 @@ export default async function ShiftsPage() {
   const user = await requireAccess("/shifts");
   const t = await getT();
   const locale = await getLocale();
-  const canEdit = canManageSettings(user.role) || user.role === "hr";
+  const canEdit = hasPermission(user, "shifts");
 
   return (
     <div className="flex flex-col gap-6">

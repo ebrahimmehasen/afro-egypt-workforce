@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { auditActor, recordChange } from "@/lib/audit";
+import { recordChangeAs } from "@/lib/audit";
+import { getSession } from "@/lib/auth";
+import { gate } from "@/lib/change-requests";
 import { nextId } from "@/lib/id";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
@@ -36,13 +38,35 @@ export async function createOvertime(_prev: ActionState, formData: FormData): Pr
   return { success: true, message: t.overtime.submitted };
 }
 
-export async function decideOvertime(id: string, decision: "approved" | "rejected") {
+type OvertimeDecisionPayload = { id: string; decision: "approved" | "rejected" };
+
+export async function decideOvertime(id: string, decision: "approved" | "rejected"): Promise<ActionState> {
   const t = await getT();
-  const actor = await auditActor();
+  const overtime = await prisma.overtime.findUnique({ where: { id } });
+  if (!overtime) return { error: t.validation.requestNotFound };
+  const actor = await getSession();
+
+  return gate(
+    {
+      actionKey: "overtime.decide",
+      module: t.nav.overtime,
+      actionLabel: decision === "approved" ? t.auditActions.approveOvertime : t.auditActions.rejectOvertime,
+      summary: `${overtime.employeeId} — ${overtime.hours} ${t.common.hours} — ${decision === "approved" ? t.statuses.approved : t.statuses.rejected}`,
+      targetId: id,
+    },
+    { id, decision } satisfies OvertimeDecisionPayload,
+    () => applyDecideOvertime({ id, decision }, actor?.name ?? t.auditActions.system),
+  );
+}
+
+export async function applyDecideOvertime(payload: OvertimeDecisionPayload, actorName: string): Promise<ActionState> {
+  const t = await getT();
+  const { id, decision } = payload;
   const overtime = await prisma.overtime.findUnique({ where: { id } });
   if (!overtime) return { error: t.validation.requestNotFound };
 
-  await recordChange(
+  await recordChangeAs(
+    actorName,
     {
       module: t.nav.overtime,
       action: decision === "approved" ? t.auditActions.approveOvertime : t.auditActions.rejectOvertime,
@@ -50,7 +74,7 @@ export async function decideOvertime(id: string, decision: "approved" | "rejecte
       newValue: decision === "approved" ? t.statuses.approved : t.statuses.rejected,
       reason: `${overtime.employeeId} — ${overtime.hours} ${t.common.hours}`,
     },
-    (tx) => tx.overtime.update({ where: { id }, data: { status: decision, approvedBy: actor } }),
+    (tx) => tx.overtime.update({ where: { id }, data: { status: decision, approvedBy: actorName } }),
   );
 
   revalidatePath("/overtime");
