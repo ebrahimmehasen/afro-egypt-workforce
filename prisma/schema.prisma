@@ -108,14 +108,26 @@ enum PayrollPeriodStatus {
   closed
 }
 
+/// Document slots on the employee service file. The first nine mirror the
+/// company's own HR-F-04 "فهرس ملف الخدمة" checklist and are what
+/// REQUIRED_EMPLOYEE_DOCUMENT_TYPES (src/lib/types.ts) counts as missing;
+/// the rest are optional extras that can be uploaded but are never demanded.
 enum EmployeeDocumentType {
-  national_id_photo // صورة البطاقة
+  national_id_photo // بطاقة الرقم القومي
   birth_certificate // شهادة الميلاد
-  qualification_certificate // شهادة المؤهل
-  criminal_record // الفيش والتشبيه
-  military_certificate // شهادة الموقف من التجنيد
+  criminal_record // صحيفة الحالة الجنائية (الفيش الجنائي)
+  health_certificate // شهادة صحية / كشف طبي
+  work_contract // عقد العمل / إقرار استلام عمل
+  social_insurance_form // استمارة التأمينات الاجتماعية
+  job_application_form // استمارة طلب توظيف / التحاق بوظيفة
+  qualification_certificate // المؤهل الدراسي
+  personal_photo // صورة شخصية
+  military_certificate // شهادة الموقف من التجنيد (ذكور فقط)
   work_experience_certificate // كعب عمل
   cv // السيرة الذاتية
+  driving_license // رخصة القيادة
+  company_policy // لائحة داخلية / سياسات الشركة
+  other // أخرى
 }
 
 
@@ -423,7 +435,9 @@ model PayrollRecord {
 // HR documents
 // ---------------------------------------------------------------------------
 
-/// One uploaded file per document type per employee (a re-upload replaces it).
+/// Scanned files on an employee's service file. A type can hold several files —
+/// an ID card is a front and a back, a qualification can run to several pages —
+/// so uploads append rather than replace, and deletes address a single row by id.
 model EmployeeDocument {
   id         String               @id @default(cuid())
   employeeId String
@@ -439,8 +453,8 @@ model EmployeeDocument {
   uploadedBy String? // display name of the user who uploaded it
   uploadedAt DateTime             @default(now())
 
-  @@unique([employeeId, type])
   @@index([employeeId])
+  @@index([employeeId, type])
 }
 
 /// A signed acknowledgment scan. Three fixed slots (see STANDARD_ACKNOWLEDGMENTS

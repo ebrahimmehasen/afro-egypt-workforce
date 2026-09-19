@@ -21,6 +21,9 @@ export const DEPARTMENT_CODES: Record<string, string> = {
   "التنجيد": "UPH",
   "التخطيط": "PLAN",
   "النقل": "TRN",
+  // Holding pen for employees imported from the paper service files before HR
+  // has assigned them a real department — the TBD- prefix makes them obvious.
+  "غير محدد": "TBD",
 };
 
 /** Falls back to a sanitized prefix of the department name for anything not in the table above. */

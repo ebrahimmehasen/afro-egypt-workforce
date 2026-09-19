@@ -1,14 +1,14 @@
-import { EMPLOYEE_DOCUMENT_TYPES, EmployeeDocument, EmployeeDocumentType } from "@/lib/types";
+import { REQUIRED_EMPLOYEE_DOCUMENT_TYPES, EmployeeDocument, EmployeeDocumentType } from "@/lib/types";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 
 // Client-safe (imported by documents-panel.tsx / acknowledgments-panel.tsx) —
 // no Node built-ins here. Server-only storage paths live in
 // @/lib/document-storage instead.
 
-/** Document types this employee has not uploaded yet. */
+/** Required document slots (HR-F-04) this employee has nothing filed under yet. */
 export function missingDocumentTypes(docs: EmployeeDocument[]): EmployeeDocumentType[] {
   const present = new Set(docs.map((d) => d.type));
-  return EMPLOYEE_DOCUMENT_TYPES.filter((t) => !present.has(t));
+  return REQUIRED_EMPLOYEE_DOCUMENT_TYPES.filter((t) => !present.has(t));
 }
 
 export function documentsComplete(docs: EmployeeDocument[]): boolean {

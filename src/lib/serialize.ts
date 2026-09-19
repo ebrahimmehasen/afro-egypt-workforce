@@ -87,7 +87,7 @@ export function toEmployeeDocument(d: PEmployeeDocument): EmployeeDocument {
     employeeId: d.employeeId,
     type: d.type,
     // see toEmployeeAcknowledgment — d.fileUrl is a private storage key, not a URL.
-    fileUrl: `/api/employees/${d.employeeId}/documents?type=${encodeURIComponent(d.type)}`,
+    fileUrl: `/api/employees/${d.employeeId}/documents?docId=${encodeURIComponent(d.id)}`,
     fileName: d.fileName ?? undefined,
     mimeType: d.mimeType ?? undefined,
     uploadedBy: d.uploadedBy ?? undefined,

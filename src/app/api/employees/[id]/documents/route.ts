@@ -19,7 +19,7 @@ const EXT_BY_MIME: Record<string, string> = {
 };
 
 /**
- * GET /api/employees/:id/documents?type=... — streams the file back.
+ * GET /api/employees/:id/documents?docId=... — streams the file back.
  * Scope-checked (same rule as the /employees/[id] page): admin/hr see anyone,
  * a supervisor only their department, an employee only themselves. The
  * physical path is read from the database row, never from the request.
@@ -33,14 +33,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  const type = req.nextUrl.searchParams.get("type") as EmployeeDocumentType | null;
-  if (!type || !EMPLOYEE_DOCUMENT_TYPES.includes(type)) {
-    return NextResponse.json({ error: "invalid document type" }, { status: 400 });
-  }
+  const docId = req.nextUrl.searchParams.get("docId");
+  if (!docId) return NextResponse.json({ error: "missing docId" }, { status: 400 });
 
-  const doc = await prisma.employeeDocument.findUnique({
-    where: { employeeId_type: { employeeId: id, type } },
-  });
+  // Scoped to this employee so a valid id from another employee's file can't be read.
+  const doc = await prisma.employeeDocument.findFirst({ where: { id: docId, employeeId: id } });
   if (!doc) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   try {
@@ -94,31 +91,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   await writeFile(absPath, Buffer.from(await file.arrayBuffer()));
 
   try {
-    const existing = await prisma.employeeDocument.findUnique({
-      where: { employeeId_type: { employeeId: id, type } },
-    });
-
     await recordChangeAs(
       user.name,
       {
         module: t.nav.employees,
         action: t.documents.auditUpload,
-        oldValue: existing?.fileName ?? "-",
         newValue: `${t.documents.types[type]} — ${file.name}`,
-        reason: `${employee.name} (${id})`,
+        reason: `${employee.name} (${employee.employeeNumber})`,
       },
       (tx) =>
-        tx.employeeDocument.upsert({
-          where: { employeeId_type: { employeeId: id, type } },
-          create: { employeeId: id, type, fileUrl: storageKey, fileName: file.name, mimeType: file.type, uploadedBy: user.name },
-          update: { fileUrl: storageKey, fileName: file.name, mimeType: file.type, uploadedBy: user.name, uploadedAt: new Date() },
+        tx.employeeDocument.create({
+          data: { employeeId: id, type, fileUrl: storageKey, fileName: file.name, mimeType: file.type, uploadedBy: user.name },
         }),
     );
-
-    // replaced an older file — remove it (best effort)
-    if (existing && existing.fileUrl !== storageKey) {
-      await unlink(path.join(DOCUMENT_STORAGE_ROOT, existing.fileUrl)).catch(() => {});
-    }
   } catch {
     await unlink(absPath).catch(() => {});
     return NextResponse.json({ error: "save failed" }, { status: 500 });
@@ -127,7 +112,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json({ ok: true, type });
 }
 
-/** DELETE /api/employees/:id/documents?type=... */
+/** DELETE /api/employees/:id/documents?docId=... */
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSession();
   if (!user || !canManageEmployeeFiles(user.role)) {
@@ -135,14 +120,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
   const { id } = await params;
   const t = await getT();
-  const type = String(req.nextUrl.searchParams.get("type") ?? "") as EmployeeDocumentType;
-  if (!EMPLOYEE_DOCUMENT_TYPES.includes(type)) {
-    return NextResponse.json({ error: "invalid document type" }, { status: 400 });
-  }
+  const docId = req.nextUrl.searchParams.get("docId");
+  if (!docId) return NextResponse.json({ error: "missing docId" }, { status: 400 });
 
-  const doc = await prisma.employeeDocument.findUnique({
-    where: { employeeId_type: { employeeId: id, type } },
-  });
+  const employee = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
+  if (!employee) return NextResponse.json({ error: "employee not found" }, { status: 404 });
+
+  const doc = await prisma.employeeDocument.findFirst({ where: { id: docId, employeeId: id } });
   if (!doc) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   await recordChangeAs(
@@ -150,8 +134,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     {
       module: t.nav.employees,
       action: t.documents.auditDelete,
-      oldValue: `${t.documents.types[type]} — ${doc.fileName ?? ""}`,
-      reason: id,
+      oldValue: `${t.documents.types[doc.type]} — ${doc.fileName ?? ""}`,
+      reason: `${employee.name} (${employee.employeeNumber})`,
     },
     (tx) => tx.employeeDocument.delete({ where: { id: doc.id } }),
   );

@@ -205,20 +205,49 @@ export interface PayrollRecord {
 export type EmployeeDocumentType =
   | "national_id_photo"
   | "birth_certificate"
-  | "qualification_certificate"
   | "criminal_record"
+  | "health_certificate"
+  | "work_contract"
+  | "social_insurance_form"
+  | "job_application_form"
+  | "qualification_certificate"
+  | "personal_photo"
   | "military_certificate"
   | "work_experience_certificate"
-  | "cv";
+  | "cv"
+  | "driving_license"
+  | "company_policy"
+  | "other";
 
-export const EMPLOYEE_DOCUMENT_TYPES: EmployeeDocumentType[] = [
+/**
+ * The nine slots the company's own HR-F-04 service-file checklist demands.
+ * These are the ones an employee is reported as *missing*.
+ */
+export const REQUIRED_EMPLOYEE_DOCUMENT_TYPES: EmployeeDocumentType[] = [
   "national_id_photo",
   "birth_certificate",
-  "qualification_certificate",
   "criminal_record",
+  "health_certificate",
+  "work_contract",
+  "social_insurance_form",
+  "job_application_form",
+  "qualification_certificate",
+  "personal_photo",
+];
+
+/** Uploadable but never demanded — military status is male-only, the rest are extras. */
+export const OPTIONAL_EMPLOYEE_DOCUMENT_TYPES: EmployeeDocumentType[] = [
   "military_certificate",
   "work_experience_certificate",
   "cv",
+  "driving_license",
+  "company_policy",
+  "other",
+];
+
+export const EMPLOYEE_DOCUMENT_TYPES: EmployeeDocumentType[] = [
+  ...REQUIRED_EMPLOYEE_DOCUMENT_TYPES,
+  ...OPTIONAL_EMPLOYEE_DOCUMENT_TYPES,
 ];
 
 export interface EmployeeDocument {

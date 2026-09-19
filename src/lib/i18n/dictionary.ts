@@ -1,3 +1,5 @@
+import type { EmployeeDocumentType } from "@/lib/types";
+
 export interface Dictionary {
   app: {
     companyName: string;
@@ -539,15 +541,9 @@ export interface Dictionary {
     deleted: string;
     auditUpload: string;
     auditDelete: string;
-    types: {
-      national_id_photo: string;
-      birth_certificate: string;
-      qualification_certificate: string;
-      criminal_record: string;
-      military_certificate: string;
-      work_experience_certificate: string;
-      cv: string;
-    };
+    requiredSection: string;
+    optionalSection: string;
+    types: Record<EmployeeDocumentType, string>;
   };
   acknowledgments: {
     title: string;
