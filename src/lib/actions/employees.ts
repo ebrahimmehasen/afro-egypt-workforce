@@ -9,6 +9,7 @@ import { gate } from "@/lib/change-requests";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
 import { generateEmployeeNumber } from "@/lib/employee-number";
+import { invalidFieldsError } from "@/lib/validation";
 
 const employeeSchema = z
   .object({
@@ -34,7 +35,63 @@ const employeeSchema = z
     message: "salary amount required",
   });
 
-type EmployeePayload = z.infer<typeof employeeSchema> & { id: string };
+// The personal fields are nullable in the DB (older rows have none), and an
+// admin's edit may legitimately clear them, so the payload allows null there.
+type EmployeePayload = Omit<z.infer<typeof employeeSchema>, "phone" | "address" | "qualification" | "militaryStatus" | "nationalId"> & {
+  id: string;
+  phone: string | null;
+  address: string | null;
+  qualification: string | null;
+  militaryStatus: z.infer<typeof employeeSchema>["militaryStatus"] | null;
+  nationalId: string | null;
+};
+
+/** The schema reports the salary rule on `salaryType`; the input to fix is the amount field. */
+const salaryField = (raw: Record<string, unknown>) => (field: string) =>
+  field === "salaryType" ? (raw.salaryType === "daily" ? "dailyRate" : "basicSalary") : field;
+
+const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+const numOr = (v: unknown, fallback: number) => {
+  const raw = str(v);
+  const n = Number(raw);
+  return raw === "" || Number.isNaN(n) ? fallback : n;
+};
+const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T =>
+  allowed.includes(str(v) as T) ? (str(v) as T) : fallback;
+
+type ExistingEmployee = NonNullable<Awaited<ReturnType<typeof prisma.employee.findFirst>>>;
+
+/**
+ * An admin's edit is taken as typed: no length / format / "required" rules on
+ * the personal data (national ID, phone, address, qualification…), so they can
+ * fix or clear anything. Only what the database itself needs to stay
+ * consistent is enforced — blank values for the columns that can't be empty
+ * keep their current value, and a national ID still can't duplicate another
+ * employee's (checked by the caller).
+ */
+function lenientEmployeePayload(id: string, raw: Record<string, unknown>, before: ExistingEmployee): EmployeePayload {
+  const salaryType = oneOf(raw.salaryType, ["monthly", "daily"] as const, before.salaryType);
+  const hire = str(raw.hireDate);
+  return {
+    id,
+    name: str(raw.name) || before.name,
+    departmentId: str(raw.departmentId) || before.departmentId,
+    jobTitle: str(raw.jobTitle) || before.jobTitle,
+    hireDate: /^\d{4}-\d{2}-\d{2}$/.test(hire) ? hire : before.hireDate.toISOString().slice(0, 10),
+    shiftId: str(raw.shiftId) || before.shiftId,
+    salaryType,
+    basicSalary: numOr(raw.basicSalary, before.basicSalary),
+    dailyRate: numOr(raw.dailyRate, before.dailyRate ?? 0) || undefined,
+    dailyWorkingHours: numOr(raw.dailyWorkingHours, before.dailyWorkingHours),
+    allowances: numOr(raw.allowances, before.allowancesTotal),
+    status: oneOf(raw.status, ["active", "on_leave", "terminated"] as const, before.status),
+    phone: str(raw.phone) || null,
+    address: str(raw.address) || null,
+    qualification: str(raw.qualification) || null,
+    militaryStatus: oneOf(raw.militaryStatus, ["completed", "exempted", "postponed", "not_applicable"] as const, before.militaryStatus ?? "not_applicable"),
+    nationalId: str(raw.nationalId) || null,
+  };
+}
 
 async function nextEmployeeId() {
   const rows = await prisma.employee.findMany({ select: { id: true } });
@@ -47,12 +104,13 @@ async function nextEmployeeId() {
 
 export async function createEmployee(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const t = await getT();
-  const parsed = employeeSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: t.validation.invalidData };
+  const raw = Object.fromEntries(formData);
+  const parsed = employeeSchema.safeParse(raw);
+  if (!parsed.success) return invalidFieldsError(t, parsed.error.issues, salaryField(raw));
   const id = await nextEmployeeId();
 
   if (await prisma.employee.findUnique({ where: { nationalId: parsed.data.nationalId } })) {
-    return { error: t.validation.nationalIdTaken };
+    return { error: t.validation.nationalIdTaken, fields: ["nationalId"] };
   }
 
   const actor = await getSession();
@@ -72,8 +130,8 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
 
 export async function applyCreateEmployee(payload: EmployeePayload, actorName: string): Promise<ActionState> {
   const t = await getT();
-  if (await prisma.employee.findUnique({ where: { nationalId: payload.nationalId } })) {
-    return { error: t.validation.nationalIdTaken };
+  if (payload.nationalId && (await prisma.employee.findUnique({ where: { nationalId: payload.nationalId } }))) {
+    return { error: t.validation.nationalIdTaken, fields: ["nationalId"] };
   }
   const { id, allowances, hireDate, dailyRate, salaryType, nationalId, ...rest } = payload;
 
@@ -107,17 +165,32 @@ export async function applyCreateEmployee(payload: EmployeePayload, actorName: s
 export async function updateEmployee(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const t = await getT();
   const id = String(formData.get("id") ?? "");
-  const parsed = employeeSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: t.validation.invalidData };
+  const actor = await getSession();
+  const raw = Object.fromEntries(formData);
 
   const before = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
   if (!before) return { error: t.validation.employeeNotFound };
 
-  const nidOwner = await prisma.employee.findUnique({ where: { nationalId: parsed.data.nationalId } });
-  if (nidOwner && nidOwner.id !== id) return { error: t.validation.nationalIdTaken };
+  let payload: EmployeePayload;
+  if (actor?.role === "admin") {
+    payload = lenientEmployeePayload(id, raw, before);
+    // Structural checks only: the department / shift must exist or the save would crash.
+    const [department, shift] = await Promise.all([
+      prisma.department.findUnique({ where: { id: payload.departmentId } }),
+      prisma.shift.findUnique({ where: { id: payload.shiftId } }),
+    ]);
+    const missing = [!department && "departmentId", !shift && "shiftId"].filter(Boolean) as string[];
+    if (missing.length) return invalidFieldsError(t, missing.map((f) => ({ path: [f] }) as never));
+  } else {
+    const parsed = employeeSchema.safeParse(raw);
+    if (!parsed.success) return invalidFieldsError(t, parsed.error.issues, salaryField(raw));
+    payload = { id, ...parsed.data };
+  }
 
-  const actor = await getSession();
-  const payload: EmployeePayload = { id, ...parsed.data };
+  if (payload.nationalId) {
+    const nidOwner = await prisma.employee.findUnique({ where: { nationalId: payload.nationalId } });
+    if (nidOwner && nidOwner.id !== id) return { error: t.validation.nationalIdTaken, fields: ["nationalId"] };
+  }
 
   return gate(
     {
@@ -138,8 +211,10 @@ export async function applyUpdateEmployee(payload: EmployeePayload, actorName: s
 
   const before = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
   if (!before) return { error: t.validation.employeeNotFound };
-  const nidOwner = await prisma.employee.findUnique({ where: { nationalId } });
-  if (nidOwner && nidOwner.id !== id) return { error: t.validation.nationalIdTaken };
+  if (nationalId) {
+    const nidOwner = await prisma.employee.findUnique({ where: { nationalId } });
+    if (nidOwner && nidOwner.id !== id) return { error: t.validation.nationalIdTaken, fields: ["nationalId"] };
+  }
 
   await recordChangeAs(
     actorName,

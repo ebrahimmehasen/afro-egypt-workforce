@@ -4,7 +4,7 @@ import { useFormStatus } from "react-dom";
 import { useActionState, useState } from "react";
 import { Plus, Pencil } from "lucide-react";
 import { createUser, updateUser } from "@/lib/actions/users";
-import { useActionFeedback } from "@/hooks/use-action-feedback";
+import { useActionFeedback, keepFilledFields } from "@/hooks/use-action-feedback";
 import { useT } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,7 +78,7 @@ export function UserFormDialog({
         <DialogHeader>
           <DialogTitle>{user ? t.users.editUser : t.users.addUser}</DialogTitle>
         </DialogHeader>
-        <form action={formAction} className="flex flex-col gap-4">
+        <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           {user && <input type="hidden" name="id" value={user.id} />}
 
           <div className="flex flex-col gap-1.5">

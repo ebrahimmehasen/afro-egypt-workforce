@@ -4,7 +4,7 @@ import { useFormStatus } from "react-dom";
 import { useActionState, useState } from "react";
 import { Plus, Pencil } from "lucide-react";
 import { createDepartment, updateDepartment } from "@/lib/actions/departments";
-import { useActionFeedback } from "@/hooks/use-action-feedback";
+import { useActionFeedback, keepFilledFields } from "@/hooks/use-action-feedback";
 import { useT } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +40,7 @@ export function DepartmentFormDialog({ department }: { department?: Department }
         <DialogHeader>
           <DialogTitle>{department ? t.departments.editDepartment : t.departments.addDepartment}</DialogTitle>
         </DialogHeader>
-        <form action={formAction} className="flex flex-col gap-4">
+        <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           {department && <input type="hidden" name="id" value={department.id} />}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="name">{t.departments.formName}</Label>

@@ -43,12 +43,14 @@ export function EmployeesTable({
   departments,
   shifts,
   canEdit,
+  isAdmin = false,
   incompleteDocIds = [],
 }: {
   employees: Employee[];
   departments: Department[];
   shifts: Shift[];
   canEdit: boolean;
+  isAdmin?: boolean;
   incompleteDocIds?: string[];
 }) {
   const t = useT();
@@ -173,7 +175,7 @@ export function EmployeesTable({
                       </Link>
                       {canEdit && (
                         <>
-                          <EmployeeFormDialog departments={departments} shifts={shifts} employee={e} />
+                          <EmployeeFormDialog departments={departments} shifts={shifts} employee={e} lenient={isAdmin} />
                           <DeleteEmployeeButton id={e.id} name={e.name} />
                         </>
                       )}

@@ -37,7 +37,7 @@ export async function gate(
 ): Promise<ActionState> {
   const t = await getT();
   const actor = await getSession();
-  if (!actor) return { error: t.validation.invalidData };
+  if (!actor) return { error: t.validation.sessionExpired };
 
   if (actor.role === "admin") return apply();
 

@@ -32,6 +32,7 @@ export default async function EmployeesPage() {
         departments={db.departments}
         shifts={db.shifts}
         canEdit={canEdit}
+        isAdmin={user.role === "admin"}
         incompleteDocIds={incompleteDocIds}
       />
     </div>

@@ -146,6 +146,7 @@ export interface Dictionary {
     hireDate: string;
   };
   employees: {
+    adminNoValidation: string;
     title: string;
     totalCount: string;
     tenureAll: string;
@@ -706,6 +707,9 @@ export interface Dictionary {
   };
   validation: {
     invalidData: string;
+    invalidFields: string;
+    sessionExpired: string;
+    fieldProblems: Record<string, string>;
     notAllowed: string;
     notFound: string;
     selectEmployee: string;

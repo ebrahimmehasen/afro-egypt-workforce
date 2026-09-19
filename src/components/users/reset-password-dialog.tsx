@@ -4,7 +4,7 @@ import { useFormStatus } from "react-dom";
 import { useActionState, useState } from "react";
 import { KeyRound } from "lucide-react";
 import { resetUserPassword } from "@/lib/actions/users";
-import { useActionFeedback } from "@/hooks/use-action-feedback";
+import { useActionFeedback, keepFilledFields } from "@/hooks/use-action-feedback";
 import { useT } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +36,7 @@ export function ResetPasswordDialog({ userId, userName }: { userId: string; user
         <DialogHeader>
           <DialogTitle>{t.users.resetPassword} — {userName}</DialogTitle>
         </DialogHeader>
-        <form action={formAction} className="flex flex-col gap-4">
+        <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           <input type="hidden" name="id" value={userId} />
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="rp-pw">{t.users.newPassword}</Label>

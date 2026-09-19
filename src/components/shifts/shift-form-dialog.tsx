@@ -4,7 +4,7 @@ import { useFormStatus } from "react-dom";
 import { useActionState, useState } from "react";
 import { Plus, Pencil } from "lucide-react";
 import { createShift, updateShift } from "@/lib/actions/shifts";
-import { useActionFeedback } from "@/hooks/use-action-feedback";
+import { useActionFeedback, keepFilledFields } from "@/hooks/use-action-feedback";
 import { useT } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +42,7 @@ export function ShiftFormDialog({ shift }: { shift?: Shift }) {
         <DialogHeader>
           <DialogTitle>{shift ? t.shifts.editShift : t.shifts.addShift}</DialogTitle>
         </DialogHeader>
-        <form action={formAction} className="flex flex-col gap-4">
+        <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           {shift && <input type="hidden" name="id" value={shift.id} />}
           <input type="hidden" name="workDays" value="0,1,2,3,4,5" />
           <div className="flex flex-col gap-1.5">

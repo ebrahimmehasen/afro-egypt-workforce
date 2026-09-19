@@ -10,6 +10,7 @@ import { getSession } from "@/lib/auth";
 import { canManageUsers, isStaffRole } from "@/lib/permissions";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
+import { invalidFieldsError } from "@/lib/validation";
 
 async function guard() {
   const user = await getSession();
@@ -44,7 +45,7 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
   if (!actor) return { error: t.validation.invalidData };
 
   const parsed = createSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: t.validation.invalidData };
+  if (!parsed.success) return invalidFieldsError(t, parsed.error.issues);
   const { name, email, password, role } = parsed.data;
   const employeeId = clean(parsed.data.employeeId);
   const jobTitle = parsed.data.jobTitle || null;
@@ -102,7 +103,7 @@ export async function updateUser(_prev: ActionState, formData: FormData): Promis
   if (!actor) return { error: t.validation.invalidData };
 
   const parsed = updateSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: t.validation.invalidData };
+  if (!parsed.success) return invalidFieldsError(t, parsed.error.issues);
   const { id, name, role, active, employeeId } = parsed.data;
 
   const before = await prisma.user.findUnique({ where: { id } });

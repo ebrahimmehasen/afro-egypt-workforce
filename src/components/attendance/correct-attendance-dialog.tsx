@@ -4,7 +4,7 @@ import { useFormStatus } from "react-dom";
 import { useActionState, useState } from "react";
 import { PencilLine } from "lucide-react";
 import { correctAttendance } from "@/lib/actions/attendance";
-import { useActionFeedback } from "@/hooks/use-action-feedback";
+import { useActionFeedback, keepFilledFields } from "@/hooks/use-action-feedback";
 import { useT } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +44,7 @@ export function CorrectAttendanceDialog({ record, employeeName }: { record: Dail
           <DialogTitle>{t.attendance.correctDialogTitle} {employeeName}</DialogTitle>
           <DialogDescription>{t.attendance.correctDialogDesc}</DialogDescription>
         </DialogHeader>
-        <form action={formAction} className="flex flex-col gap-4">
+        <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           <input type="hidden" name="employeeId" value={record.employeeId} />
           <input type="hidden" name="date" value={record.date} />
           <div className="grid grid-cols-2 gap-4">
