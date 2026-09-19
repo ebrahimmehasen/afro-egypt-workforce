@@ -63,7 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSession();
-  if (!user || !canManageEmployeeFiles(user.role)) {
+  if (!user || !canManageEmployeeFiles(user)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 /** DELETE /api/employees/:id/acknowledgments?key=... */
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSession();
-  if (!user || !canManageEmployeeFiles(user.role)) {
+  if (!user || !canManageEmployeeFiles(user)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const { id } = await params;

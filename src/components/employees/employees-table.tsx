@@ -7,13 +7,7 @@ import { Employee, Department, Shift } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { MultiSelectFilter } from "@/components/shared/multi-select-filter";
 import {
   Table,
   TableBody,
@@ -28,38 +22,49 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { formatEGP } from "@/lib/constants";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { useLocale, useT } from "@/components/providers/locale-provider";
+import { today } from "@/lib/today";
 
 const STATUS_VARIANT: Record<Employee["status"], "success" | "secondary" | "warning" | "destructive"> = {
   active: "success",
   on_leave: "secondary",
-  suspended: "warning",
   terminated: "destructive",
 };
+
+/** True while the employee is still inside their first 3 months (hire date + 3 months hasn't arrived yet). */
+function isNewHire(hireDate: string, todayStr: string): boolean {
+  const cutoff = new Date(`${hireDate}T00:00:00Z`);
+  if (Number.isNaN(cutoff.getTime())) return false;
+  cutoff.setUTCMonth(cutoff.getUTCMonth() + 3);
+  return todayStr < cutoff.toISOString().slice(0, 10);
+}
 
 export function EmployeesTable({
   employees,
   departments,
   shifts,
   canEdit,
+  isAdmin = false,
   incompleteDocIds = [],
 }: {
   employees: Employee[];
   departments: Department[];
   shifts: Shift[];
   canEdit: boolean;
+  isAdmin?: boolean;
   incompleteDocIds?: string[];
 }) {
   const t = useT();
   const locale = useLocale();
   const incompleteDocs = new Set(incompleteDocIds);
+  const todayStr = today();
   const [search, setSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [deptFilter, setDeptFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [tenureFilter, setTenureFilter] = useState<string[]>([]);
 
   const STATUS_LABEL: Record<Employee["status"], string> = {
     active: t.employees.statusActive,
     on_leave: t.employees.statusOnLeave,
-    suspended: t.employees.statusSuspended,
     terminated: t.employees.statusTerminated,
   };
 
@@ -72,11 +77,13 @@ export function EmployeesTable({
         !search ||
         e.name.toLowerCase().includes(search.toLowerCase()) ||
         e.employeeNumber.toLowerCase().includes(search.toLowerCase());
-      const matchesDept = deptFilter === "all" || e.departmentId === deptFilter;
-      const matchesStatus = statusFilter === "all" || e.status === statusFilter;
-      return matchesSearch && matchesDept && matchesStatus;
+      const matchesDept = deptFilter.length === 0 || deptFilter.includes(e.departmentId);
+      const matchesStatus = statusFilter.length === 0 || statusFilter.includes(e.status);
+      const matchesTenure =
+        tenureFilter.length === 0 || tenureFilter.includes(isNewHire(e.hireDate, todayStr) ? "new" : "established");
+      return matchesSearch && matchesDept && matchesStatus && matchesTenure;
     });
-  }, [employees, search, deptFilter, statusFilter]);
+  }, [employees, search, deptFilter, statusFilter, tenureFilter, todayStr]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -90,25 +97,39 @@ export function EmployeesTable({
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Select value={deptFilter} onValueChange={setDeptFilter}>
-          <SelectTrigger className="sm:w-48"><SelectValue placeholder={t.common.allDepartments} /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.common.allDepartments}</SelectItem>
-            {departments.map((d) => (
-              <SelectItem key={d.id} value={d.id}>{translateLabel(d.name, locale)}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="sm:w-44"><SelectValue placeholder={t.common.allStatuses} /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.common.allStatuses}</SelectItem>
-            <SelectItem value="active">{t.employees.statusActive}</SelectItem>
-            <SelectItem value="on_leave">{t.employees.statusOnLeave}</SelectItem>
-            <SelectItem value="suspended">{t.employees.statusSuspended}</SelectItem>
-            <SelectItem value="terminated">{t.employees.statusTerminated}</SelectItem>
-          </SelectContent>
-        </Select>
+        <MultiSelectFilter
+          className="sm:w-48"
+          placeholder={t.common.allDepartments}
+          selected={deptFilter}
+          onChange={setDeptFilter}
+          options={departments.map((d) => ({ value: d.id, label: translateLabel(d.name, locale) }))}
+        />
+        <MultiSelectFilter
+          className="sm:w-44"
+          placeholder={t.common.allStatuses}
+          selected={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: "active", label: t.employees.statusActive },
+            { value: "on_leave", label: t.employees.statusOnLeave },
+            { value: "terminated", label: t.employees.statusTerminated },
+          ]}
+        />
+        <MultiSelectFilter
+          className="sm:w-52"
+          placeholder={t.employees.tenureAll}
+          selected={tenureFilter}
+          onChange={setTenureFilter}
+          options={[
+            { value: "new", label: t.employees.tenureNew },
+            { value: "established", label: t.employees.tenureEstablished },
+          ]}
+        />
+      </div>
+
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span className="h-3 w-3 rounded-sm border border-gold-400/50 bg-gold-400/25" />
+        {t.employees.newHireLegend}
       </div>
 
       {filtered.length === 0 ? (
@@ -130,7 +151,7 @@ export function EmployeesTable({
             </TableHeader>
             <TableBody>
               {filtered.map((e) => (
-                <TableRow key={e.id}>
+                <TableRow key={e.id} className={isNewHire(e.hireDate, todayStr) ? "bg-gold-400/15 hover:bg-gold-400/25" : undefined}>
                   <TableCell dir="ltr" className="font-mono text-xs tabular-nums">{e.employeeNumber}</TableCell>
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-1.5">
@@ -154,7 +175,7 @@ export function EmployeesTable({
                       </Link>
                       {canEdit && (
                         <>
-                          <EmployeeFormDialog departments={departments} shifts={shifts} employee={e} />
+                          <EmployeeFormDialog departments={departments} shifts={shifts} employee={e} lenient={isAdmin} />
                           <DeleteEmployeeButton id={e.id} name={e.name} />
                         </>
                       )}

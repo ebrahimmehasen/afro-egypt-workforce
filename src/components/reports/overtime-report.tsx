@@ -6,9 +6,7 @@ import { formatEGP } from "@/lib/constants";
 import { requestStatusLabel } from "@/lib/i18n/labels";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { Label } from "@/components/ui/label";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { MultiSelectFilter } from "@/components/shared/multi-select-filter";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -22,11 +20,11 @@ const STATUS_OPTIONS: RequestStatus[] = ["pending", "approved", "rejected"];
 export function OvertimeReport({ records, employees }: { records: Overtime[]; employees: Employee[] }) {
   const t = useT();
   const locale = useLocale();
-  const [status, setStatus] = useState("all");
+  const [status, setStatus] = useState<string[]>([]);
   const empMap = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
 
   const rows = useMemo(
-    () => records.filter((o) => status === "all" || o.status === status).sort((a, b) => (a.date < b.date ? 1 : -1)),
+    () => records.filter((o) => status.length === 0 || status.includes(o.status)).sort((a, b) => (a.date < b.date ? 1 : -1)),
     [records, status],
   );
 
@@ -44,15 +42,13 @@ export function OvertimeReport({ records, employees }: { records: Overtime[]; em
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs">{t.reports.filterStatus}</Label>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t.common.all}</SelectItem>
-              {STATUS_OPTIONS.map((value) => (
-                <SelectItem key={value} value={value}>{requestStatusLabel(value, t)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelectFilter
+            className="w-44"
+            placeholder={t.common.all}
+            selected={status}
+            onChange={setStatus}
+            options={STATUS_OPTIONS.map((value) => ({ value, label: requestStatusLabel(value, t) }))}
+          />
         </div>
         <ExportButtons
           filename="overtime-report"

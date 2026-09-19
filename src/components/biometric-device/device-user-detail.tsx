@@ -94,7 +94,6 @@ function LinkedEmployeeSummary({
   const STATUS_LABEL: Record<Employee["status"], string> = {
     active: t.employees.statusActive,
     on_leave: t.employees.statusOnLeave,
-    suspended: t.employees.statusSuspended,
     terminated: t.employees.statusTerminated,
   };
 

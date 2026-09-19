@@ -74,7 +74,7 @@ export function AllowancesTable({
                         startTransition(async () => {
                           const res = await deleteAllowance(a.id);
                           if (res?.error) toast.error(res.error);
-                          else toast.success(t.deductions.deletedAllowance);
+                          else toast.success(res?.message ?? t.deductions.deletedAllowance);
                         })
                       }
                     >

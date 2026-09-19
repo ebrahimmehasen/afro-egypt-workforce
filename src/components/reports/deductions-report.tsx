@@ -6,9 +6,7 @@ import { formatEGP } from "@/lib/constants";
 import { deductionTypeLabel } from "@/lib/i18n/labels";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { Label } from "@/components/ui/label";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { MultiSelectFilter } from "@/components/shared/multi-select-filter";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -22,11 +20,11 @@ const TYPE_OPTIONS: DeductionType[] = ["late", "absence", "early_leave", "penalt
 export function DeductionsReport({ deductions, employees }: { deductions: Deduction[]; employees: Employee[] }) {
   const t = useT();
   const locale = useLocale();
-  const [type, setType] = useState("all");
+  const [type, setType] = useState<string[]>([]);
   const empMap = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
 
   const rows = useMemo(
-    () => deductions.filter((d) => type === "all" || d.type === type).sort((a, b) => (a.date < b.date ? 1 : -1)),
+    () => deductions.filter((d) => type.length === 0 || type.includes(d.type)).sort((a, b) => (a.date < b.date ? 1 : -1)),
     [deductions, type],
   );
 
@@ -45,15 +43,13 @@ export function DeductionsReport({ deductions, employees }: { deductions: Deduct
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs">{t.reports.filterType}</Label>
-          <Select value={type} onValueChange={setType}>
-            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t.common.all}</SelectItem>
-              {TYPE_OPTIONS.map((value) => (
-                <SelectItem key={value} value={value}>{deductionTypeLabel(value, t)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelectFilter
+            className="w-48"
+            placeholder={t.common.all}
+            selected={type}
+            onChange={setType}
+            options={TYPE_OPTIONS.map((value) => ({ value, label: deductionTypeLabel(value, t) }))}
+          />
         </div>
         <ExportButtons
           filename="deductions-report"

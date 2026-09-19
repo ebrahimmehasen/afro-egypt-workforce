@@ -483,12 +483,20 @@ async function main() {
 
   // ---- demo users (hashed passwords) ---------------------------------
   const hash = await bcrypt.hash("demo123", 10);
+  // hr/supervisor are "اداري" accounts — access is granted per-page via `permissions`
+  // (see /permissions). These demo accounts get the full legacy set so the demo
+  // logins keep working out of the box.
+  const HR_PERMISSIONS = [
+    "employees", "departments", "shifts", "attendance", "leaves", "overtime",
+    "deductions", "payroll", "reports", "workforce_cost", "audit_log",
+  ];
+  const SUPERVISOR_PERMISSIONS = ["employees", "attendance", "leaves", "overtime", "reports"];
   await prisma.user.createMany({
     data: [
-      { id: "USR-1", name: "مدير النظام", email: "admin@404legends.demo", passwordHash: hash, role: "admin" },
-      { id: "USR-2", name: "Ahmed HR", email: "hr@afroegypt.demo", passwordHash: hash, role: "hr" },
-      { id: "USR-3", name: "مشرف الإنتاج", email: "supervisor@afroegypt.demo", passwordHash: hash, role: "supervisor", departmentId: "DEP-1" },
-      { id: "USR-4", name: "أحمد علي", email: "ahmed@afroegypt.demo", passwordHash: hash, role: "employee", employeeId: "EMP-1001" },
+      { id: "USR-1", name: "مدير النظام", email: "admin@404legends.demo", passwordHash: hash, role: "admin", permissions: [] },
+      { id: "USR-2", name: "Ahmed HR", email: "hr@afroegypt.demo", passwordHash: hash, role: "hr", permissions: HR_PERMISSIONS },
+      { id: "USR-3", name: "مشرف الإنتاج", email: "supervisor@afroegypt.demo", passwordHash: hash, role: "supervisor", departmentId: "DEP-1", permissions: SUPERVISOR_PERMISSIONS },
+      { id: "USR-4", name: "أحمد علي", email: "ahmed@afroegypt.demo", passwordHash: hash, role: "employee", employeeId: "EMP-1001", permissions: [] },
     ],
   });
 

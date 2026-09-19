@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, Building2, Clock, Fingerprint, CalendarDays,
-  TimerReset, MinusCircle, Wallet, FileBarChart, TrendingUp, History, Settings, ShieldCheck, ScanFace,
+  TimerReset, MinusCircle, Wallet, FileBarChart, TrendingUp, History, Settings, ShieldCheck,
+  KeyRound, ClipboardCheck, ScanFace,
   type LucideIcon,
 } from "lucide-react";
 import { NAV_ITEMS, navLabel } from "@/lib/i18n/labels";
@@ -13,7 +14,8 @@ import { cn } from "@/lib/utils";
 
 const ICONS: Record<string, LucideIcon> = {
   LayoutDashboard, Users, Building2, Clock, Fingerprint, CalendarDays,
-  TimerReset, MinusCircle, Wallet, FileBarChart, TrendingUp, History, Settings, ShieldCheck, ScanFace,
+  TimerReset, MinusCircle, Wallet, FileBarChart, TrendingUp, History, Settings, ShieldCheck,
+  KeyRound, ClipboardCheck, ScanFace,
 };
 
 export function SidebarNav({ allowedPaths }: { allowedPaths: string[] }) {

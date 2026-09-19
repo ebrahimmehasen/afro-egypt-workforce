@@ -1,14 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recordChange } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
-import { canManageUsers } from "@/lib/permissions";
+import { canManageUsers, isStaffRole } from "@/lib/permissions";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
+import { invalidFieldsError } from "@/lib/validation";
 
 async function guard() {
   const user = await getSession();
@@ -16,7 +18,7 @@ async function guard() {
   return user;
 }
 
-const roleEnum = z.enum(["admin", "hr", "supervisor", "employee"]);
+const roleEnum = z.enum(["admin", "hr", "supervisor", "staff", "employee"]);
 
 const createSchema = z.object({
   name: z.string().min(2),
@@ -24,7 +26,7 @@ const createSchema = z.object({
   password: z.string().min(8),
   role: roleEnum,
   employeeId: z.string().optional(),
-  departmentId: z.string().optional(),
+  jobTitle: z.string().trim().max(100).optional(),
 });
 
 const updateSchema = z.object({
@@ -33,7 +35,6 @@ const updateSchema = z.object({
   role: roleEnum,
   active: z.coerce.boolean(),
   employeeId: z.string().optional(),
-  departmentId: z.string().optional(),
 });
 
 const clean = (v?: string) => (v && v !== "none" ? v : null);
@@ -44,33 +45,54 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
   if (!actor) return { error: t.validation.invalidData };
 
   const parsed = createSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: t.validation.invalidData };
-  const { name, email, password, role, employeeId, departmentId } = parsed.data;
+  if (!parsed.success) return invalidFieldsError(t, parsed.error.issues);
+  const { name, email, password, role } = parsed.data;
+  const employeeId = clean(parsed.data.employeeId);
+  const jobTitle = parsed.data.jobTitle || null;
+  let currentJobTitle: string | null = null;
+
+  // Every non-admin account is made from an existing employee record.
+  if (role !== "admin" && !employeeId) return { error: t.users.employeeRequired };
+  if (employeeId) {
+    const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });
+    if (!employee) return { error: t.validation.employeeNotFound };
+    currentJobTitle = employee.jobTitle;
+    if (await prisma.user.findFirst({ where: { employeeId } })) return { error: t.users.employeeHasUser };
+  }
 
   const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
   if (existing) return { error: t.users.emailTaken };
 
   const passwordHash = await bcrypt.hash(password, 10);
-  await recordChange(
+  const created = await recordChange(
     {
       module: t.nav.users,
       action: t.users.auditCreate,
-      newValue: `${name} <${email}> — ${role}`,
+      newValue: `${name} <${email}> — ${role}${employeeId && jobTitle && jobTitle !== currentJobTitle ? ` — ${jobTitle}` : ""}`,
     },
-    (tx) =>
-      tx.user.create({
+    async (tx) => {
+      // A job title typed here (new or existing) is saved on the linked employee record.
+      if (employeeId && jobTitle && jobTitle !== currentJobTitle) {
+        await tx.employee.update({ where: { id: employeeId }, data: { jobTitle } });
+      }
+      return tx.user.create({
         data: {
           name,
           email: email.toLowerCase(),
           passwordHash,
           role,
-          employeeId: clean(employeeId),
-          departmentId: clean(departmentId),
+          employeeId,
+          permissions: [], // granted from the user details page right after creation (n/a for role=admin/employee)
+          departmentIds: [],
         },
-      }),
+      });
+    },
   );
 
-  revalidatePath("/users");
+  revalidatePath("/users", "layout");
+  revalidatePath("/employees");
+  // hr/supervisor/staff start with zero access — send the admin straight to set it.
+  if (isStaffRole(role)) redirect(`/users/${created.id}`);
   return { success: true, message: t.users.saved };
 }
 
@@ -80,8 +102,8 @@ export async function updateUser(_prev: ActionState, formData: FormData): Promis
   if (!actor) return { error: t.validation.invalidData };
 
   const parsed = updateSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: t.validation.invalidData };
-  const { id, name, role, active, employeeId, departmentId } = parsed.data;
+  if (!parsed.success) return invalidFieldsError(t, parsed.error.issues);
+  const { id, name, role, active, employeeId } = parsed.data;
 
   const before = await prisma.user.findUnique({ where: { id } });
   if (!before) return { error: t.validation.notFound };
@@ -97,11 +119,11 @@ export async function updateUser(_prev: ActionState, formData: FormData): Promis
     (tx) =>
       tx.user.update({
         where: { id },
-        data: { name, role, active, employeeId: clean(employeeId), departmentId: clean(departmentId) },
+        data: { name, role, active, employeeId: clean(employeeId) },
       }),
   );
 
-  revalidatePath("/users");
+  revalidatePath("/users", "layout");
   return { success: true, message: t.users.saved };
 }
 
@@ -127,6 +149,6 @@ export async function resetUserPassword(_prev: ActionState, formData: FormData):
     (tx) => tx.user.update({ where: { id }, data: { passwordHash } }),
   );
 
-  revalidatePath("/users");
+  revalidatePath("/users", "layout");
   return { success: true, message: t.users.passwordReset };
 }

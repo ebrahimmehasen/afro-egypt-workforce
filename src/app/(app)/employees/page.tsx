@@ -2,7 +2,7 @@ import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { employeesInScope, viewerScope } from "@/lib/scope";
 import { missingDocumentTypes } from "@/lib/documents";
-import { canCorrectAttendance } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { getT, format } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmployeesTable } from "@/components/employees/employees-table";
@@ -12,7 +12,7 @@ export default async function EmployeesPage() {
   const db = await getDb();
   const user = await requireAccess("/employees");
   const t = await getT();
-  const canEdit = canCorrectAttendance(user.role); // admin/hr can manage employee records
+  const canEdit = hasPermission(user, "employees");
 
   const employees = employeesInScope(viewerScope(user, db.employees), db.employees);
 
@@ -32,6 +32,7 @@ export default async function EmployeesPage() {
         departments={db.departments}
         shifts={db.shifts}
         canEdit={canEdit}
+        isAdmin={user.role === "admin"}
         incompleteDocIds={incompleteDocIds}
       />
     </div>

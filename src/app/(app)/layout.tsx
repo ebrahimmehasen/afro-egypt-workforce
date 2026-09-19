@@ -11,7 +11,7 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
   if (!user) redirect("/login");
 
   return (
-    <AppShell user={user} allowedPaths={allowedNavPaths(user.role)}>
+    <AppShell user={user} allowedPaths={allowedNavPaths(user)}>
       {children}
     </AppShell>
   );

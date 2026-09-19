@@ -1,15 +1,17 @@
-export type Role = "admin" | "hr" | "supervisor" | "employee";
+export type Role = "admin" | "hr" | "supervisor" | "staff" | "employee";
 
 export interface User {
   id: string;
   name: string;
   email: string;
   role: Role;
-  employeeId?: string; // linked employee record, for supervisor/employee roles
-  departmentId?: string; // for supervisor scoping
+  employeeId?: string; // linked employee record, for the employee self-service role
+  departmentId?: string; // legacy single-department link — superseded by departmentIds
+  departmentIds?: string[]; // scope for hr/supervisor "اداري" accounts; empty = all departments
+  permissions?: string[]; // granular page grants for hr/supervisor "اداري" accounts; ignored for admin/employee
 }
 
-export type EmployeeStatus = "active" | "on_leave" | "suspended" | "terminated";
+export type EmployeeStatus = "active" | "on_leave" | "terminated";
 
 export type SalaryType = "monthly" | "daily";
 

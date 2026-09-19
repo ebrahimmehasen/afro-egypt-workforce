@@ -4,7 +4,7 @@ import { useFormStatus } from "react-dom";
 import { useActionState, useState } from "react";
 import { Plus, Pencil } from "lucide-react";
 import { createUser, updateUser } from "@/lib/actions/users";
-import { useActionFeedback } from "@/hooks/use-action-feedback";
+import { useActionFeedback, keepFilledFields } from "@/hooks/use-action-feedback";
 import { useT } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import type { Role } from "@/lib/types";
 
-type Opt = { id: string; name: string };
+type Opt = { id: string; name: string; jobTitle: string; label: string };
+const NEW_TITLE = "__new__";
 type ExistingUser = {
   id: string;
   name: string;
@@ -22,7 +23,6 @@ type ExistingUser = {
   role: Role;
   active: boolean;
   employeeId: string | null;
-  departmentId: string | null;
 };
 
 const selectCls = "h-10 rounded-md border border-input bg-background px-3 text-sm";
@@ -36,11 +36,14 @@ function SubmitButton({ label }: { label: string }) {
 export function UserFormDialog({
   user,
   employees,
-  departments,
+  jobTitles = [],
+  labeled = false,
 }: {
   user?: ExistingUser;
   employees: Opt[];
-  departments: Opt[];
+  jobTitles?: string[];
+  /** Text button instead of the pencil icon (used on the user details page). */
+  labeled?: boolean;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -48,13 +51,32 @@ export function UserFormDialog({
   const [state, formAction] = useActionState(action, {});
   useActionFeedback(state, () => setOpen(false));
 
-  const roles: Role[] = ["admin", "hr", "supervisor", "employee"];
+  const roles: Role[] = ["admin", "hr", "supervisor", "staff", "employee"];
+  const [name, setName] = useState(user?.name ?? "");
+  const [employeeId, setEmployeeId] = useState(user?.employeeId ?? "");
+  const [titleChoice, setTitleChoice] = useState("");
+  const [newTitle, setNewTitle] = useState("");
+  const jobTitle = titleChoice === NEW_TITLE ? newTitle.trim() : titleChoice;
+
+  // Picking an employee fills the account name from the employee record.
+  function pickEmployee(id: string) {
+    setEmployeeId(id);
+    const emp = employees.find((e) => e.id === id);
+    if (emp && !user) {
+      setName(emp.name);
+      setTitleChoice(emp.jobTitle);
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {user ? (
-          <Button variant="ghost" size="icon" aria-label={t.common.edit}><Pencil className="h-4 w-4" /></Button>
+          labeled ? (
+            <Button variant="outline" className="gap-2"><Pencil className="h-4 w-4" />{t.common.edit}</Button>
+          ) : (
+            <Button variant="ghost" size="icon" aria-label={t.common.edit}><Pencil className="h-4 w-4" /></Button>
+          )
         ) : (
           <Button className="gap-2"><Plus className="h-4 w-4" />{t.users.addUser}</Button>
         )}
@@ -63,12 +85,58 @@ export function UserFormDialog({
         <DialogHeader>
           <DialogTitle>{user ? t.users.editUser : t.users.addUser}</DialogTitle>
         </DialogHeader>
-        <form action={formAction} className="flex flex-col gap-4">
+        <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           {user && <input type="hidden" name="id" value={user.id} />}
 
           <div className="flex flex-col gap-1.5">
+            <Label htmlFor="u-emp">{user ? t.users.linkedEmployee : t.users.selectEmployee}</Label>
+            <select
+              id="u-emp"
+              name="employeeId"
+              value={employeeId}
+              onChange={(e) => pickEmployee(e.target.value)}
+              className={selectCls}
+              required={!user}
+            >
+              <option value="">{user ? "—" : `— ${t.users.selectEmployee} —`}</option>
+              {employees.map((e) => (
+                <option key={e.id} value={e.id}>{e.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {!user && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="u-title">{t.users.jobTitle}</Label>
+              <select
+                id="u-title"
+                value={titleChoice}
+                onChange={(e) => setTitleChoice(e.target.value)}
+                className={selectCls}
+                disabled={!employeeId}
+              >
+                <option value="">—</option>
+                {jobTitles.map((j) => (
+                  <option key={j} value={j}>{j}</option>
+                ))}
+                <option value={NEW_TITLE}>{t.users.newJobTitle}</option>
+              </select>
+              {titleChoice === NEW_TITLE && (
+                <Input
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder={t.users.newJobTitlePlaceholder}
+                  required
+                  autoFocus
+                />
+              )}
+              <input type="hidden" name="jobTitle" value={jobTitle} />
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="u-name">{t.users.name}</Label>
-            <Input id="u-name" name="name" defaultValue={user?.name} required />
+            <Input id="u-name" name="name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
 
           {!user && (
@@ -104,28 +172,7 @@ export function UserFormDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="u-emp">{t.users.linkedEmployee}</Label>
-              <select id="u-emp" name="employeeId" defaultValue={user?.employeeId ?? "none"} className={selectCls}>
-                <option value="none">— {t.common.all} —</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>{e.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="u-dep">{t.users.linkedDepartment}</Label>
-              <select id="u-dep" name="departmentId" defaultValue={user?.departmentId ?? "none"} className={selectCls}>
-                <option value="none">— {t.common.all} —</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <p className="text-xs text-muted-foreground">{t.users.scopingHint}</p>
+          <p className="text-xs text-muted-foreground">{user ? t.users.scopingHint : t.users.createFromEmployeeHint}</p>
 
           <DialogFooter>
             <SubmitButton label={user ? t.common.save : t.common.add} />

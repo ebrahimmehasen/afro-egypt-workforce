@@ -1,7 +1,7 @@
 import { getDb, getAttendanceLogsForDate } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { employeesInScope, viewerScope } from "@/lib/scope";
-import { canCorrectAttendance } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { today } from "@/lib/today";
 import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
@@ -24,7 +24,7 @@ export default async function AttendancePage({
   const db = await getDb();
   const user = await requireAccess("/attendance");
   const t = await getT();
-  const canCorrect = canCorrectAttendance(user.role);
+  const canCorrect = hasPermission(user, "attendance");
 
   const scope = viewerScope(user, db.employees);
   const employees = employeesInScope(scope, db.employees).filter((e) => e.status === "active");

@@ -95,6 +95,7 @@ export function roleLabel(role: Role, t: Dictionary): string {
     admin: t.roles.admin,
     hr: t.roles.hr,
     supervisor: t.roles.supervisor,
+    staff: t.roles.staff,
     employee: t.roles.employee,
   };
   return map[role];
@@ -114,6 +115,7 @@ export const NAV_ITEMS = [
   { href: "/workforce-cost", key: "workforceCost", icon: "TrendingUp" },
   { href: "/audit-log", key: "auditLog", icon: "History" },
   { href: "/users", key: "users", icon: "ShieldCheck" },
+  { href: "/change-requests", key: "changeRequests", icon: "ClipboardCheck" },
   { href: "/biometric-device", key: "biometricDevice", icon: "ScanFace" },
   { href: "/settings", key: "settings", icon: "Settings" },
 ] as const;

@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
-import { canEditPayroll } from "@/lib/permissions";
+import { hasPermission, isSelfService } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
 import { currentYearMonth } from "@/lib/today";
 import { getT, format } from "@/lib/i18n";
@@ -35,7 +35,7 @@ export default async function PayrollPage({
   const user = await requireAccess("/payroll");
   const t = await getT();
   const locale = await getLocale();
-  const canEdit = canEditPayroll(user.role);
+  const canEdit = hasPermission(user, "payroll");
 
   const { period: periodParam } = await searchParams;
   const ym = currentYearMonth();
@@ -54,7 +54,7 @@ export default async function PayrollPage({
         .sort((a, b) => a.employee!.name.localeCompare(b.employee!.name, locale === "ar" ? "ar" : "en"))
     : [];
 
-  if (user.role === "employee" && user.employeeId) {
+  if (isSelfService(user) && user.employeeId) {
     records = records.filter((r) => r.employee!.id === user.employeeId);
   }
 

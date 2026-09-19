@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { employeesInScope, rowsInScope, viewerScope } from "@/lib/scope";
-import { canApprove } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
 import { OvertimeFormDialog } from "@/components/overtime/overtime-form-dialog";
@@ -34,7 +34,7 @@ export default async function OvertimePage({
         key={initialStatus}
         records={sorted}
         employees={db.employees}
-        canApprove={canApprove(user.role)}
+        canApprove={hasPermission(user, "overtime")}
         initialStatus={initialStatus}
       />
     </div>

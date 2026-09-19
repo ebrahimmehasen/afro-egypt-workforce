@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { employeesInScope, rowsInScope, viewerScope } from "@/lib/scope";
-import { canApprove } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
 import { LeaveFormDialog } from "@/components/leaves/leave-form-dialog";
@@ -25,7 +25,7 @@ export default async function LeavesPage() {
         description={t.leaves.description}
         actions={<LeaveFormDialog employees={employees} />}
       />
-      <LeavesTable leaves={sorted} employees={db.employees} canApprove={canApprove(user.role)} />
+      <LeavesTable leaves={sorted} employees={db.employees} canApprove={hasPermission(user, "leaves")} canDelete={user.role === "admin"} />
     </div>
   );
 }

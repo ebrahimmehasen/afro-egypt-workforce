@@ -33,7 +33,7 @@ export function DeleteDepartmentButton({ id, name }: { id: string; name: string 
               startTransition(async () => {
                 const res = await deleteDepartment(id);
                 if (res?.error) toast.error(res.error);
-                else toast.success(t.departments.deleted);
+                else toast.success(res?.message ?? t.departments.deleted);
               });
             }}
           >

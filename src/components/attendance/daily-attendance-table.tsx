@@ -5,9 +5,7 @@ import { Search, CalendarX } from "lucide-react";
 import { DailyAttendance, Department, Employee } from "@/lib/types";
 import { matchesAttendanceStatusFilter } from "@/lib/attendance-engine";
 import { Input } from "@/components/ui/input";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { MultiSelectFilter } from "@/components/shared/multi-select-filter";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -35,8 +33,8 @@ export function DailyAttendanceTable({
   const t = useT();
   const locale = useLocale();
   const [search, setSearch] = useState("");
-  const [dept, setDept] = useState("all");
-  const [status, setStatus] = useState(initialStatus);
+  const [dept, setDept] = useState<string[]>([]);
+  const [status, setStatus] = useState<string[]>(initialStatus === "all" ? [] : [initialStatus]);
 
   function fmtTime(iso: string | null) {
     if (!iso) return "—";
@@ -49,8 +47,10 @@ export function DailyAttendanceTable({
     return records
       .map((r) => ({ record: r, employee: empMap.get(r.employeeId) }))
       .filter(({ employee }) => employee)
-      .filter(({ employee }) => dept === "all" || employee!.departmentId === dept)
-      .filter(({ record }) => matchesAttendanceStatusFilter(record.status, status))
+      .filter(({ employee }) => dept.length === 0 || dept.includes(employee!.departmentId))
+      .filter(
+        ({ record }) => status.length === 0 || status.some((s) => matchesAttendanceStatusFilter(record.status, s)),
+      )
       .filter(
         ({ employee }) =>
           !search ||
@@ -67,25 +67,27 @@ export function DailyAttendanceTable({
           <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder={t.attendance.searchEmployee} className="ps-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Select value={dept} onValueChange={setDept}>
-          <SelectTrigger className="sm:w-48"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.common.allDepartments}</SelectItem>
-            {departments.map((d) => <SelectItem key={d.id} value={d.id}>{translateLabel(d.name, locale)}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="sm:w-44"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.common.allStatuses}</SelectItem>
-            <SelectItem value="present">{t.statuses.present}</SelectItem>
-            <SelectItem value="late">{t.statuses.late}</SelectItem>
-            <SelectItem value="absent">{t.statuses.absent}</SelectItem>
-            <SelectItem value="leave">{t.statuses.leave}</SelectItem>
-            <SelectItem value="early_leave">{t.statuses.earlyLeave}</SelectItem>
-            <SelectItem value="missing_punch">{t.statuses.missingPunch}</SelectItem>
-          </SelectContent>
-        </Select>
+        <MultiSelectFilter
+          className="sm:w-48"
+          placeholder={t.common.allDepartments}
+          selected={dept}
+          onChange={setDept}
+          options={departments.map((d) => ({ value: d.id, label: translateLabel(d.name, locale) }))}
+        />
+        <MultiSelectFilter
+          className="sm:w-44"
+          placeholder={t.common.allStatuses}
+          selected={status}
+          onChange={setStatus}
+          options={[
+            { value: "present", label: t.statuses.present },
+            { value: "late", label: t.statuses.late },
+            { value: "absent", label: t.statuses.absent },
+            { value: "leave", label: t.statuses.leave },
+            { value: "early_leave", label: t.statuses.earlyLeave },
+            { value: "missing_punch", label: t.statuses.missingPunch },
+          ]}
+        />
       </div>
 
       {rows.length === 0 ? (

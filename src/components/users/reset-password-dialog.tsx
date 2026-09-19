@@ -4,7 +4,7 @@ import { useFormStatus } from "react-dom";
 import { useActionState, useState } from "react";
 import { KeyRound } from "lucide-react";
 import { resetUserPassword } from "@/lib/actions/users";
-import { useActionFeedback } from "@/hooks/use-action-feedback";
+import { useActionFeedback, keepFilledFields } from "@/hooks/use-action-feedback";
 import { useT } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ function SubmitButton() {
   return <Button type="submit" disabled={pending}>{pending ? t.common.saving : t.users.resetPassword}</Button>;
 }
 
-export function ResetPasswordDialog({ userId, userName }: { userId: string; userName: string }) {
+export function ResetPasswordDialog({ userId, userName, labeled = false }: { userId: string; userName: string; labeled?: boolean }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(resetUserPassword, {});
@@ -28,15 +28,19 @@ export function ResetPasswordDialog({ userId, userName }: { userId: string; user
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={t.users.resetPassword}>
-          <KeyRound className="h-4 w-4" />
-        </Button>
+        {labeled ? (
+          <Button variant="outline" className="gap-2"><KeyRound className="h-4 w-4" />{t.users.resetPassword}</Button>
+        ) : (
+          <Button variant="ghost" size="icon" aria-label={t.users.resetPassword}>
+            <KeyRound className="h-4 w-4" />
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t.users.resetPassword} — {userName}</DialogTitle>
         </DialogHeader>
-        <form action={formAction} className="flex flex-col gap-4">
+        <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           <input type="hidden" name="id" value={userId} />
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="rp-pw">{t.users.newPassword}</Label>

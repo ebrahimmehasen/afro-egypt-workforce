@@ -27,7 +27,7 @@ export async function requireSession(): Promise<User> {
  */
 export async function requireAccess(path: string): Promise<User> {
   const user = await requireSession();
-  if (!canAccess(user.role, path)) redirect("/dashboard");
+  if (!canAccess(user, path)) redirect("/dashboard");
   return user;
 }
 

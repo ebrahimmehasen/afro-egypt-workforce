@@ -4,7 +4,7 @@ import { useFormStatus } from "react-dom";
 import { useActionState, useState } from "react";
 import { Plus, Pencil } from "lucide-react";
 import { createEmployee, updateEmployee } from "@/lib/actions/employees";
-import { useActionFeedback } from "@/hooks/use-action-feedback";
+import { useActionFeedback, keepFilledFields } from "@/hooks/use-action-feedback";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { Button } from "@/components/ui/button";
@@ -42,10 +42,13 @@ export function EmployeeFormDialog({
   departments,
   shifts,
   employee,
+  lenient = false,
 }: {
   departments: Department[];
   shifts: Shift[];
   employee?: Employee;
+  /** Admin editing: the browser-side format/required rules are dropped too (the server takes it as typed). */
+  lenient?: boolean;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -54,6 +57,7 @@ export function EmployeeFormDialog({
   const action = employee ? updateEmployee : createEmployee;
   const [state, formAction] = useActionState(action, {});
   useActionFeedback(state, () => setOpen(false));
+  const bad = (field: string) => (state.fields?.includes(field) ? "border-destructive ring-1 ring-destructive" : "");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -72,20 +76,20 @@ export function EmployeeFormDialog({
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>{employee ? t.employees.editEmployee : t.employees.addEmployee}</DialogTitle>
-          <DialogDescription>{t.common.allFieldsRequired}</DialogDescription>
+          <DialogDescription>{lenient ? t.employees.adminNoValidation : t.common.allFieldsRequired}</DialogDescription>
         </DialogHeader>
-        <form action={formAction} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <form action={formAction} ref={keepFilledFields} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {employee && <input type="hidden" name="id" value={employee.id} />}
 
           <div className="flex flex-col gap-1.5 sm:col-span-2">
             <Label htmlFor="name">{t.employees.formName}</Label>
-            <Input id="name" name="name" defaultValue={employee?.name} required />
+            <Input id="name" name="name" defaultValue={employee?.name} className={bad("name")} required />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label>{t.employees.formDepartment}</Label>
             <Select name="departmentId" defaultValue={employee?.departmentId ?? departments[0]?.id}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className={bad("departmentId")}><SelectValue /></SelectTrigger>
               <SelectContent>
                 {departments.map((d) => (
                   <SelectItem key={d.id} value={d.id}>{translateLabel(d.name, locale)}</SelectItem>
@@ -96,18 +100,18 @@ export function EmployeeFormDialog({
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="jobTitle">{t.employees.formJobTitle}</Label>
-            <Input id="jobTitle" name="jobTitle" defaultValue={employee?.jobTitle} required />
+            <Input id="jobTitle" name="jobTitle" defaultValue={employee?.jobTitle} className={bad("jobTitle")} required />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="hireDate">{t.employees.formHireDate}</Label>
-            <Input id="hireDate" name="hireDate" type="date" defaultValue={employee?.hireDate} required />
+            <Input id="hireDate" name="hireDate" type="date" defaultValue={employee?.hireDate} className={bad("hireDate")} required />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label>{t.employees.formShift}</Label>
             <Select name="shiftId" defaultValue={employee?.shiftId ?? shifts[0]?.id}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className={bad("shiftId")}><SelectValue /></SelectTrigger>
               <SelectContent>
                 {shifts.map((s) => (
                   <SelectItem key={s.id} value={s.id}>{translateLabel(s.name, locale)}</SelectItem>
@@ -135,7 +139,7 @@ export function EmployeeFormDialog({
             <>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="basicSalary">{t.employees.formBasicSalary}</Label>
-                <Input id="basicSalary" name="basicSalary" type="number" min={0} defaultValue={employee?.basicSalary} required />
+                <Input id="basicSalary" name="basicSalary" type="number" min={0} defaultValue={employee?.basicSalary} className={bad("basicSalary")} required={!lenient} />
               </div>
               <input type="hidden" name="dailyWorkingHours" value={employee?.dailyWorkingHours ?? 8} />
             </>
@@ -144,18 +148,18 @@ export function EmployeeFormDialog({
               <input type="hidden" name="basicSalary" value={0} />
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="dailyRate">{t.employees.formDailyRate}</Label>
-                <Input id="dailyRate" name="dailyRate" type="number" min={0} defaultValue={employee?.dailyRate} required />
+                <Input id="dailyRate" name="dailyRate" type="number" min={0} defaultValue={employee?.dailyRate} className={bad("dailyRate")} required={!lenient} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="dailyWorkingHours">{t.employees.formDailyHours}</Label>
-                <Input id="dailyWorkingHours" name="dailyWorkingHours" type="number" min={1} step="0.5" defaultValue={employee?.dailyWorkingHours ?? 8} />
+                <Input id="dailyWorkingHours" name="dailyWorkingHours" type="number" min={1} step="0.5" defaultValue={employee?.dailyWorkingHours ?? 8} className={bad("dailyWorkingHours")} />
               </div>
             </>
           )}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="allowances">{t.employees.formAllowances}</Label>
-            <Input id="allowances" name="allowances" type="number" min={0} defaultValue={employee?.allowances ?? 0} />
+            <Input id="allowances" name="allowances" type="number" min={0} defaultValue={employee?.allowances ?? 0} className={bad("allowances")} />
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -165,7 +169,6 @@ export function EmployeeFormDialog({
               <SelectContent>
                 <SelectItem value="active">{t.employees.statusActive}</SelectItem>
                 <SelectItem value="on_leave">{t.employees.statusOnLeave}</SelectItem>
-                <SelectItem value="suspended">{t.employees.statusSuspended}</SelectItem>
                 <SelectItem value="terminated">{t.employees.statusTerminated}</SelectItem>
               </SelectContent>
             </Select>
@@ -177,17 +180,17 @@ export function EmployeeFormDialog({
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="nationalId">{t.employees.formNationalId}</Label>
-            <Input id="nationalId" name="nationalId" dir="ltr" inputMode="numeric" pattern="\d{14}" maxLength={14} defaultValue={employee?.nationalId} required />
+            <Input id="nationalId" name="nationalId" dir="ltr" inputMode="numeric" pattern={lenient ? undefined : "\\d{14}"} maxLength={lenient ? undefined : 14} defaultValue={employee?.nationalId} className={bad("nationalId")} required={!lenient} />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="phone">{t.employees.formPhone}</Label>
-            <Input id="phone" name="phone" dir="ltr" defaultValue={employee?.phone} required />
+            <Input id="phone" name="phone" dir="ltr" defaultValue={employee?.phone} className={bad("phone")} required={!lenient} />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="qualification">{t.employees.formQualification}</Label>
-            <Input id="qualification" name="qualification" defaultValue={employee?.qualification} required />
+            <Input id="qualification" name="qualification" defaultValue={employee?.qualification} className={bad("qualification")} required={!lenient} />
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -205,7 +208,7 @@ export function EmployeeFormDialog({
 
           <div className="flex flex-col gap-1.5 sm:col-span-2">
             <Label htmlFor="address">{t.employees.formAddress}</Label>
-            <Input id="address" name="address" defaultValue={employee?.address} required />
+            <Input id="address" name="address" defaultValue={employee?.address} className={bad("address")} required={!lenient} />
           </div>
 
           <DialogFooter className="sm:col-span-2">

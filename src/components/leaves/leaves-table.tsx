@@ -12,16 +12,19 @@ import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { DeleteLeaveButton } from "@/components/leaves/delete-leave-button";
 import { EmptyState } from "@/components/shared/empty-state";
 
 export function LeavesTable({
   leaves,
   employees,
   canApprove,
+  canDelete,
 }: {
   leaves: Leave[];
   employees: Employee[];
   canApprove: boolean;
+  canDelete: boolean;
 }) {
   const t = useT();
   const empMap = new Map(employees.map((e) => [e.id, e]));
@@ -51,7 +54,7 @@ export function LeavesTable({
             <TableHead>{t.leaves.colReason}</TableHead>
             <TableHead>{t.leaves.colStatus}</TableHead>
             <TableHead>{t.leaves.colApprovedBy}</TableHead>
-            {canApprove && <TableHead className="text-end">{t.leaves.colActions}</TableHead>}
+            {(canApprove || canDelete) && <TableHead className="text-end">{t.leaves.colActions}</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -69,9 +72,9 @@ export function LeavesTable({
                 <TableCell className="max-w-[220px] truncate text-muted-foreground">{l.reason}</TableCell>
                 <TableCell><RequestStatusBadge status={l.status} /></TableCell>
                 <TableCell className="text-muted-foreground">{l.approvedBy ?? "—"}</TableCell>
-                {canApprove && (
+                {(canApprove || canDelete) && (
                   <TableCell className="text-end">
-                    {l.status === "pending" ? (
+                    {l.status === "pending" ? (canApprove ? (
                       <div className="flex justify-end gap-1">
                         <Button size="icon" variant="ghost" className="text-success" disabled={pending} onClick={() => decide(l.id, "approved")}>
                           <Check className="h-4 w-4" />
@@ -80,6 +83,10 @@ export function LeavesTable({
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )) : canDelete ? (
+                      <DeleteLeaveButton id={l.id} name={employee?.name ?? l.employeeId} />
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}

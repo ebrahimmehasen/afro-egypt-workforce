@@ -4,9 +4,7 @@ import { useMemo, useState } from "react";
 import { Search, History } from "lucide-react";
 import { AuditLogEntry } from "@/lib/types";
 import { Input } from "@/components/ui/input";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { MultiSelectFilter } from "@/components/shared/multi-select-filter";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -18,13 +16,13 @@ export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
   const t = useT();
   const locale = useLocale();
   const [search, setSearch] = useState("");
-  const [module, setModule] = useState("all");
+  const [module, setModule] = useState<string[]>([]);
 
   const modules = useMemo(() => Array.from(new Set(entries.map((e) => e.module))), [entries]);
 
   const rows = useMemo(() => {
     return entries.filter((e) => {
-      const matchesModule = module === "all" || e.module === module;
+      const matchesModule = module.length === 0 || module.includes(e.module);
       const matchesSearch =
         !search ||
         e.userName.toLowerCase().includes(search.toLowerCase()) ||
@@ -40,13 +38,13 @@ export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
           <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder={t.auditLog.searchPlaceholder} className="ps-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Select value={module} onValueChange={setModule}>
-          <SelectTrigger className="sm:w-56"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.auditLog.allModules}</SelectItem>
-            {modules.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <MultiSelectFilter
+          className="sm:w-56"
+          placeholder={t.auditLog.allModules}
+          selected={module}
+          onChange={setModule}
+          options={modules.map((m) => ({ value: m, label: m }))}
+        />
       </div>
 
       {rows.length === 0 ? (

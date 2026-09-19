@@ -1,11 +1,12 @@
 "use client";
 
-import { Bell, LogOut, Menu } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 import { User } from "@/lib/types";
 import { today } from "@/lib/today";
 import { roleLabel, displayUserName } from "@/lib/i18n/labels";
 import { intlLocale } from "@/lib/i18n/format";
 import { useLocale, useT } from "@/components/providers/locale-provider";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -50,10 +51,7 @@ export function Topbar({ user, onMenuClick }: { user: User; onMenuClick?: () => 
       <div className="flex items-center gap-2 sm:gap-3">
         <LanguageSwitcher />
 
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute end-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />
-        </Button>
+        <NotificationBell />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

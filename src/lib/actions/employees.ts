@@ -2,11 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
-import { recordChange } from "@/lib/audit";
+import { prisma, TransactionClient } from "@/lib/prisma";
+import { recordChangeAs } from "@/lib/audit";
+import { getSession } from "@/lib/auth";
+import { gate } from "@/lib/change-requests";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
 import { generateEmployeeNumber } from "@/lib/employee-number";
+import { invalidFieldsError } from "@/lib/validation";
 
 const employeeSchema = z
   .object({
@@ -20,7 +23,7 @@ const employeeSchema = z
     dailyRate: z.coerce.number().min(0).optional(),
     dailyWorkingHours: z.coerce.number().positive().default(8),
     allowances: z.coerce.number().min(0).default(0),
-    status: z.enum(["active", "on_leave", "suspended", "terminated"]),
+    status: z.enum(["active", "on_leave", "terminated"]),
     phone: z.string().min(6),
     address: z.string().min(3),
     qualification: z.string().min(2),
@@ -31,6 +34,64 @@ const employeeSchema = z
     path: ["salaryType"],
     message: "salary amount required",
   });
+
+// The personal fields are nullable in the DB (older rows have none), and an
+// admin's edit may legitimately clear them, so the payload allows null there.
+type EmployeePayload = Omit<z.infer<typeof employeeSchema>, "phone" | "address" | "qualification" | "militaryStatus" | "nationalId"> & {
+  id: string;
+  phone: string | null;
+  address: string | null;
+  qualification: string | null;
+  militaryStatus: z.infer<typeof employeeSchema>["militaryStatus"] | null;
+  nationalId: string | null;
+};
+
+/** The schema reports the salary rule on `salaryType`; the input to fix is the amount field. */
+const salaryField = (raw: Record<string, unknown>) => (field: string) =>
+  field === "salaryType" ? (raw.salaryType === "daily" ? "dailyRate" : "basicSalary") : field;
+
+const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+const numOr = (v: unknown, fallback: number) => {
+  const raw = str(v);
+  const n = Number(raw);
+  return raw === "" || Number.isNaN(n) ? fallback : n;
+};
+const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T =>
+  allowed.includes(str(v) as T) ? (str(v) as T) : fallback;
+
+type ExistingEmployee = NonNullable<Awaited<ReturnType<typeof prisma.employee.findFirst>>>;
+
+/**
+ * An admin's edit is taken as typed: no length / format / "required" rules on
+ * the personal data (national ID, phone, address, qualification…), so they can
+ * fix or clear anything. Only what the database itself needs to stay
+ * consistent is enforced — blank values for the columns that can't be empty
+ * keep their current value, and a national ID still can't duplicate another
+ * employee's (checked by the caller).
+ */
+function lenientEmployeePayload(id: string, raw: Record<string, unknown>, before: ExistingEmployee): EmployeePayload {
+  const salaryType = oneOf(raw.salaryType, ["monthly", "daily"] as const, before.salaryType);
+  const hire = str(raw.hireDate);
+  return {
+    id,
+    name: str(raw.name) || before.name,
+    departmentId: str(raw.departmentId) || before.departmentId,
+    jobTitle: str(raw.jobTitle) || before.jobTitle,
+    hireDate: /^\d{4}-\d{2}-\d{2}$/.test(hire) ? hire : before.hireDate.toISOString().slice(0, 10),
+    shiftId: str(raw.shiftId) || before.shiftId,
+    salaryType,
+    basicSalary: numOr(raw.basicSalary, before.basicSalary),
+    dailyRate: numOr(raw.dailyRate, before.dailyRate ?? 0) || undefined,
+    dailyWorkingHours: numOr(raw.dailyWorkingHours, before.dailyWorkingHours),
+    allowances: numOr(raw.allowances, before.allowancesTotal),
+    status: oneOf(raw.status, ["active", "on_leave", "terminated"] as const, before.status),
+    phone: str(raw.phone) || null,
+    address: str(raw.address) || null,
+    qualification: str(raw.qualification) || null,
+    militaryStatus: oneOf(raw.militaryStatus, ["completed", "exempted", "postponed", "not_applicable"] as const, before.militaryStatus ?? "not_applicable"),
+    nationalId: str(raw.nationalId) || null,
+  };
+}
 
 async function nextEmployeeId() {
   const rows = await prisma.employee.findMany({ select: { id: true } });
@@ -43,24 +104,43 @@ async function nextEmployeeId() {
 
 export async function createEmployee(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const t = await getT();
-  const parsed = employeeSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: t.validation.invalidData };
+  const raw = Object.fromEntries(formData);
+  const parsed = employeeSchema.safeParse(raw);
+  if (!parsed.success) return invalidFieldsError(t, parsed.error.issues, salaryField(raw));
   const id = await nextEmployeeId();
-  const { allowances, hireDate, dailyRate, salaryType, nationalId, ...rest } = parsed.data;
 
-  if (await prisma.employee.findUnique({ where: { nationalId } })) {
-    return { error: t.validation.nationalIdTaken };
+  if (await prisma.employee.findUnique({ where: { nationalId: parsed.data.nationalId } })) {
+    return { error: t.validation.nationalIdTaken, fields: ["nationalId"] };
   }
+
+  const actor = await getSession();
+  const payload: EmployeePayload = { id, ...parsed.data };
+
+  return gate(
+    {
+      actionKey: "employees.create",
+      module: t.nav.employees,
+      actionLabel: t.auditActions.addEmployee,
+      summary: payload.name,
+    },
+    payload,
+    () => applyCreateEmployee(payload, actor?.name ?? t.auditActions.system),
+  );
+}
+
+export async function applyCreateEmployee(payload: EmployeePayload, actorName: string): Promise<ActionState> {
+  const t = await getT();
+  if (payload.nationalId && (await prisma.employee.findUnique({ where: { nationalId: payload.nationalId } }))) {
+    return { error: t.validation.nationalIdTaken, fields: ["nationalId"] };
+  }
+  const { id, allowances, hireDate, dailyRate, salaryType, nationalId, ...rest } = payload;
 
   const department = await prisma.department.findUnique({ where: { id: rest.departmentId } });
   if (!department) return { error: t.validation.invalidData };
 
-  await recordChange(
-    {
-      module: t.nav.employees,
-      action: t.auditActions.addEmployee,
-      newValue: parsed.data.name,
-    },
+  await recordChangeAs(
+    actorName,
+    { module: t.nav.employees, action: t.auditActions.addEmployee, newValue: payload.name },
     async (tx) => {
       const employeeNumber = await generateEmployeeNumber(tx, department.name);
       return tx.employee.create({
@@ -85,26 +165,67 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
 export async function updateEmployee(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const t = await getT();
   const id = String(formData.get("id") ?? "");
-  const parsed = employeeSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: t.validation.invalidData };
+  const actor = await getSession();
+  const raw = Object.fromEntries(formData);
 
   const before = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
   if (!before) return { error: t.validation.employeeNotFound };
 
-  const { allowances, hireDate, dailyRate, salaryType, nationalId, ...rest } = parsed.data;
+  let payload: EmployeePayload;
+  if (actor?.role === "admin") {
+    payload = lenientEmployeePayload(id, raw, before);
+    // Structural checks only: the department / shift must exist or the save would crash.
+    const [department, shift] = await Promise.all([
+      prisma.department.findUnique({ where: { id: payload.departmentId } }),
+      prisma.shift.findUnique({ where: { id: payload.shiftId } }),
+    ]);
+    const missing = [!department && "departmentId", !shift && "shiftId"].filter(Boolean) as string[];
+    if (missing.length) return invalidFieldsError(t, missing.map((f) => ({ path: [f] }) as never));
+  } else {
+    const parsed = employeeSchema.safeParse(raw);
+    if (!parsed.success) return invalidFieldsError(t, parsed.error.issues, salaryField(raw));
+    payload = { id, ...parsed.data };
+  }
 
-  const nidOwner = await prisma.employee.findUnique({ where: { nationalId } });
-  if (nidOwner && nidOwner.id !== id) return { error: t.validation.nationalIdTaken };
+  if (payload.nationalId) {
+    const nidOwner = await prisma.employee.findUnique({ where: { nationalId: payload.nationalId } });
+    if (nidOwner && nidOwner.id !== id) return { error: t.validation.nationalIdTaken, fields: ["nationalId"] };
+  }
 
-  await recordChange(
+  return gate(
+    {
+      actionKey: "employees.update",
+      module: t.nav.employees,
+      actionLabel: t.auditActions.editEmployee,
+      summary: `${before.name} — ${before.basicSalary} EGP → ${payload.name} — ${payload.basicSalary} EGP`,
+      targetId: id,
+    },
+    payload,
+    () => applyUpdateEmployee(payload, actor?.name ?? t.auditActions.system),
+  );
+}
+
+export async function applyUpdateEmployee(payload: EmployeePayload, actorName: string): Promise<ActionState> {
+  const t = await getT();
+  const { id, allowances, hireDate, dailyRate, salaryType, nationalId, ...rest } = payload;
+
+  const before = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
+  if (!before) return { error: t.validation.employeeNotFound };
+  if (nationalId) {
+    const nidOwner = await prisma.employee.findUnique({ where: { nationalId } });
+    if (nidOwner && nidOwner.id !== id) return { error: t.validation.nationalIdTaken, fields: ["nationalId"] };
+  }
+
+  await recordChangeAs(
+    actorName,
     {
       module: t.nav.employees,
       action: t.auditActions.editEmployee,
       oldValue: `${before.name} — ${before.basicSalary} EGP`,
-      newValue: `${parsed.data.name} — ${parsed.data.basicSalary} EGP`,
+      newValue: `${payload.name} — ${payload.basicSalary} EGP`,
     },
-    (tx) =>
-      tx.employee.update({
+    async (tx) => {
+      const updated = await tx.employee.update({
         where: { id },
         data: {
           ...rest,
@@ -114,7 +235,10 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
           hireDate: new Date(`${hireDate}T00:00:00.000Z`),
           allowancesTotal: allowances,
         },
-      }),
+      });
+      await freezeLinkedAccountIfInactive(tx, id, updated.status);
+      return updated;
+    },
   );
 
   revalidatePath("/employees");
@@ -122,19 +246,53 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
   return { success: true, message: t.employees.savedEdits };
 }
 
+/**
+ * terminated freezes any linked login (User.active = false) so
+ * permissions/access stop immediately — reactivating the employee later does
+ * NOT auto-restore login access, an admin must re-enable it explicitly.
+ */
+async function freezeLinkedAccountIfInactive(
+  tx: TransactionClient,
+  employeeId: string,
+  status: string,
+) {
+  if (status !== "terminated") return;
+  await tx.user.updateMany({ where: { employeeId, active: true }, data: { active: false } });
+}
+
 /** Soft delete — the employee is archived (deletedAt set), not physically removed. */
-export async function deleteEmployee(id: string) {
+export async function deleteEmployee(id: string): Promise<ActionState> {
   const t = await getT();
   const removed = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
   if (!removed) return { error: t.validation.employeeNotFound };
+  const actor = await getSession();
 
-  await recordChange(
+  return gate(
     {
+      actionKey: "employees.delete",
       module: t.nav.employees,
-      action: t.auditActions.deleteEmployee,
-      oldValue: `${removed.name} (${removed.employeeNumber})`,
+      actionLabel: t.auditActions.deleteEmployee,
+      summary: `${removed.name} (${removed.employeeNumber})`,
+      targetId: id,
     },
-    (tx) => tx.employee.update({ where: { id }, data: { deletedAt: new Date(), status: "terminated" } }),
+    { id },
+    () => applyDeleteEmployee({ id }, actor?.name ?? t.auditActions.system),
+  );
+}
+
+export async function applyDeleteEmployee(payload: { id: string }, actorName: string): Promise<ActionState> {
+  const t = await getT();
+  const removed = await prisma.employee.findFirst({ where: { id: payload.id, deletedAt: null } });
+  if (!removed) return { error: t.validation.employeeNotFound };
+
+  await recordChangeAs(
+    actorName,
+    { module: t.nav.employees, action: t.auditActions.deleteEmployee, oldValue: `${removed.name} (${removed.employeeNumber})` },
+    async (tx) => {
+      const updated = await tx.employee.update({ where: { id: payload.id }, data: { deletedAt: new Date(), status: "terminated" } });
+      await freezeLinkedAccountIfInactive(tx, payload.id, updated.status);
+      return updated;
+    },
   );
 
   revalidatePath("/employees");

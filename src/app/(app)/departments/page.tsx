@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { viewerScope } from "@/lib/scope";
-import { canManageSettings, canCorrectAttendance } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
 import { getAttendanceByDepartment } from "@/lib/selectors";
 import { getT, format } from "@/lib/i18n";
@@ -18,7 +18,7 @@ export default async function DepartmentsPage() {
   const user = await requireAccess("/departments");
   const t = await getT();
   const locale = await getLocale();
-  const canEdit = canCorrectAttendance(user.role);
+  const canEdit = hasPermission(user, "departments");
   const rates = await getAttendanceByDepartment(viewerScope(user, db.employees));
 
   const rows = db.departments.map((dept) => {
@@ -34,7 +34,7 @@ export default async function DepartmentsPage() {
       <PageHeader
         title={t.departments.title}
         description={format(t.departments.totalCount, { count: db.departments.length })}
-        actions={canManageSettings(user.role) ? <DepartmentFormDialog /> : null}
+        actions={canEdit ? <DepartmentFormDialog /> : null}
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -51,7 +51,7 @@ export default async function DepartmentsPage() {
                     <p className="text-xs text-muted-foreground">{dept.managerName}</p>
                   </div>
                 </div>
-                {canManageSettings(user.role) && (
+                {canEdit && (
                   <div className="flex items-center">
                     <DepartmentFormDialog department={dept} />
                     <DeleteDepartmentButton id={dept.id} name={translateLabel(dept.name, locale)} />

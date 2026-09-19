@@ -4,7 +4,7 @@ import { useFormStatus } from "react-dom";
 import { useActionState, useState } from "react";
 import { Plus } from "lucide-react";
 import { createDeduction } from "@/lib/actions/deductions";
-import { useActionFeedback } from "@/hooks/use-action-feedback";
+import { useActionFeedback, keepFilledFields } from "@/hooks/use-action-feedback";
 import { useT } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +50,7 @@ export function DeductionFormDialog({ employees }: { employees: Employee[] }) {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>{t.deductions.dialogDeductionTitle}</DialogTitle></DialogHeader>
-        <form action={formAction} className="flex flex-col gap-4">
+        <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label>{t.common.employee}</Label>
             <Select name="employeeId" defaultValue={employees[0]?.id}>

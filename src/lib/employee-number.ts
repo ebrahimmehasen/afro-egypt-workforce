@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { TransactionClient } from "@/lib/prisma";
 import { departmentCode } from "@/lib/department-codes";
 
 /**
@@ -14,7 +14,7 @@ import { departmentCode } from "@/lib/department-codes";
  * (sequences are allowed to skip), what matters is no two employees ever get
  * the same number, which this guarantees regardless of transaction outcome.
  */
-export async function generateEmployeeNumber(tx: Prisma.TransactionClient, departmentName: string): Promise<string> {
+export async function generateEmployeeNumber(tx: TransactionClient, departmentName: string): Promise<string> {
   const code = departmentCode(departmentName);
 
   await tx.$executeRaw`

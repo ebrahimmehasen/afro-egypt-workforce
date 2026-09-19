@@ -77,6 +77,7 @@ async function main() {
         email: adminEmail,
         passwordHash: await bcrypt.hash(adminPassword, 10),
         role: "admin",
+        permissions: [],
       },
     });
     console.log(`Created admin user: ${adminEmail}`);

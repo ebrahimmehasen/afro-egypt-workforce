@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { auditActor, recordChange } from "@/lib/audit";
+import { recordChangeAs } from "@/lib/audit";
+import { getSession } from "@/lib/auth";
+import { isSelfService } from "@/lib/permissions";
+import { canViewEmployee } from "@/lib/scope";
+import { gate } from "@/lib/change-requests";
 import { nextId } from "@/lib/id";
 import { recalculateRange } from "@/lib/attendance-service";
 import { ActionState } from "@/hooks/use-action-feedback";
@@ -24,6 +28,17 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
   const t = await getT();
   const parsed = leaveSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
+
+  // A self-service account may only file for itself; anyone else only within
+  // the employees they can see. (Server actions are callable directly, so the
+  // dialog's employee list is not enough.)
+  const actor = await getSession();
+  if (!actor) return { error: t.validation.invalidData };
+  if (actor.role !== "admin") {
+    const own = isSelfService(actor) ? actor.employeeId === parsed.data.employeeId : await canViewEmployee(actor, parsed.data.employeeId);
+    if (!own) return { error: t.validation.notAllowed };
+  }
+
   await prisma.leave.create({
     data: {
       id: nextId("LV"),
@@ -39,13 +54,35 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
   return { success: true, message: t.leaves.submitted };
 }
 
-export async function decideLeave(id: string, decision: "approved" | "rejected") {
+type LeaveDecisionPayload = { id: string; decision: "approved" | "rejected" };
+
+export async function decideLeave(id: string, decision: "approved" | "rejected"): Promise<ActionState> {
   const t = await getT();
-  const actor = await auditActor();
+  const leave = await prisma.leave.findUnique({ where: { id }, include: { employee: true } });
+  if (!leave) return { error: t.validation.requestNotFound };
+  const actor = await getSession();
+
+  return gate(
+    {
+      actionKey: "leaves.decide",
+      module: t.nav.leaves,
+      actionLabel: decision === "approved" ? t.auditActions.approveLeave : t.auditActions.rejectLeave,
+      summary: `${leaveTypeLabel(leave.type, t)} — ${leave.employee.employeeNumber} — ${decision === "approved" ? t.statuses.approved : t.statuses.rejected}`,
+      targetId: id,
+    },
+    { id, decision } satisfies LeaveDecisionPayload,
+    () => applyDecideLeave({ id, decision }, actor?.name ?? t.auditActions.system),
+  );
+}
+
+export async function applyDecideLeave(payload: LeaveDecisionPayload, actorName: string): Promise<ActionState> {
+  const t = await getT();
+  const { id, decision } = payload;
   const leave = await prisma.leave.findUnique({ where: { id }, include: { employee: true } });
   if (!leave) return { error: t.validation.requestNotFound };
 
-  await recordChange(
+  await recordChangeAs(
+    actorName,
     {
       module: t.nav.leaves,
       action: decision === "approved" ? t.auditActions.approveLeave : t.auditActions.rejectLeave,
@@ -53,7 +90,7 @@ export async function decideLeave(id: string, decision: "approved" | "rejected")
       newValue: decision === "approved" ? t.statuses.approved : t.statuses.rejected,
       reason: `${leaveTypeLabel(leave.type, t)} — ${leave.employee.employeeNumber}`,
     },
-    (tx) => tx.leave.update({ where: { id }, data: { status: decision, approvedBy: actor } }),
+    (tx) => tx.leave.update({ where: { id }, data: { status: decision, approvedBy: actorName } }),
   );
 
   if (decision === "approved") {
@@ -69,4 +106,43 @@ export async function decideLeave(id: string, decision: "approved" | "rejected")
   revalidatePath("/dashboard");
   revalidatePath("/audit-log");
   return { success: true };
+}
+
+/**
+ * Admin-only: remove a leave request after it has been decided. Not routed
+ * through `gate` — nobody else may delete these, not even by request. An
+ * approved leave had already been folded into attendance, so its days are
+ * recomputed once it's gone.
+ */
+export async function deleteLeave(id: string): Promise<ActionState> {
+  const t = await getT();
+  const actor = await getSession();
+  if (!actor || actor.role !== "admin") return { error: t.validation.notAllowed };
+
+  const leave = await prisma.leave.findUnique({ where: { id }, include: { employee: true } });
+  if (!leave) return { error: t.validation.requestNotFound };
+
+  await recordChangeAs(
+    actor.name,
+    {
+      module: t.nav.leaves,
+      action: t.auditActions.deleteLeave,
+      oldValue: `${leaveTypeLabel(leave.type, t)} — ${leave.employee.employeeNumber} — ${leave.from.toISOString().slice(0, 10)} → ${leave.to.toISOString().slice(0, 10)} — ${leave.status === "approved" ? t.statuses.approved : leave.status === "rejected" ? t.statuses.rejected : t.statuses.pending}`,
+    },
+    (tx) => tx.leave.delete({ where: { id } }),
+  );
+
+  if (leave.status === "approved") {
+    await recalculateRange(
+      leave.employeeId,
+      leave.from.toISOString().slice(0, 10),
+      leave.to.toISOString().slice(0, 10),
+    );
+  }
+
+  revalidatePath("/leaves");
+  revalidatePath("/attendance");
+  revalidatePath("/dashboard");
+  revalidatePath("/audit-log");
+  return { success: true, message: t.leaves.deleted };
 }
