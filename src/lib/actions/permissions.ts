@@ -64,7 +64,6 @@ export async function updateUserPermissions(_prev: ActionState, formData: FormDa
       }),
   );
 
-  revalidatePath("/permissions");
-  revalidatePath("/users");
+  revalidatePath("/users", "layout");
   return { success: true, message: t.permissions.saved };
 }

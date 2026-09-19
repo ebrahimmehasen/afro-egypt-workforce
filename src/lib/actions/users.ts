@@ -82,18 +82,17 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
           passwordHash,
           role,
           employeeId,
-          permissions: [], // granted from /permissions right after creation (n/a for role=admin/employee)
+          permissions: [], // granted from the user details page right after creation (n/a for role=admin/employee)
           departmentIds: [],
         },
       });
     },
   );
 
-  revalidatePath("/users");
-  revalidatePath("/permissions");
+  revalidatePath("/users", "layout");
   revalidatePath("/employees");
   // hr/supervisor/staff start with zero access — send the admin straight to set it.
-  if (isStaffRole(role)) redirect(`/permissions?u=${created.id}`);
+  if (isStaffRole(role)) redirect(`/users/${created.id}`);
   return { success: true, message: t.users.saved };
 }
 
@@ -124,7 +123,7 @@ export async function updateUser(_prev: ActionState, formData: FormData): Promis
       }),
   );
 
-  revalidatePath("/users");
+  revalidatePath("/users", "layout");
   return { success: true, message: t.users.saved };
 }
 
@@ -150,6 +149,6 @@ export async function resetUserPassword(_prev: ActionState, formData: FormData):
     (tx) => tx.user.update({ where: { id }, data: { passwordHash } }),
   );
 
-  revalidatePath("/users");
+  revalidatePath("/users", "layout");
   return { success: true, message: t.users.passwordReset };
 }

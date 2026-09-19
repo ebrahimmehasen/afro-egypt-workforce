@@ -531,6 +531,12 @@ export const ar: Dictionary = {
     savedPayroll: "تم حفظ إعدادات الرواتب",
   },
   users: {
+    backToList: "كل المستخدمين",
+    detailsTitle: "بيانات المستخدم",
+    createdAt: "تاريخ الإنشاء",
+    permissionsSection: "الصلاحيات",
+    noPermissionsForRole: "الصلاحيات بتتحدد لحسابات الموارد البشرية والمشرف والاداري فقط. لو عايز تديله صلاحيات غيّر دوره من زر التعديل.",
+    openDetails: "فتح بيانات المستخدم",
     description: "إضافة وإدارة مستخدمي النظام وصلاحياتهم",
     addUser: "إضافة مستخدم",
     editUser: "تعديل المستخدم",

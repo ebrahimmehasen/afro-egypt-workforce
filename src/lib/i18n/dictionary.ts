@@ -529,6 +529,12 @@ export interface Dictionary {
     savedPayroll: string;
   };
   users: {
+    backToList: string;
+    detailsTitle: string;
+    createdAt: string;
+    permissionsSection: string;
+    noPermissionsForRole: string;
+    openDetails: string;
     description: string;
     addUser: string;
     editUser: string;

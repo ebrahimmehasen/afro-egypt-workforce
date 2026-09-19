@@ -19,7 +19,7 @@ function SubmitButton() {
   return <Button type="submit" disabled={pending}>{pending ? t.common.saving : t.users.resetPassword}</Button>;
 }
 
-export function ResetPasswordDialog({ userId, userName }: { userId: string; userName: string }) {
+export function ResetPasswordDialog({ userId, userName, labeled = false }: { userId: string; userName: string; labeled?: boolean }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(resetUserPassword, {});
@@ -28,9 +28,13 @@ export function ResetPasswordDialog({ userId, userName }: { userId: string; user
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={t.users.resetPassword}>
-          <KeyRound className="h-4 w-4" />
-        </Button>
+        {labeled ? (
+          <Button variant="outline" className="gap-2"><KeyRound className="h-4 w-4" />{t.users.resetPassword}</Button>
+        ) : (
+          <Button variant="ghost" size="icon" aria-label={t.users.resetPassword}>
+            <KeyRound className="h-4 w-4" />
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

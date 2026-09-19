@@ -531,6 +531,12 @@ export const en: Dictionary = {
     savedPayroll: "Payroll settings saved",
   },
   users: {
+    backToList: "All users",
+    detailsTitle: "User details",
+    createdAt: "Created",
+    permissionsSection: "Permissions",
+    noPermissionsForRole: "Permissions apply to HR, Supervisor and Administrative accounts only. Change the role with the edit button to grant some.",
+    openDetails: "Open user details",
     description: "Add and manage system users and their access",
     addUser: "Add User",
     editUser: "Edit User",

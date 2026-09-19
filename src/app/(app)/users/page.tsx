@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
@@ -10,7 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { UserFormDialog } from "@/components/users/user-form-dialog";
-import { ResetPasswordDialog } from "@/components/users/reset-password-dialog";
+import { ClickableRow } from "@/components/shared/clickable-row";
 import { isStaffRole } from "@/lib/permissions";
 
 export default async function UsersPage() {
@@ -55,13 +57,15 @@ export default async function UsersPage() {
               <TableHead>{t.users.scope}</TableHead>
               <TableHead>{t.users.status}</TableHead>
               <TableHead>{t.users.lastLogin}</TableHead>
-              <TableHead className="text-end">{t.common.actions}</TableHead>
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.map((u) => (
-              <TableRow key={u.id}>
-                <TableCell className="font-medium">{u.name}</TableCell>
+              <ClickableRow key={u.id} href={`/users/${u.id}`}>
+                <TableCell className="font-medium">
+                  <Link href={`/users/${u.id}`} className="hover:underline" aria-label={`${t.users.openDetails}: ${u.name}`}>{u.name}</Link>
+                </TableCell>
                 <TableCell dir="ltr">{u.email}</TableCell>
                 <TableCell><Badge variant={roleVariant[u.role]}>{t.roles[u.role]}</Badge></TableCell>
                 <TableCell className="text-sm text-muted-foreground">
@@ -84,23 +88,10 @@ export default async function UsersPage() {
                 <TableCell className="text-sm text-muted-foreground" dir="ltr">
                   {u.lastLoginAt ? u.lastLoginAt.toISOString().slice(0, 16).replace("T", " ") : "—"}
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-end gap-1">
-                    <ResetPasswordDialog userId={u.id} userName={u.name} />
-                    <UserFormDialog
-                      user={{
-                        id: u.id,
-                        name: u.name,
-                        email: u.email,
-                        role: u.role,
-                        active: u.active,
-                        employeeId: u.employeeId,
-                      }}
-                      employees={employeeOpts.filter((e) => e.id === u.employeeId || !linkedEmployeeIds.has(e.id))}
-                    />
-                  </div>
+                <TableCell className="text-end text-muted-foreground">
+                  <ChevronLeft className="inline h-4 w-4 ltr:rotate-180" />
                 </TableCell>
-              </TableRow>
+              </ClickableRow>
             ))}
           </TableBody>
         </Table>

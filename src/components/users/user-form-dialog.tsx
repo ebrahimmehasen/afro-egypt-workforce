@@ -37,10 +37,13 @@ export function UserFormDialog({
   user,
   employees,
   jobTitles = [],
+  labeled = false,
 }: {
   user?: ExistingUser;
   employees: Opt[];
   jobTitles?: string[];
+  /** Text button instead of the pencil icon (used on the user details page). */
+  labeled?: boolean;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -69,7 +72,11 @@ export function UserFormDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {user ? (
-          <Button variant="ghost" size="icon" aria-label={t.common.edit}><Pencil className="h-4 w-4" /></Button>
+          labeled ? (
+            <Button variant="outline" className="gap-2"><Pencil className="h-4 w-4" />{t.common.edit}</Button>
+          ) : (
+            <Button variant="ghost" size="icon" aria-label={t.common.edit}><Pencil className="h-4 w-4" /></Button>
+          )
         ) : (
           <Button className="gap-2"><Plus className="h-4 w-4" />{t.users.addUser}</Button>
         )}
