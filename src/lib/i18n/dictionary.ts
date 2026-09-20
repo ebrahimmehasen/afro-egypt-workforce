@@ -562,6 +562,13 @@ export interface Dictionary {
     auditCreate: string;
     auditUpdate: string;
     auditResetPassword: string;
+    deleteUser: string;
+    deleteUserTitle: string;
+    deleteUserConfirm: string;
+    userDeleted: string;
+    cannotDeleteSelf: string;
+    cannotDeleteLastAdmin: string;
+    auditDelete: string;
     jobTitle: string;
     newJobTitle: string;
     newJobTitlePlaceholder: string;
@@ -639,6 +646,12 @@ export interface Dictionary {
     auditDelete: string;
     requiredSection: string;
     optionalSection: string;
+    makeRequired: string;
+    makeOptional: string;
+    requiredLabel: string;
+    optionalLabel: string;
+    requirementSaved: string;
+    auditRequirement: string;
     types: Record<EmployeeDocumentType, string>;
   };
   acknowledgments: {

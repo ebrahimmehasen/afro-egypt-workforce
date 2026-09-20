@@ -127,6 +127,32 @@ export async function updateUser(_prev: ActionState, formData: FormData): Promis
   return { success: true, message: t.users.saved };
 }
 
+export async function deleteUser(id: string): Promise<ActionState> {
+  const t = await getT();
+  const actor = await guard();
+  if (!actor) return { error: t.validation.invalidData };
+  if (id === actor.id) return { error: t.users.cannotDeleteSelf };
+
+  const target = await prisma.user.findUnique({ where: { id } });
+  if (!target) return { error: t.validation.notFound };
+  if (target.role === "admin" && target.active) {
+    const otherAdmins = await prisma.user.count({ where: { role: "admin", active: true, id: { not: id } } });
+    if (otherAdmins === 0) return { error: t.users.cannotDeleteLastAdmin };
+  }
+
+  await recordChange(
+    {
+      module: t.nav.users,
+      action: t.users.auditDelete,
+      oldValue: `${target.name} <${target.email}> — ${target.role}`,
+    },
+    (tx) => tx.user.delete({ where: { id } }),
+  );
+
+  revalidatePath("/users", "layout");
+  return { success: true, message: t.users.userDeleted };
+}
+
 export async function resetUserPassword(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const t = await getT();
   const actor = await guard();

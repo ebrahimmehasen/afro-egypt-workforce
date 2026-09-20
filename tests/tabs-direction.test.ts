@@ -13,7 +13,8 @@ function render(locale: "ar" | "en", dir?: "ltr" | "rtl") {
     { defaultValue: "a", dir },
     createElement(TabsList, null, createElement(TabsTrigger, { value: "a" }, "A"), createElement(TabsTrigger, { value: "b" }, "B")),
   );
-  return renderToStaticMarkup(createElement(LocaleProvider, { locale, dictionary: {} as Dictionary }, tabs));
+  // LocaleProvider is a plain function component (no hooks), so calling it directly keeps `children` typed.
+  return renderToStaticMarkup(LocaleProvider({ locale, dictionary: {} as Dictionary, children: tabs }));
 }
 
 describe("Tabs direction follows the locale", () => {

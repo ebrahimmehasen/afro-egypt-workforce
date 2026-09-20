@@ -11,7 +11,7 @@ import { intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { requestStatusLabel, deductionTypeLabel } from "@/lib/i18n/labels";
 import { canManageEmployeeFiles, hasPermission } from "@/lib/permissions";
-import { missingDocumentTypes } from "@/lib/documents";
+import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
 import { DeleteEmployeeButton } from "@/components/employees/delete-employee-button";
 import { DocumentsPanel } from "@/components/employees/documents-panel";
@@ -60,7 +60,8 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
 
   const documents = db.employeeDocuments.filter((d) => d.employeeId === employee.id);
   const acknowledgments = db.employeeAcknowledgments.filter((a) => a.employeeId === employee.id);
-  const missingDocs = missingDocumentTypes(documents);
+  const requiredDocs = requiredDocumentTypes(employee);
+  const missingDocs = missingDocumentTypes(documents, requiredDocs);
   const canManageDocs = canManageEmployeeFiles(user);
   const canEdit = hasPermission(user, "employees");
 
@@ -111,7 +112,12 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
         </TabsList>
 
         <TabsContent value="documents" className="flex flex-col gap-4">
-          <DocumentsPanel employeeId={employee.id} documents={documents} canManage={canManageDocs} />
+          <DocumentsPanel
+            employeeId={employee.id}
+            documents={documents}
+            requiredTypes={requiredDocs}
+            canManage={canManageDocs}
+          />
           <AcknowledgmentsPanel
             employeeId={employee.id}
             acknowledgments={acknowledgments}

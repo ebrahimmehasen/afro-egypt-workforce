@@ -37,6 +37,8 @@ export interface Employee {
   qualification?: string;
   militaryStatus?: MilitaryStatus;
   nationalId?: string;
+  /** This employee's own required-document list; unset means the company default. */
+  requiredDocuments?: EmployeeDocumentType[];
   avatarColor?: string;
 }
 

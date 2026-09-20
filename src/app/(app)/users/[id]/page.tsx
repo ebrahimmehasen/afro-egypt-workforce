@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserFormDialog } from "@/components/users/user-form-dialog";
 import { ResetPasswordDialog } from "@/components/users/reset-password-dialog";
+import { DeleteUserButton } from "@/components/users/delete-user-button";
 import { PermissionsEditor } from "@/components/permissions/permissions-editor";
 
 const stamp = (d: Date | null) => (d ? d.toISOString().slice(0, 16).replace("T", " ") : "—");
@@ -77,12 +78,13 @@ export default async function UserDetailsPage({ params }: { params: Promise<{ id
         description={t.users.detailsTitle}
         actions={
           <>
-            <ResetPasswordDialog userId={user.id} userName={user.name} labeled />
             <UserFormDialog
               labeled
               user={{ id: user.id, name: user.name, email: user.email, role: user.role, active: user.active, employeeId: user.employeeId }}
               employees={employeeOpts}
             />
+            <ResetPasswordDialog userId={user.id} userName={user.name} labeled />
+            <DeleteUserButton userId={user.id} userName={user.name} />
           </>
         }
       />

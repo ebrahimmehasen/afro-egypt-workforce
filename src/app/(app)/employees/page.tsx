@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { employeesInScope, viewerScope } from "@/lib/scope";
-import { missingDocumentTypes } from "@/lib/documents";
+import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
 import { hasPermission } from "@/lib/permissions";
 import { getT, format } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
@@ -17,7 +17,10 @@ export default async function EmployeesPage() {
   const employees = employeesInScope(viewerScope(user, db.employees), db.employees);
 
   const incompleteDocIds = employees
-    .filter((e) => missingDocumentTypes(db.employeeDocuments.filter((d) => d.employeeId === e.id)).length > 0)
+    .filter(
+      (e) =>
+        missingDocumentTypes(db.employeeDocuments.filter((d) => d.employeeId === e.id), requiredDocumentTypes(e)).length > 0,
+    )
     .map((e) => e.id);
 
   return (

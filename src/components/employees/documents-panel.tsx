@@ -3,14 +3,10 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileCheck2, FileWarning, Trash2, Upload } from "lucide-react";
-import {
-  OPTIONAL_EMPLOYEE_DOCUMENT_TYPES,
-  REQUIRED_EMPLOYEE_DOCUMENT_TYPES,
-  EmployeeDocument,
-  EmployeeDocumentType,
-} from "@/lib/types";
-import { ACCEPTED_DOCUMENT_MIME } from "@/lib/documents";
+import { ArrowDown, ArrowUp, FileCheck2, FileWarning, Trash2, Upload } from "lucide-react";
+import { EMPLOYEE_DOCUMENT_TYPES, EmployeeDocument, EmployeeDocumentType } from "@/lib/types";
+import { ACCEPTED_DOCUMENT_MIME, canBeRequired } from "@/lib/documents";
+import { setDocumentRequired } from "@/lib/actions/employee-documents";
 import { useT } from "@/components/providers/locale-provider";
 import { FilePreview } from "@/components/employees/file-preview";
 import { Button } from "@/components/ui/button";
@@ -20,10 +16,13 @@ import { Card, CardContent } from "@/components/ui/card";
 export function DocumentsPanel({
   employeeId,
   documents,
+  requiredTypes,
   canManage,
 }: {
   employeeId: string;
   documents: EmployeeDocument[];
+  /** This employee's own required document types (custom list, else the company default). */
+  requiredTypes: EmployeeDocumentType[];
   canManage: boolean;
 }) {
   const t = useT();
@@ -38,9 +37,12 @@ export function DocumentsPanel({
     else byType.set(d.type, [d]);
   }
 
-  const missing = REQUIRED_EMPLOYEE_DOCUMENT_TYPES.filter((ty) => !byType.has(ty));
-  // Optional slots only clutter the list when empty — show the ones that have files.
-  const optionalShown = OPTIONAL_EMPLOYEE_DOCUMENT_TYPES.filter((ty) => byType.has(ty) || canManage);
+  const missing = requiredTypes.filter((ty) => !byType.has(ty));
+  // Optional slots only clutter the list when empty — managers still see them all,
+  // since that's where a document is moved into the required list from.
+  const optionalShown = EMPLOYEE_DOCUMENT_TYPES.filter(
+    (ty) => !requiredTypes.includes(ty) && (byType.has(ty) || canManage),
+  );
 
   async function upload(type: EmployeeDocumentType, file: File) {
     setBusy(type);
@@ -74,6 +76,20 @@ export function DocumentsPanel({
     }
   }
 
+  async function toggleRequired(type: EmployeeDocumentType, required: boolean) {
+    setBusy(`req:${type}`);
+    try {
+      const res = await setDocumentRequired(employeeId, type, required);
+      if (res.error) throw new Error(res.error);
+      toast.success(res.message ?? t.documents.requirementSaved);
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t.documents.uploadFailed);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function renderSlot(type: EmployeeDocumentType, required: boolean) {
     const files = byType.get(type) ?? [];
     return (
@@ -91,6 +107,18 @@ export function DocumentsPanel({
 
           {canManage && (
             <div className="flex shrink-0 items-center gap-1.5">
+              {canBeRequired(type) && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 gap-1 px-2 text-xs text-muted-foreground"
+                  disabled={busy === `req:${type}`}
+                  onClick={() => void toggleRequired(type, !required)}
+                >
+                  {required ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
+                  {required ? t.documents.makeOptional : t.documents.makeRequired}
+                </Button>
+              )}
               <input
                 ref={(el) => {
                   inputs.current[type] = el;
@@ -160,10 +188,14 @@ export function DocumentsPanel({
           )}
         </div>
 
-        <p className="text-xs text-muted-foreground">{t.documents.requiredSection}</p>
-        <ul className="flex flex-col divide-y divide-border">
-          {REQUIRED_EMPLOYEE_DOCUMENT_TYPES.map((type) => renderSlot(type, true))}
-        </ul>
+        {requiredTypes.length > 0 && (
+          <>
+            <p className="text-xs text-muted-foreground">{t.documents.requiredSection}</p>
+            <ul className="flex flex-col divide-y divide-border">
+              {requiredTypes.map((type) => renderSlot(type, true))}
+            </ul>
+          </>
+        )}
 
         {optionalShown.length > 0 && (
           <>

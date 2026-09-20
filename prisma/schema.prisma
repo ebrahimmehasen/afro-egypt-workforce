@@ -251,6 +251,10 @@ model Employee {
   qualification         String?
   militaryStatus        MilitaryStatus?
   nationalId            String?         @unique // الرقم القومي — enforced required by the form; nullable for the migration of existing rows
+  /// This employee's own list of required document types (a JSON array of
+  /// EmployeeDocumentType). null = the company default (REQUIRED_EMPLOYEE_DOCUMENT_TYPES) —
+  /// only set once someone moves a document between "required" and "additional".
+  requiredDocuments     Json?
   avatarColor           String?
   deletedAt             DateTime?
   createdAt             DateTime       @default(now())

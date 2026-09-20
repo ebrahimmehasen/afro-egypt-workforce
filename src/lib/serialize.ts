@@ -35,6 +35,7 @@ import type {
   PayrollRecord,
   Shift,
 } from "@/lib/types";
+import { parseRequiredDocuments } from "@/lib/documents";
 
 export const dayStr = (d: Date): string => d.toISOString().slice(0, 10);
 const iso = (d: Date): string => d.toISOString();
@@ -61,6 +62,7 @@ export function toEmployee(e: PEmployee): Employee {
     qualification: e.qualification ?? undefined,
     militaryStatus: e.militaryStatus ?? undefined,
     nationalId: e.nationalId ?? undefined,
+    requiredDocuments: parseRequiredDocuments(e.requiredDocuments),
     avatarColor: e.avatarColor ?? undefined,
   };
 }
