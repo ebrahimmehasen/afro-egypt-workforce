@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, Eye, ExternalLink } from "lucide-react";
 import { useT } from "@/components/providers/locale-provider";
+import { ImageViewer } from "@/components/employees/image-viewer";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -43,23 +44,23 @@ export function FilePreview({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle className="truncate pe-8 text-start">{filename}</DialogTitle>
           </DialogHeader>
 
-          <div className="flex max-h-[72vh] items-center justify-center overflow-auto rounded-lg border border-border bg-muted/30">
-            {kind === "image" && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={url} alt={filename} className="max-h-[72vh] w-auto object-contain" />
-            )}
-            {kind === "pdf" && (
-              <iframe src={url} title={filename} className="h-[72vh] w-full" />
-            )}
-            {kind === "other" && (
+          {/* images get zoom / rotate / drag here; a PDF keeps the browser's own viewer, which has those tools built in */}
+          {kind === "image" && <ImageViewer src={url} alt={filename} />}
+          {kind === "pdf" && (
+            <div className="overflow-hidden rounded-lg border border-border bg-muted/30">
+              <iframe src={url} title={filename} className="h-[calc(90vh-14rem)] min-h-64 w-full" />
+            </div>
+          )}
+          {kind === "other" && (
+            <div className="flex items-center justify-center rounded-lg border border-border bg-muted/30">
               <p className="p-10 text-sm text-muted-foreground">{t.filePreview.noPreview}</p>
-            )}
-          </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-2">
             <Button asChild variant="outline" size="sm" className="gap-1.5">

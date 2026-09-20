@@ -692,6 +692,12 @@ export const en: Dictionary = {
     download: "Download",
     noPreview: "This file can't be previewed — download it to open",
     openTab: "Open in new tab",
+    rotateRight: "Rotate right",
+    rotateLeft: "Rotate left",
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    resetView: "Fit to window",
+    panHint: "Drag to move the image; mouse wheel or double-click to zoom",
   },
   statuses: {
     present: "Present",

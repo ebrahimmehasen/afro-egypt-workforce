@@ -692,6 +692,12 @@ export const ar: Dictionary = {
     download: "تنزيل",
     noPreview: "لا يمكن معاينة هذا الملف — نزّله لفتحه",
     openTab: "فتح في تبويب جديد",
+    rotateRight: "تدوير لليمين",
+    rotateLeft: "تدوير لليسار",
+    zoomIn: "تكبير",
+    zoomOut: "تصغير",
+    resetView: "ملاءمة الحجم",
+    panHint: "اسحب الصورة لتحريكها، وعجلة الماوس أو النقر المزدوج للتكبير",
   },
   statuses: {
     present: "حاضر",

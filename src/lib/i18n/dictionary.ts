@@ -676,6 +676,12 @@ export interface Dictionary {
     download: string;
     noPreview: string;
     openTab: string;
+    rotateRight: string;
+    rotateLeft: string;
+    zoomIn: string;
+    zoomOut: string;
+    resetView: string;
+    panHint: string;
   };
   statuses: {
     present: string;
