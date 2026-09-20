@@ -164,9 +164,13 @@ export interface Dictionary {
     colName: string;
     colDepartment: string;
     colJobTitle: string;
+    colDevice: string;
     colShift: string;
     colBasicSalary: string;
     colStatus: string;
+    deviceLinked: string;
+    deviceNotLinked: string;
+    deviceMissingOnDevice: string;
     formName: string;
     formDepartment: string;
     formJobTitle: string;

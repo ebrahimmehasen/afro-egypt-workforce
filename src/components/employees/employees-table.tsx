@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Users, FileWarning } from "lucide-react";
+import { Search, Users, FileWarning, Fingerprint } from "lucide-react";
 import { Employee, Department, Shift } from "@/lib/types";
+import { deviceLink } from "@/lib/device-link";
+import { getDeviceUserNamesAction } from "@/lib/actions/device-users";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { MultiSelectFilter } from "@/components/shared/multi-select-filter";
@@ -36,6 +38,28 @@ function isNewHire(hireDate: string, todayStr: string): boolean {
   return todayStr < cutoff.toISOString().slice(0, 10);
 }
 
+/** The fingerprint-device column: the name the device itself holds for this employee, or why it isn't shown. */
+function DeviceCell({ employee, names }: { employee: Employee; names: Record<string, string> | null }) {
+  const t = useT();
+  const link = deviceLink(employee.biometricDeviceUserId, names);
+
+  if (link.state === "not_linked") {
+    return <span className="text-xs text-muted-foreground">{t.employees.deviceNotLinked}</span>;
+  }
+  return (
+    <span className="flex items-center gap-1.5">
+      <Fingerprint className="h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
+      {link.state === "named" ? (
+        <span>{link.name}</span>
+      ) : link.state === "missing" ? (
+        <span className="text-xs text-warning">{t.employees.deviceMissingOnDevice}</span>
+      ) : (
+        <span className="text-xs text-muted-foreground">{t.employees.deviceLinked}</span>
+      )}
+    </span>
+  );
+}
+
 export function EmployeesTable({
   employees,
   departments,
@@ -55,6 +79,22 @@ export function EmployeesTable({
   const [deptFilter, setDeptFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [tenureFilter, setTenureFilter] = useState<string[]>([]);
+  // The names the fingerprint device itself holds. Asked for after the list is on screen, never
+  // before it: the device is on the factory network and can be slow or off, and the roster must
+  // not wait for it. Until (or unless) they arrive, a linked employee just reads "مربوط".
+  const [deviceNames, setDeviceNames] = useState<Record<string, string> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getDeviceUserNamesAction()
+      .then((res) => {
+        if (!cancelled && "names" in res) setDeviceNames(res.names);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const STATUS_LABEL: Record<Employee["status"], string> = {
     active: t.employees.statusActive,
@@ -137,6 +177,7 @@ export function EmployeesTable({
                 <TableHead>{t.employees.colName}</TableHead>
                 <TableHead>{t.employees.colDepartment}</TableHead>
                 <TableHead>{t.employees.colJobTitle}</TableHead>
+                <TableHead>{t.employees.colDevice}</TableHead>
                 <TableHead>{t.employees.colShift}</TableHead>
                 <TableHead>{t.employees.colBasicSalary}</TableHead>
                 <TableHead>{t.employees.colStatus}</TableHead>
@@ -167,6 +208,7 @@ export function EmployeesTable({
                   </TableCell>
                   <TableCell>{translateLabel(deptMap.get(e.departmentId) ?? "", locale)}</TableCell>
                   <TableCell>{translateLabel(e.jobTitle, locale)}</TableCell>
+                  <TableCell><DeviceCell employee={e} names={deviceNames} /></TableCell>
                   <TableCell>{translateLabel(shiftMap.get(e.shiftId) ?? "", locale)}</TableCell>
                   <TableCell className="tabular-nums">{formatEGP(e.basicSalary, locale)}</TableCell>
                   <TableCell><Badge variant={STATUS_VARIANT[e.status]}>{STATUS_LABEL[e.status]}</Badge></TableCell>
