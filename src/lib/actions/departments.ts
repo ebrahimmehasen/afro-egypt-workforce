@@ -12,19 +12,24 @@ import { getT } from "@/lib/i18n";
 
 const departmentSchema = z.object({
   name: z.string().min(2),
-  managerName: z.string().min(2),
+  managerId: z.string().min(1),
 });
 
 /** The head must be a real, current employee — the form offers a list, this enforces it server-side. */
-async function isActiveEmployeeName(name: string) {
-  return (await prisma.employee.count({ where: { name, deletedAt: null, status: { not: "terminated" } } })) > 0;
+function activeEmployee(id: string) {
+  return prisma.employee.findFirst({
+    where: { id, deletedAt: null, status: { not: "terminated" } },
+    select: { id: true, name: true },
+  });
 }
+
+type DepartmentPayload = { id: string; name: string; managerId: string };
 
 export async function createDepartment(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const t = await getT();
   const parsed = departmentSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  if (!(await isActiveEmployeeName(parsed.data.managerName))) return { error: t.validation.managerRequired };
+  if (!(await activeEmployee(parsed.data.managerId))) return { error: t.validation.managerRequired };
   const actor = await getSession();
   const payload = { id: nextId("DEP"), ...parsed.data };
 
@@ -35,14 +40,13 @@ export async function createDepartment(_prev: ActionState, formData: FormData): 
   );
 }
 
-export async function applyCreateDepartment(
-  payload: { id: string; name: string; managerName: string },
-  actorName: string,
-): Promise<ActionState> {
+export async function applyCreateDepartment(payload: DepartmentPayload, actorName: string): Promise<ActionState> {
   const t = await getT();
+  const manager = await activeEmployee(payload.managerId);
+  if (!manager) return { error: t.validation.managerRequired };
   await recordChangeAs(
     actorName,
-    { module: t.nav.departments, action: t.auditActions.addDepartment, newValue: payload.name },
+    { module: t.nav.departments, action: t.auditActions.addDepartment, newValue: `${payload.name} — ${manager.name}` },
     (tx) => tx.department.create({ data: payload }),
   );
   revalidatePath("/departments");
@@ -54,8 +58,12 @@ export async function updateDepartment(_prev: ActionState, formData: FormData): 
   const id = String(formData.get("id") ?? "");
   const parsed = departmentSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
-  if (!(await isActiveEmployeeName(parsed.data.managerName))) return { error: t.validation.managerRequired };
-  const before = await prisma.department.findFirst({ where: { id, deletedAt: null } });
+  const manager = await activeEmployee(parsed.data.managerId);
+  if (!manager) return { error: t.validation.managerRequired };
+  const before = await prisma.department.findFirst({
+    where: { id, deletedAt: null },
+    include: { manager: { select: { name: true } } },
+  });
   if (!before) return { error: t.validation.departmentNotFound };
   const actor = await getSession();
   const payload = { id, ...parsed.data };
@@ -65,7 +73,7 @@ export async function updateDepartment(_prev: ActionState, formData: FormData): 
       actionKey: "departments.update",
       module: t.nav.departments,
       actionLabel: t.auditActions.editDepartment,
-      summary: `${before.name} — ${before.managerName} → ${payload.name} — ${payload.managerName}`,
+      summary: `${before.name} — ${before.manager?.name ?? "-"} → ${payload.name} — ${manager.name}`,
       targetId: id,
     },
     payload,
@@ -73,22 +81,24 @@ export async function updateDepartment(_prev: ActionState, formData: FormData): 
   );
 }
 
-export async function applyUpdateDepartment(
-  payload: { id: string; name: string; managerName: string },
-  actorName: string,
-): Promise<ActionState> {
+export async function applyUpdateDepartment(payload: DepartmentPayload, actorName: string): Promise<ActionState> {
   const t = await getT();
-  const before = await prisma.department.findFirst({ where: { id: payload.id, deletedAt: null } });
+  const before = await prisma.department.findFirst({
+    where: { id: payload.id, deletedAt: null },
+    include: { manager: { select: { name: true } } },
+  });
   if (!before) return { error: t.validation.departmentNotFound };
+  const manager = await activeEmployee(payload.managerId);
+  if (!manager) return { error: t.validation.managerRequired };
   await recordChangeAs(
     actorName,
     {
       module: t.nav.departments,
       action: t.auditActions.editDepartment,
-      oldValue: `${before.name} — ${before.managerName}`,
-      newValue: `${payload.name} — ${payload.managerName}`,
+      oldValue: `${before.name} — ${before.manager?.name ?? "-"}`,
+      newValue: `${payload.name} — ${manager.name}`,
     },
-    (tx) => tx.department.update({ where: { id: payload.id }, data: { name: payload.name, managerName: payload.managerName } }),
+    (tx) => tx.department.update({ where: { id: payload.id }, data: { name: payload.name, managerId: payload.managerId } }),
   );
   revalidatePath("/departments");
   return { success: true, message: t.departments.savedEdits };

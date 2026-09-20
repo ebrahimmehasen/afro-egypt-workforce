@@ -43,7 +43,10 @@ export interface Employee {
 export interface Department {
   id: string;
   name: string;
-  managerName: string;
+  /** The head's employee id; unset until one is chosen. */
+  managerId?: string;
+  /** The head's current name, read from the linked employee — never stored on the department. */
+  managerName?: string;
 }
 
 export interface Shift {

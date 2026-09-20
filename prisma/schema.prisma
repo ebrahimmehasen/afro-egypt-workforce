@@ -179,15 +179,20 @@ model User {
 // ---------------------------------------------------------------------------
 
 model Department {
-  id          String    @id @default(cuid())
-  name        String
-  managerName String
-  deletedAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        String    @id @default(cuid())
+  name      String
+  /// The department head — a real employee, so a rename shows up here on its own.
+  /// Cleared (not blocked) if that employee is ever hard-deleted.
+  managerId String?
+  manager   Employee? @relation("DepartmentManager", fields: [managerId], references: [id], onDelete: SetNull)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  employees Employee[]
+  employees Employee[] @relation("DepartmentMembers")
   users     User[]
+
+  @@index([managerId])
 }
 
 /// Per-department atomic counter backing Employee.employeeNumber generation
@@ -224,7 +229,7 @@ model Employee {
   employeeNumber        String         @unique
   name                  String
   departmentId          String
-  department            Department     @relation(fields: [departmentId], references: [id])
+  department            Department     @relation("DepartmentMembers", fields: [departmentId], references: [id])
   jobTitle              String
   hireDate              DateTime       @db.Date
   shiftId               String
@@ -261,6 +266,7 @@ model Employee {
   documents       EmployeeDocument[]
   acknowledgments EmployeeAcknowledgment[]
   users           User[]
+  managedDepartments Department[] @relation("DepartmentManager")
 
   @@index([departmentId])
   @@index([shiftId])

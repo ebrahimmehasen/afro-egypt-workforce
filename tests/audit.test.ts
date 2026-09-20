@@ -37,7 +37,7 @@ describe.skipIf(!dbUp)("recordChangeAs", () => {
     await recordChangeAs(
       "Tester",
       { module: "test-module", action: "create", newValue: TEST_DEPT },
-      (tx) => tx.department.create({ data: { id: TEST_DEPT, name: "Audit Test", managerName: "N/A" } }),
+      (tx) => tx.department.create({ data: { id: TEST_DEPT, name: "Audit Test" } }),
     );
 
     expect(await prisma.department.findUnique({ where: { id: TEST_DEPT } })).toBeTruthy();
@@ -48,7 +48,7 @@ describe.skipIf(!dbUp)("recordChangeAs", () => {
   it("rolls the audit row back when the write throws", async () => {
     await expect(
       recordChangeAs("Tester", { module: "test-module", action: "create" }, async (tx) => {
-        await tx.department.create({ data: { id: TEST_DEPT, name: "Audit Test", managerName: "N/A" } });
+        await tx.department.create({ data: { id: TEST_DEPT, name: "Audit Test" } });
         throw new Error("boom");
       }),
     ).rejects.toThrow("boom");

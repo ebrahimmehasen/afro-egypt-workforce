@@ -29,15 +29,6 @@ const DEVICE_ID = "ZK-01";
 
 const DEPARTMENT_NAMES = ["الإنتاج", "المخازن", "الصيانة", "الأمن", "الموارد البشرية", "الحسابات"] as const;
 
-const DEPARTMENT_MANAGERS: Record<string, string> = {
-  الإنتاج: "مهندس/ كريم عبدالعزيز",
-  المخازن: "أ/ سيد فهمي",
-  الصيانة: "مهندس/ طارق حجازي",
-  الأمن: "أ/ رضا غانم",
-  "الموارد البشرية": "أ/ إيمان فؤاد",
-  الحسابات: "أ/ عادل زكي",
-};
-
 const JOB_TITLES: Record<string, string[]> = {
   الإنتاج: ["عامل إنتاج", "عامل خط تعبئة", "فني تشغيل", "مشرف خط إنتاج"],
   المخازن: ["عامل مخزن", "أمين مخزن", "مراقب مخزون"],
@@ -415,7 +406,7 @@ async function main() {
   await prisma.device.create({ data: { id: DEVICE_ID, name: "جهاز البصمة التجريبي", location: "البوابة الرئيسية" } });
 
   await prisma.department.createMany({
-    data: DEPARTMENT_NAMES.map((name, i) => ({ id: `DEP-${i + 1}`, name, managerName: DEPARTMENT_MANAGERS[name] })),
+    data: DEPARTMENT_NAMES.map((name, i) => ({ id: `DEP-${i + 1}`, name })),
   });
   await prisma.shift.createMany({
     data: SHIFTS.map((s) => ({

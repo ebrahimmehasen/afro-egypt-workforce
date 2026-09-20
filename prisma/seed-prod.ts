@@ -51,7 +51,7 @@ async function main() {
     await prisma.department.upsert({
       where: { id: `DEP-${i + 1}` },
       update: {},
-      create: { id: `DEP-${i + 1}`, name: DEPARTMENTS[i], managerName: "—" },
+      create: { id: `DEP-${i + 1}`, name: DEPARTMENTS[i] },
     });
   }
 

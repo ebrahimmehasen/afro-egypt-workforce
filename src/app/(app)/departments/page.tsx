@@ -53,7 +53,7 @@ export default async function DepartmentsPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-foreground">{translateLabel(dept.name, locale)}</p>
-                    <p className="text-xs text-muted-foreground">{dept.managerName}</p>
+                    <p className="text-xs text-muted-foreground">{dept.managerName ?? "—"}</p>
                   </div>
                 </div>
                 {canEdit && (

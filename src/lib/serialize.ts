@@ -95,8 +95,8 @@ export function toEmployeeDocument(d: PEmployeeDocument): EmployeeDocument {
   };
 }
 
-export function toDepartment(d: PDepartment): Department {
-  return { id: d.id, name: d.name, managerName: d.managerName };
+export function toDepartment(d: PDepartment & { manager: { name: string } | null }): Department {
+  return { id: d.id, name: d.name, managerId: d.managerId ?? undefined, managerName: d.manager?.name };
 }
 
 export function toShift(s: PShift): Shift {

@@ -61,7 +61,11 @@ export async function getDb(): Promise<Store> {
     payrollSettings,
   ] = await Promise.all([
     prisma.employee.findMany({ where: { deletedAt: null }, orderBy: { id: "asc" } }),
-    prisma.department.findMany({ where: { deletedAt: null }, orderBy: { id: "asc" } }),
+    prisma.department.findMany({
+      where: { deletedAt: null },
+      orderBy: { id: "asc" },
+      include: { manager: { select: { name: true } } },
+    }),
     prisma.shift.findMany({ where: { deletedAt: null }, orderBy: { id: "asc" } }),
     prisma.dailyAttendance.findMany({ orderBy: { date: "asc" } }),
     prisma.leave.findMany({ orderBy: { createdAt: "desc" } }),

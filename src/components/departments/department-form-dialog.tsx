@@ -36,9 +36,9 @@ export function DepartmentFormDialog({
   employees: ManagerOption[];
 }) {
   const t = useT();
-  // A legacy free-typed manager that isn't an employee can't be pre-selected —
-  // leave it blank so the form forces a real pick.
-  const currentManager = employees.some((e) => e.name === department?.managerName) ? department?.managerName : "";
+  // Blank when the head was cleared or is no longer selectable (e.g. terminated),
+  // so the form forces a real pick.
+  const currentManager = employees.some((e) => e.id === department?.managerId) ? department?.managerId : "";
   const [open, setOpen] = useState(false);
   const action = department ? updateDepartment : createDepartment;
   const [state, formAction] = useActionState(action, {});
@@ -64,11 +64,11 @@ export function DepartmentFormDialog({
             <Input id="name" name="name" defaultValue={department?.name} required />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="managerName">{t.departments.formManager}</Label>
-            <select id="managerName" name="managerName" defaultValue={currentManager} className={selectCls} required>
+            <Label htmlFor="managerId">{t.departments.formManager}</Label>
+            <select id="managerId" name="managerId" defaultValue={currentManager} className={selectCls} required>
               <option value="">— {t.departments.selectManager} —</option>
               {employees.map((e) => (
-                <option key={e.id} value={e.name}>{e.name} — {e.employeeNumber}</option>
+                <option key={e.id} value={e.id}>{e.name} — {e.employeeNumber}</option>
               ))}
             </select>
           </div>
