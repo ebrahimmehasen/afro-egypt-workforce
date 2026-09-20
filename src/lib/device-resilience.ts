@@ -53,6 +53,8 @@ export function realtimeStatus(s: {
   return "reconnecting";
 }
 
+export type BoundedCache<T> = ReturnType<typeof createBoundedCache<T>>;
+
 export type CachedResult<T> =
   | { ok: true; value: T; fetchedAt: number; stale: boolean }
   | { ok: false; error: string };

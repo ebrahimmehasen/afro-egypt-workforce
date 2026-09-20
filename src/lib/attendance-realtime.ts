@@ -2,8 +2,10 @@ import { startRealtimeListener, stopRealtimeListener, isRealtimeListenerActive, 
 import { ingestOneRecord } from "@/lib/attendance-ingest";
 import { syncDeviceAttendance } from "@/lib/attendance-sync";
 
-let initialized = false;
-let catchingUp = false;
+// Shared through globalThis for the same reason as the listener state in zk-device.ts: this module can be
+// compiled into more than one bundle, and "start once" / "don't overlap" must hold for the whole process.
+const globalRef = globalThis as typeof globalThis & { __afroAttendanceRealtime?: { initialized: boolean; catchingUp: boolean } };
+const flags = (globalRef.__afroAttendanceRealtime ??= { initialized: false, catchingUp: false });
 // Belt-and-braces backstop, not the primary path. Real-time delivery is normally instant, and every
 // reconnect after a gap already triggers a catch-up, so this only guards against a silently missed
 // event. A full sync downloads the device's whole log, so it is deliberately infrequent.
@@ -20,23 +22,23 @@ async function handleRealtimeRecord(r: RawAttendanceRecord) {
 /** Pulls in whatever the listener could have missed. Never overlaps itself, and a failure
  * (device unreachable again) is just logged — the next reconnect tries again. */
 async function catchUp(reason: string) {
-  if (catchingUp) return;
-  catchingUp = true;
+  if (flags.catchingUp) return;
+  flags.catchingUp = true;
   try {
     const r = await syncDeviceAttendance();
     console.log(`[attendance-realtime] catch-up (${reason}): ${r.imported} new punch(es)`);
   } catch (e) {
     console.error(`[attendance-realtime] catch-up (${reason}) failed:`, e instanceof Error ? e.message : e);
   } finally {
-    catchingUp = false;
+    flags.catchingUp = false;
   }
 }
 
 /** Starts the real-time listener and the safety-net poll. Call once per
  * server process (see src/lib/startup.ts). */
 export function initAttendanceRealtime() {
-  if (initialized) return;
-  initialized = true;
+  if (flags.initialized) return;
+  flags.initialized = true;
 
   // The catch-up runs after the first successful connect and after every reconnect that follows
   // a dropped connection — so a power cut or restart is healed as soon as the device is back.

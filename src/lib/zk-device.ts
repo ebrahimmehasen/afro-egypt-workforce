@@ -2,7 +2,7 @@
 const ZKLib = require("node-zklib");
 const { COMMANDS, REQUEST_DATA } = require("node-zklib/constants");
 import { prisma } from "@/lib/prisma";
-import { createBoundedCache, createMutex, reconnectDelay, realtimeStatus, RealtimeStatus } from "@/lib/device-resilience";
+import { BoundedCache, createBoundedCache, createMutex, reconnectDelay, realtimeStatus, RealtimeStatus } from "@/lib/device-resilience";
 
 const SINGLETON = "singleton";
 // A device on the same LAN answers in milliseconds, so waiting longer to connect only makes
@@ -87,23 +87,46 @@ async function openSocket(zk: any, ms: number = CONNECT_TIMEOUT_MS): Promise<voi
 // listener's own reconnect used to run at the same time and fight for that
 // single slot, which is what made everything crawl (and the page hang) after
 // a power cut or restart.
-const runExclusive = createMutex();
+// Everything that has to be ONE thing per server process lives on globalThis. Next.js compiles this
+// module into several bundles (the layout that starts the listener, each page, each group of server
+// actions) and every bundle gets its own copy of module-level variables. With plain module state the
+// listener lived in one copy while the status poll, the pause/resume buttons, the page's own device
+// reads and the cache invalidation all talked to other copies that never saw it: the badge said
+// "disconnected", and those operations fought the listener for the device's single connection.
+interface ZkShared {
+  runExclusive: ReturnType<typeof createMutex>;
+  overviewCache: BoundedCache<DeviceOverview> | null;
+  realtimeZk: any;
+  realtimeCallback: ((r: RawAttendanceRecord) => void) | null;
+  realtimeOnReconnected: (() => void) | null;
+  realtimeUserPaused: boolean;
+  realtimeReconnectTimer: NodeJS.Timeout | null;
+  reconnectAttempt: number;
+  // True while punches may have happened that the listener didn't hear: the server
+  // just started, or the connection dropped. Cleared - and a catch-up triggered -
+  // on the next successful connect. Our own pause/resume around an operation
+  // deliberately doesn't set it.
+  realtimeGap: boolean;
+  // When the listener last went down, and how many of our own device operations are running (the
+  // listener is switched off on purpose while one runs). Only used to report an honest status.
+  realtimeDownSince: number | null;
+  deviceOpsRunning: number;
+}
 
-let realtimeZk: any = null;
-let realtimeCallback: ((r: RawAttendanceRecord) => void) | null = null;
-let realtimeOnReconnected: (() => void) | null = null;
-let realtimeUserPaused = false;
-let realtimeReconnectTimer: NodeJS.Timeout | null = null;
-let reconnectAttempt = 0;
-// True while punches may have happened that the listener didn't hear: the server
-// just started, or the connection dropped. Cleared - and a catch-up triggered -
-// on the next successful connect. Our own pause/resume around an operation
-// deliberately doesn't set it.
-let realtimeGap = false;
-// When the listener last went down, and how many of our own device operations are running (the
-// listener is switched off on purpose while one runs). Only used to report an honest status.
-let realtimeDownSince: number | null = null;
-let deviceOpsRunning = 0;
+const globalRef = globalThis as typeof globalThis & { __afroZkShared?: ZkShared };
+const S: ZkShared = (globalRef.__afroZkShared ??= {
+  runExclusive: createMutex(),
+  overviewCache: null,
+  realtimeZk: null,
+  realtimeCallback: null,
+  realtimeOnReconnected: null,
+  realtimeUserPaused: false,
+  realtimeReconnectTimer: null,
+  reconnectAttempt: 0,
+  realtimeGap: false,
+  realtimeDownSince: null,
+  deviceOpsRunning: 0,
+});
 
 function attachRealtimeSocketHandlers(zk: any) {
   const socket = zk?.zklibTcp?.socket;
@@ -113,11 +136,11 @@ function attachRealtimeSocketHandlers(zk: any) {
   // A device that loses power without closing its end is caught by the periodic catch-up instead, which
   // makes a fresh connection and so notices it's gone.
   const onDrop = () => {
-    if (realtimeZk !== zk) return; // a newer connection already replaced this one
-    realtimeZk = null;
-    realtimeDownSince = Date.now();
-    realtimeGap = true;
-    if (!realtimeUserPaused && realtimeCallback) scheduleRealtimeReconnect();
+    if (S.realtimeZk !== zk) return; // a newer connection already replaced this one
+    S.realtimeZk = null;
+    S.realtimeDownSince = Date.now();
+    S.realtimeGap = true;
+    if (!S.realtimeUserPaused && S.realtimeCallback) scheduleRealtimeReconnect();
   };
   socket.once("close", onDrop);
   socket.once("error", onDrop);
@@ -126,16 +149,16 @@ function attachRealtimeSocketHandlers(zk: any) {
 /** Retries with a growing delay so a device that's still booting (or still holding our old
  * session after a power cut) isn't hammered. `delayMs = 0` is used to bring the listener back
  * right after one of our own operations. */
-function scheduleRealtimeReconnect(delayMs: number = reconnectDelay(reconnectAttempt)) {
-  if (realtimeReconnectTimer) return;
-  realtimeReconnectTimer = setTimeout(async () => {
-    realtimeReconnectTimer = null;
-    if (realtimeUserPaused || !realtimeCallback) return;
+function scheduleRealtimeReconnect(delayMs: number = reconnectDelay(S.reconnectAttempt)) {
+  if (S.realtimeReconnectTimer) return;
+  S.realtimeReconnectTimer = setTimeout(async () => {
+    S.realtimeReconnectTimer = null;
+    if (S.realtimeUserPaused || !S.realtimeCallback) return;
     try {
       await connectRealtimeNow();
     } catch (e) {
-      reconnectAttempt += 1;
-      realtimeGap = true;
+      S.reconnectAttempt += 1;
+      S.realtimeGap = true;
       console.error("[attendance-realtime] reconnect failed:", e instanceof Error ? e.message : e);
       scheduleRealtimeReconnect();
     }
@@ -143,14 +166,14 @@ function scheduleRealtimeReconnect(delayMs: number = reconnectDelay(reconnectAtt
 }
 
 async function connectRealtimeNow(): Promise<void> {
-  await runExclusive(async () => {
-    if (realtimeZk || realtimeUserPaused) return;
+  await S.runExclusive(async () => {
+    if (S.realtimeZk || S.realtimeUserPaused) return;
     const { ip, port } = await getDeviceConnection();
     const zk = new ZKLib(ip, port, CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
     await openSocket(zk);
     try {
       await zk.zklibTcp.getRealTimeLogs((raw: { userId: string; attTime: Date }) => {
-        realtimeCallback?.({ deviceUserId: String(raw.userId), recordTime: raw.attTime });
+        S.realtimeCallback?.({ deviceUserId: String(raw.userId), recordTime: raw.attTime });
       });
     } catch (e) {
       try {
@@ -160,15 +183,15 @@ async function connectRealtimeNow(): Promise<void> {
       }
       throw e;
     }
-    realtimeZk = zk;
-    realtimeDownSince = null;
+    S.realtimeZk = zk;
+    S.realtimeDownSince = null;
     attachRealtimeSocketHandlers(zk);
   });
 
-  reconnectAttempt = 0;
-  if (realtimeGap && realtimeZk) {
-    realtimeGap = false;
-    realtimeOnReconnected?.();
+  S.reconnectAttempt = 0;
+  if (S.realtimeGap && S.realtimeZk) {
+    S.realtimeGap = false;
+    S.realtimeOnReconnected?.();
   }
 }
 
@@ -180,22 +203,22 @@ export async function startRealtimeListener(
   onRecord: (r: RawAttendanceRecord) => void,
   onReconnected?: () => void,
 ): Promise<void> {
-  realtimeCallback = onRecord;
+  S.realtimeCallback = onRecord;
   if (onReconnected) {
-    realtimeOnReconnected = onReconnected;
-    realtimeGap = true;
+    S.realtimeOnReconnected = onReconnected;
+    S.realtimeGap = true;
   }
-  realtimeUserPaused = false;
-  realtimeDownSince ??= Date.now();
-  if (realtimeReconnectTimer) {
-    clearTimeout(realtimeReconnectTimer);
-    realtimeReconnectTimer = null;
+  S.realtimeUserPaused = false;
+  S.realtimeDownSince ??= Date.now();
+  if (S.realtimeReconnectTimer) {
+    clearTimeout(S.realtimeReconnectTimer);
+    S.realtimeReconnectTimer = null;
   }
   try {
     await connectRealtimeNow();
   } catch (e) {
-    realtimeGap = true;
-    reconnectAttempt += 1;
+    S.realtimeGap = true;
+    S.reconnectAttempt += 1;
     scheduleRealtimeReconnect();
     throw e;
   }
@@ -206,16 +229,16 @@ export async function startRealtimeListener(
  * called again; withDevice's internal pause/resume never sets that flag. */
 export async function stopRealtimeListener(opts: { userInitiated?: boolean } = {}): Promise<void> {
   if (opts.userInitiated) {
-    realtimeUserPaused = true;
+    S.realtimeUserPaused = true;
   }
-  if (realtimeReconnectTimer) {
-    clearTimeout(realtimeReconnectTimer);
-    realtimeReconnectTimer = null;
+  if (S.realtimeReconnectTimer) {
+    clearTimeout(S.realtimeReconnectTimer);
+    S.realtimeReconnectTimer = null;
   }
-  const zk = realtimeZk;
-  realtimeZk = null;
+  const zk = S.realtimeZk;
+  S.realtimeZk = null;
   if (zk) {
-    realtimeDownSince = Date.now();
+    S.realtimeDownSince = Date.now();
     try {
       await zk.disconnect();
     } catch {
@@ -225,21 +248,21 @@ export async function stopRealtimeListener(opts: { userInitiated?: boolean } = {
 }
 
 export function isRealtimeListenerActive(): boolean {
-  return realtimeZk !== null;
+  return S.realtimeZk !== null;
 }
 
 export function isRealtimeListenerPaused(): boolean {
-  return realtimeUserPaused;
+  return S.realtimeUserPaused;
 }
 
 /** The status to show — see realtimeStatus for why it isn't just "is the socket open right now". */
 export function getRealtimeConnectionStatus(): RealtimeStatus {
   return realtimeStatus({
     active: isRealtimeListenerActive(),
-    userPaused: realtimeUserPaused,
-    opsRunning: deviceOpsRunning,
-    downSince: realtimeDownSince,
-    failedAttempts: reconnectAttempt,
+    userPaused: S.realtimeUserPaused,
+    opsRunning: S.deviceOpsRunning,
+    downSince: S.realtimeDownSince,
+    failedAttempts: S.reconnectAttempt,
     now: Date.now(),
   });
 }
@@ -248,8 +271,8 @@ export function getRealtimeConnectionStatus(): RealtimeStatus {
 async function withDevice<T>(fn: (zk: any) => Promise<T>): Promise<T> {
   let resumeListener = false;
   try {
-    return await runExclusive(async () => {
-      deviceOpsRunning += 1;
+    return await S.runExclusive(async () => {
+      S.deviceOpsRunning += 1;
       try {
         resumeListener = isRealtimeListenerActive();
         if (resumeListener) await stopRealtimeListener();
@@ -267,13 +290,13 @@ async function withDevice<T>(fn: (zk: any) => Promise<T>): Promise<T> {
           }
         }
       } finally {
-        deviceOpsRunning -= 1;
+        S.deviceOpsRunning -= 1;
       }
     });
   } finally {
     // Runs even when the device couldn't be reached, so the listener always gets a retry
     // instead of being left switched off.
-    if (resumeListener && !realtimeUserPaused && realtimeCallback) scheduleRealtimeReconnect(0);
+    if (resumeListener && !S.realtimeUserPaused && S.realtimeCallback) scheduleRealtimeReconnect(0);
   }
 }
 
@@ -404,7 +427,7 @@ async function loadOverview(): Promise<DeviceOverview> {
 }
 
 const OVERVIEW_FRESH_MS = 30_000;
-const overviewCache = createBoundedCache(loadOverview, { freshMs: OVERVIEW_FRESH_MS });
+const overviewCache = (S.overviewCache ??= createBoundedCache(loadOverview, { freshMs: OVERVIEW_FRESH_MS }));
 
 export type DeviceOverviewResult =
   | ({ online: true; stale: boolean; fetchedAt: number } & DeviceOverview)
