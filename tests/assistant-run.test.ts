@@ -21,16 +21,16 @@ describe("runAssistant", () => {
   it("runs the requested tool against the user's own data and feeds the result back", async () => {
     const chat = vi
       .fn<ChatFn>()
-      .mockResolvedValueOnce(toolCall("find_data_gaps", {}))
+      .mockResolvedValueOnce(toolCall("find_missing_items", {}))
       .mockResolvedValueOnce(answer("عندك موظفين ناقصهم أوراق"));
     const run = await runAssistant({ ...base, chat });
 
-    expect(run.toolsUsed).toEqual(["find_data_gaps"]);
+    expect(run.toolsUsed).toEqual(["find_missing_items"]);
     expect(run.answer).toBe("عندك موظفين ناقصهم أوراق");
     const second = messagesOf(chat, 1);
     const toolMsg = second.find((m) => m.role === "tool")!;
     expect(toolMsg.tool_call_id).toBe("call_1");
-    expect(JSON.parse(toolMsg.content!)).toHaveProperty("employeesWithGaps");
+    expect(JSON.parse(toolMsg.content!)).toHaveProperty("employeesWithMissingItems");
   });
 
   it("starts every conversation with the system prompt and puts saved history before the question", async () => {

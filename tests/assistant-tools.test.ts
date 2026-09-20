@@ -14,12 +14,12 @@ describe("search_employees", () => {
   it("finds by partial name and reports how many matched", () => {
     const r = searchEmployees(ctx, { query: "سامي" });
     expect(r.total).toBe(2);
-    expect(r.employees.map((e) => e.employeeNumber)).toEqual(["PROD-001", "PROD-002"]);
+    expect(r.employees.map((e) => e.name)).toEqual(["سامي تجريبي", "سامي آخر"]);
   });
 
   it("filters by department and status, and honours the limit", () => {
     expect(searchEmployees(ctx, { department: "إنتاج" }).total).toBe(3);
-    expect(searchEmployees(ctx, { status: "terminated" }).employees[0].employeeNumber).toBe("PROD-003");
+    expect(searchEmployees(ctx, { status: "terminated" }).employees[0].name).toBe("موظف سابق");
     const limited = searchEmployees(ctx, { department: "إنتاج", limit: 1 });
     expect(limited).toMatchObject({ total: 3, showing: 1 });
     expect(limited.employees).toHaveLength(1);
@@ -67,21 +67,21 @@ describe("get_employee", () => {
   });
 });
 
-describe("find_data_gaps", () => {
+describe("find_missing_items", () => {
   it("ranks the worst records first and leaves out people who left", () => {
     const r = findDataGaps(ctx, {});
     expect(r.employeesChecked).toBe(3); // the terminated one is excluded
-    const numbers = r.employees.map((e) => e.employeeNumber);
-    expect(numbers).not.toContain("PROD-003");
-    expect(r.employees[0].totalGaps).toBeGreaterThanOrEqual(r.employees[1].totalGaps);
+    const names = r.employees.map((e) => e.name);
+    expect(names).not.toContain("موظف سابق");
+    expect(r.employees[0].itemsMissing).toBeGreaterThanOrEqual(r.employees[1].itemsMissing);
   });
 
   it("flags missing profile data by name, including an unassigned department and zero salary", () => {
     const r = findDataGaps(ctx, {});
-    const tbd = r.employees.find((e) => e.employeeNumber === "TBD-001")!;
-    expect(tbd.missingProfileData).toEqual(expect.arrayContaining(["القسم", "المرتب"]));
-    const p2 = r.employees.find((e) => e.employeeNumber === "PROD-002")!;
-    expect(p2.missingProfileData).toEqual(expect.arrayContaining(["الرقم القومي", "رقم التليفون", "المرتب"]));
+    const tbd = r.employees.find((e) => e.name === "منى تجريبية")!;
+    expect(tbd.missingDetails).toEqual(expect.arrayContaining(["القسم", "المرتب"]));
+    const p2 = r.employees.find((e) => e.name === "سامي آخر")!;
+    expect(p2.missingDetails).toEqual(expect.arrayContaining(["الرقم القومي", "رقم التليفون", "المرتب"]));
   });
 
   it("tallies what is missing most across the company and never exposes ids", () => {
@@ -93,16 +93,37 @@ describe("find_data_gaps", () => {
   it("can be limited to a department", () => {
     expect(findDataGaps(ctx, { department: "غير محدد" }).employeesChecked).toBe(1);
   });
+
+  it("answers 'who has the fewest files' from the other end of the list", () => {
+    const fewest = findDataGaps(ctx, { sort: "fewest_files" });
+    expect(fewest.sortedBy).toBe("fewest_files");
+    expect(fewest.employees[0].documentFilesOnFile).toBe(0);
+    // PROD-001 has three files on record, so it is the last one for "fewest"
+    expect(fewest.employees.at(-1)!.name).toBe("سامي تجريبي");
+
+    const most = findDataGaps(ctx, { sort: "most_files" });
+    expect(most.employees[0]).toMatchObject({ name: "سامي تجريبي", documentFilesOnFile: 3 });
+  });
+
+  it("'fewest gaps' puts the most complete record first and includes people with nothing missing", () => {
+    const r = findDataGaps(ctx, { sort: "fewest_missing" });
+    expect(r.employees[0].itemsMissing).toBeLessThanOrEqual(r.employees[1].itemsMissing);
+    expect(r.showing).toBe(r.employeesChecked); // everyone is ranked, not only those with gaps
+  });
+
+  it("falls back to the default order for an unknown sort", () => {
+    expect(findDataGaps(ctx, { sort: "banana" }).sortedBy).toBe("most_missing");
+  });
 });
 
 describe("company_overview", () => {
   it("reports headcount, hires, data quality and attendance highlights", () => {
     const r = companyOverview(ctx);
     expect(r.headcount).toEqual({ total: 4, active: 3, onLeave: 0, terminated: 1 });
-    expect(r.recentHires.list.map((h) => h.employeeNumber)).toEqual(["TBD-001"]);
+    expect(r.recentHires.list.map((h) => h.name)).toEqual(["منى تجريبية"]);
     expect(r.dataQuality).toMatchObject({ employeesWithoutRealDepartment: 1, employeesWithoutSalary: 2 });
     expect(r.attendanceLast30Days).toMatchObject({ absences: 1, lateArrivals: 1 });
-    expect(r.attendanceLast30Days.mostAbsent[0]).toMatchObject({ employeeNumber: "PROD-002", days: 1 });
+    expect(r.attendanceLast30Days.mostAbsent[0]).toMatchObject({ name: "سامي آخر", days: 1 });
     expect(JSON.stringify(r)).not.toContain("secret-id");
   });
 
@@ -141,5 +162,35 @@ describe("buildSnapshot", () => {
     for (const person of ["سامي", "منى", "PROD-001", "PROD-002", "TBD-001", "secret-id", "01000000000", "00000000000000"]) {
       expect(snapshot).not.toContain(person);
     }
+  });
+});
+
+describe("employee numbers stay out of the model's sight", () => {
+  const everything = () =>
+    JSON.stringify([
+      searchEmployees(ctx, {}),
+      findDataGaps(ctx, {}),
+      findDataGaps(ctx, { sort: "fewest_files" }),
+      companyOverview(ctx),
+    ]);
+
+  it("does not put an employee number in any list", () => {
+    for (const code of ["PROD-001", "PROD-002", "PROD-003", "TBD-001"]) expect(everything()).not.toContain(code);
+  });
+
+  it("does give it for two people who share a name, since nothing else tells them apart", () => {
+    const twin = { ...ctx.db.employees[2], id: "secret-id-9", employeeNumber: "TBD-002" }; // same name as منى تجريبية
+    const shared = { ...ctx, db: { ...ctx.db, employees: [...ctx.db.employees, twin] } };
+    const rows = searchEmployees(shared, { query: "منى" }).employees as { employeeNumber?: string; name: string }[];
+    expect(rows.map((r) => r.employeeNumber).sort()).toEqual(["TBD-001", "TBD-002"]);
+    // and someone with a unique name still has none
+    const unique = searchEmployees(shared, { query: "سامي تجريبي" }).employees as { employeeNumber?: string }[];
+    expect(unique[0].employeeNumber).toBeUndefined();
+  });
+
+  it("still gives the number in a single person's own file, and asks with numbers when a name is ambiguous", () => {
+    expect(getEmployee(ctx, { query: "سامي تجريبي" })).toMatchObject({ identity: { employeeNumber: "PROD-001" } });
+    const amb = getEmployee(ctx, { query: "سامي" }) as { candidates: { employeeNumber: string }[] };
+    expect(amb.candidates.map((c) => c.employeeNumber)).toEqual(["PROD-001", "PROD-002"]);
   });
 });
