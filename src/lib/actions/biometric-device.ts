@@ -9,13 +9,14 @@ import { canManageBiometricDevice } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { syncDeviceAttendance, backfillDeviceUser } from "@/lib/attendance-sync";
 import { removeDeviceUserAttendance } from "@/lib/attendance-ingest";
-import { pauseAttendanceRealtime, resumeAttendanceRealtime } from "@/lib/attendance-realtime";
+import { attendanceRealtimeStatus, pauseAttendanceRealtime, resumeAttendanceRealtime } from "@/lib/attendance-realtime";
 import { ActionState } from "@/hooks/use-action-feedback";
 import {
   cancelDeviceCapture,
   clearDeviceAttendanceLog,
   deleteDeviceFingerprint,
   deleteDeviceUser,
+  invalidateDeviceOverview,
   restartDevice,
   saveDeviceConnection,
   setDeviceEnabled,
@@ -269,6 +270,24 @@ export async function clearDeviceLogAction(confirmText: string) {
  * button a real punch on the device never reaches the app no matter how
  * many times someone scans their finger.
  */
+/** Cheap poll for the status badge — reads in-memory state only, never touches the device. */
+export async function getRealtimeStatusAction() {
+  const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
+  return { success: true as const, status: attendanceRealtimeStatus() };
+}
+
+/** "Retry / refresh" on the device data — drops the cached copy so the page reads from the device again. */
+export async function refreshDeviceDataAction() {
+  const t = await getT();
+  const denied = await guard(t);
+  if (denied) return denied;
+  invalidateDeviceOverview();
+  revalidatePath(PATH);
+  return { success: true as const };
+}
+
 export async function syncAttendanceNowAction() {
   const t = await getT();
   const denied = await guard(t);

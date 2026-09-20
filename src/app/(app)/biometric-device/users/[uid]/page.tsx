@@ -3,9 +3,10 @@ import { ArrowRight } from "lucide-react";
 import { requireAccess } from "@/lib/auth";
 import { getDb } from "@/lib/data";
 import { getT } from "@/lib/i18n";
-import { getDeviceSnapshot, fetchDeviceAttendanceLogs } from "@/lib/zk-device";
+import { getDeviceOverview } from "@/lib/zk-device";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
+import { RetryButton } from "@/components/biometric-device/retry-button";
 import { DeviceUserDetail, DevicePunchEntry } from "@/components/biometric-device/device-user-detail";
 
 export default async function BiometricDeviceUserPage({
@@ -16,7 +17,8 @@ export default async function BiometricDeviceUserPage({
   await requireAccess("/biometric-device");
   const { uid } = await params;
   const t = await getT();
-  const [snapshot, db] = await Promise.all([getDeviceSnapshot(), getDb()]);
+  // One bounded read of the device (users + full punch log): a slow or unreachable device can't hang this page.
+  const [overview, db] = await Promise.all([getDeviceOverview(), getDb()]);
 
   const backLink = (
     <Link href="/biometric-device" className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
@@ -25,20 +27,21 @@ export default async function BiometricDeviceUserPage({
     </Link>
   );
 
-  if (!snapshot.online) {
+  if (!overview.online) {
     return (
       <div className="flex flex-col gap-6">
         {backLink}
         <Card className="border-destructive/40 bg-destructive/5">
-          <CardContent className="p-4 text-sm text-destructive">
-            {t.biometricDevice.deviceUnreachable} — {snapshot.error}
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm text-destructive">
+            <span>{t.biometricDevice.deviceUnreachable}</span>
+            <RetryButton />
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  const user = snapshot.users.find((u) => String(u.uid) === uid);
+  const user = overview.users.find((u) => String(u.uid) === uid);
   if (!user) {
     return (
       <div className="flex flex-col gap-6">
@@ -59,10 +62,8 @@ export default async function BiometricDeviceUserPage({
   // employee at sync time, so an unlinked (or since-relinked) device user's
   // history would show empty there even though the device itself has years
   // of punches for them (this is also what the "Total Punches" count on the
-  // list page reflects, so the two need to agree). Sequential after
-  // getDeviceSnapshot() above - both hold the device's one connection slot.
-  const allDeviceLogs = await fetchDeviceAttendanceLogs();
-  const userLogs = allDeviceLogs
+  // list page reflects, so the two need to agree).
+  const userLogs = overview.logs
     .filter((r) => r.deviceUserId === user.userId)
     .sort((a, b) => a.recordTime.getTime() - b.recordTime.getTime());
   const seenToday = new Map<string, number>();

@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CircleCheck, CircleDashed, Pause, Play, RefreshCw } from "lucide-react";
+import { CircleCheck, CircleDashed, CircleX, Pause, Play, RefreshCw } from "lucide-react";
 import {
-  pauseRealtimeSyncAction, resumeRealtimeSyncAction, syncAttendanceNowAction,
+  getRealtimeStatusAction, pauseRealtimeSyncAction, resumeRealtimeSyncAction, syncAttendanceNowAction,
 } from "@/lib/actions/biometric-device";
 import { useT } from "@/components/providers/locale-provider";
+import { format } from "@/lib/i18n/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -17,11 +19,33 @@ import {
 
 type RealtimeStatus = "connected" | "paused" | "reconnecting";
 
+const STATUS_POLL_MS = 5000;
+
 export function SyncAttendanceCard({ initialStatus }: { initialStatus: RealtimeStatus }) {
   const t = useT();
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState(initialStatus);
-  const [summary, setSummary] = useState<{ imported: number; skippedUnlinked: number; skippedDuplicate: number } | null>(null);
+  const previous = useRef(initialStatus);
+
+  // The status is read from memory on the server (no device traffic), so polling it is cheap. It keeps
+  // the badge honest after a power cut, and reloads the page's device data the moment the device is back.
+  useEffect(() => {
+    let stopped = false;
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      const res = await getRealtimeStatusAction().catch(() => null);
+      if (stopped || !res || !("status" in res)) return;
+      setStatus(res.status);
+      if (previous.current !== "connected" && res.status === "connected") router.refresh();
+      previous.current = res.status;
+    };
+    const id = setInterval(tick, STATUS_POLL_MS);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
+  }, [router]);
 
   function sync() {
     startTransition(async () => {
@@ -30,8 +54,9 @@ export function SyncAttendanceCard({ initialStatus }: { initialStatus: RealtimeS
         toast.error(res.error);
         return;
       }
-      setSummary(res.result);
-      toast.success(t.biometricDevice.syncDone);
+      const { imported } = res.result;
+      toast.success(imported > 0 ? format(t.biometricDevice.syncNewPunches, { count: imported }) : t.biometricDevice.syncNoNew);
+      router.refresh();
     });
   }
 
@@ -43,6 +68,7 @@ export function SyncAttendanceCard({ initialStatus }: { initialStatus: RealtimeS
         return;
       }
       setStatus("paused");
+      previous.current = "paused";
       toast.success(t.biometricDevice.pausedDone);
     });
   }
@@ -54,30 +80,35 @@ export function SyncAttendanceCard({ initialStatus }: { initialStatus: RealtimeS
         toast.error(res.error);
         return;
       }
-      setStatus("connected");
+      // don't assume it connected — the device may still be unreachable; the poll reports the truth
+      const next = await getRealtimeStatusAction().catch(() => null);
+      const actual = next && "status" in next ? next.status : "reconnecting";
+      setStatus(actual);
+      previous.current = actual;
       toast.success(t.biometricDevice.resumedDone);
     });
   }
 
-  const statusBadge = {
-    connected: { icon: CircleCheck, label: t.biometricDevice.realtimeConnected, variant: "success" as const },
-    paused: { icon: Pause, label: t.biometricDevice.realtimePaused, variant: "outline" as const },
-    reconnecting: { icon: CircleDashed, label: t.biometricDevice.realtimeReconnecting, variant: "secondary" as const },
+  const badge = {
+    connected: { icon: CircleCheck, label: t.biometricDevice.realtimeConnected, variant: "success" as const, desc: t.biometricDevice.syncDescConnected },
+    paused: { icon: Pause, label: t.biometricDevice.realtimePaused, variant: "outline" as const, desc: t.biometricDevice.syncDescPaused },
+    reconnecting: { icon: status === "reconnecting" ? CircleX : CircleDashed, label: t.biometricDevice.realtimeReconnecting, variant: "destructive" as const, desc: t.biometricDevice.syncDescReconnecting },
   }[status];
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {t.biometricDevice.syncSectionTitle}
-          <Badge variant={statusBadge.variant} className="gap-1">
-            <statusBadge.icon className="h-3.5 w-3.5" />
-            {statusBadge.label}
-          </Badge>
-        </CardTitle>
-        <CardDescription>{t.biometricDevice.syncSectionDesc}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-foreground">{t.biometricDevice.syncSectionTitle}</h2>
+            <Badge variant={badge.variant} className="gap-1">
+              <badge.icon className="h-3.5 w-3.5" />
+              {badge.label}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">{badge.desc}</p>
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" className="gap-2" disabled={pending} onClick={sync}>
             <RefreshCw className={`h-4 w-4 ${pending ? "animate-spin" : ""}`} />
@@ -110,13 +141,6 @@ export function SyncAttendanceCard({ initialStatus }: { initialStatus: RealtimeS
             </AlertDialog>
           )}
         </div>
-        {summary && (
-          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-            <span>{t.biometricDevice.syncImported}: <span className="font-semibold text-foreground">{summary.imported}</span></span>
-            <span>{t.biometricDevice.syncUnlinked}: <span className="font-semibold text-foreground">{summary.skippedUnlinked}</span></span>
-            <span>{t.biometricDevice.syncDuplicate}: <span className="font-semibold text-foreground">{summary.skippedDuplicate}</span></span>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

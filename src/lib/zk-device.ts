@@ -2,9 +2,12 @@
 const ZKLib = require("node-zklib");
 const { COMMANDS, REQUEST_DATA } = require("node-zklib/constants");
 import { prisma } from "@/lib/prisma";
+import { createBoundedCache, createMutex, reconnectDelay } from "@/lib/device-resilience";
 
 const SINGLETON = "singleton";
-const CONNECT_TIMEOUT_MS = 8000;
+// A device on the same LAN answers in milliseconds, so waiting longer to connect only makes
+// an unreachable one (power cut, cable out) slower to report.
+const CONNECT_TIMEOUT_MS = 4000;
 const REPLY_TIMEOUT_MS = 8000;
 
 export interface DeviceConnection {
@@ -27,10 +30,6 @@ export interface DeviceUser {
   cardno: number;
 }
 
-export type DeviceSnapshot =
-  | { online: true; info: DeviceInfo; users: DeviceUser[] }
-  | { online: false; error: string };
-
 /** Connection settings row — auto-seeded on first read with the device IP found during setup. */
 export async function getDeviceConnection(): Promise<DeviceConnection> {
   const row = await prisma.biometricDeviceSettings.upsert({
@@ -49,31 +48,80 @@ export async function saveDeviceConnection(conn: DeviceConnection): Promise<void
   });
 }
 
+/**
+ * Opens the connection with a real deadline. node-zklib's `timeout` argument only marks the socket
+ * idle — it never abandons a connect — so a device that is powered off (or a cable that is out) left
+ * every caller hanging until the OS gave up, 20+ seconds later and repeated for each attempt. On the
+ * deadline the half-open sockets are torn down, so nothing lingers holding the device's single slot.
+ */
+async function openSocket(zk: any, ms: number = CONNECT_TIMEOUT_MS): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  const attempt = Promise.resolve(zk.createSocket());
+  attempt.catch(() => {}); // if the deadline wins, a later failure of this attempt is nobody's business
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      try {
+        zk.zklibTcp?.socket?.destroy();
+      } catch {
+        // already gone
+      }
+      Promise.resolve(zk.disconnect?.()).catch(() => {});
+      reject(new Error(`Could not reach the device within ${ms / 1000}s`));
+    }, ms);
+  });
+  try {
+    await Promise.race([attempt, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // --- Real-time listener state ------------------------------------------
 // The device only tolerates one connected client at a time. The real-time
-// listener (see startRealtimeListener) holds a connection open indefinitely,
-// so every short-lived operation below (withDevice) transparently pauses it
-// first and reconnects it afterward - nobody calling e.g. renameDeviceUser
-// or linkDeviceUserAction needs to know the listener exists at all.
+// listener holds a connection open indefinitely, so every short-lived
+// operation below (withDevice) pauses it first and brings it back afterwards -
+// nobody calling e.g. renameDeviceUser or linkDeviceUserAction needs to know
+// the listener exists at all.
+//
+// All connection work goes through one mutex. A page load, a sync and the
+// listener's own reconnect used to run at the same time and fight for that
+// single slot, which is what made everything crawl (and the page hang) after
+// a power cut or restart.
+const runExclusive = createMutex();
+
 let realtimeZk: any = null;
 let realtimeCallback: ((r: RawAttendanceRecord) => void) | null = null;
+let realtimeOnReconnected: (() => void) | null = null;
 let realtimeUserPaused = false;
 let realtimeReconnectTimer: NodeJS.Timeout | null = null;
-const REALTIME_RECONNECT_DELAY_MS = 5000;
+let reconnectAttempt = 0;
+// True while punches may have happened that the listener didn't hear: the server
+// just started, or the connection dropped. Cleared - and a catch-up triggered -
+// on the next successful connect. Our own pause/resume around an operation
+// deliberately doesn't set it.
+let realtimeGap = false;
 
 function attachRealtimeSocketHandlers(zk: any) {
   const socket = zk?.zklibTcp?.socket;
   if (!socket) return;
+  // A device that loses power never closes its end, so without keep-alive this socket would look
+  // connected forever while nothing arrives. With it, a dead peer surfaces as an error within seconds
+  // and the reconnect + catch-up path takes over.
+  socket.setKeepAlive(true, 15_000);
   const onDrop = () => {
     if (realtimeZk !== zk) return; // a newer connection already replaced this one
     realtimeZk = null;
+    realtimeGap = true;
     if (!realtimeUserPaused && realtimeCallback) scheduleRealtimeReconnect();
   };
   socket.once("close", onDrop);
   socket.once("error", onDrop);
 }
 
-function scheduleRealtimeReconnect() {
+/** Retries with a growing delay so a device that's still booting (or still holding our old
+ * session after a power cut) isn't hammered. `delayMs = 0` is used to bring the listener back
+ * right after one of our own operations. */
+function scheduleRealtimeReconnect(delayMs: number = reconnectDelay(reconnectAttempt)) {
   if (realtimeReconnectTimer) return;
   realtimeReconnectTimer = setTimeout(async () => {
     realtimeReconnectTimer = null;
@@ -81,33 +129,68 @@ function scheduleRealtimeReconnect() {
     try {
       await connectRealtimeNow();
     } catch (e) {
+      reconnectAttempt += 1;
+      realtimeGap = true;
       console.error("[attendance-realtime] reconnect failed:", e instanceof Error ? e.message : e);
       scheduleRealtimeReconnect();
     }
-  }, REALTIME_RECONNECT_DELAY_MS);
+  }, delayMs);
 }
 
 async function connectRealtimeNow(): Promise<void> {
-  const { ip, port } = await getDeviceConnection();
-  const zk = new ZKLib(ip, port, CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
-  await zk.createSocket();
-  await zk.zklibTcp.getRealTimeLogs((raw: { userId: string; attTime: Date }) => {
-    realtimeCallback?.({ deviceUserId: String(raw.userId), recordTime: raw.attTime });
+  await runExclusive(async () => {
+    if (realtimeZk || realtimeUserPaused) return;
+    const { ip, port } = await getDeviceConnection();
+    const zk = new ZKLib(ip, port, CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
+    await openSocket(zk);
+    try {
+      await zk.zklibTcp.getRealTimeLogs((raw: { userId: string; attTime: Date }) => {
+        realtimeCallback?.({ deviceUserId: String(raw.userId), recordTime: raw.attTime });
+      });
+    } catch (e) {
+      try {
+        await zk.disconnect();
+      } catch {
+        // best-effort close
+      }
+      throw e;
+    }
+    realtimeZk = zk;
+    attachRealtimeSocketHandlers(zk);
   });
-  realtimeZk = zk;
-  attachRealtimeSocketHandlers(zk);
+
+  reconnectAttempt = 0;
+  if (realtimeGap && realtimeZk) {
+    realtimeGap = false;
+    realtimeOnReconnected?.();
+  }
 }
 
-/** Starts (or restarts) the persistent real-time punch listener. `onRecord`
- * fires once per punch, as it happens. */
-export async function startRealtimeListener(onRecord: (r: RawAttendanceRecord) => void): Promise<void> {
+/** Starts (or restarts) the persistent real-time punch listener. `onRecord` fires once per
+ * punch, as it happens. `onReconnected` runs after every connect that follows a gap - including
+ * the very first one after the server starts - so punches made while we weren't listening get
+ * caught up. If this connect fails it throws, but a retry is already scheduled. */
+export async function startRealtimeListener(
+  onRecord: (r: RawAttendanceRecord) => void,
+  onReconnected?: () => void,
+): Promise<void> {
   realtimeCallback = onRecord;
+  if (onReconnected) {
+    realtimeOnReconnected = onReconnected;
+    realtimeGap = true;
+  }
   realtimeUserPaused = false;
   if (realtimeReconnectTimer) {
     clearTimeout(realtimeReconnectTimer);
     realtimeReconnectTimer = null;
   }
-  await connectRealtimeNow();
+  try {
+    await connectRealtimeNow();
+  } catch (e) {
+    realtimeGap = true;
+    scheduleRealtimeReconnect();
+    throw e;
+  }
 }
 
 /** Stops the real-time listener. `userInitiated: true` (the manual Pause
@@ -142,28 +225,38 @@ export function isRealtimeListenerPaused(): boolean {
 
 /** Opens a short-lived connection, runs `fn`, always disconnects — the device only tolerates one client at a time. */
 async function withDevice<T>(fn: (zk: any) => Promise<T>): Promise<T> {
-  const wasRealtimeActive = isRealtimeListenerActive();
-  if (wasRealtimeActive) await stopRealtimeListener();
-
-  const { ip, port } = await getDeviceConnection();
-  const zk = new ZKLib(ip, port, CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
-  await zk.createSocket();
+  let resumeListener = false;
   try {
-    return await fn(zk);
-  } finally {
-    try {
-      await zk.disconnect();
-    } catch {
-      // best-effort close
-    }
-    if (wasRealtimeActive && !realtimeUserPaused && realtimeCallback) {
+    return await runExclusive(async () => {
+      resumeListener = isRealtimeListenerActive();
+      if (resumeListener) await stopRealtimeListener();
+
+      const { ip, port } = await getDeviceConnection();
+      const zk = new ZKLib(ip, port, CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
+      await openSocket(zk);
       try {
-        await connectRealtimeNow();
-      } catch (e) {
-        console.error("[attendance-realtime] resume-after-action failed:", e instanceof Error ? e.message : e);
-        scheduleRealtimeReconnect();
+        return await fn(zk);
+      } finally {
+        try {
+          await zk.disconnect();
+        } catch {
+          // best-effort close
+        }
       }
-    }
+    });
+  } finally {
+    // Runs even when the device couldn't be reached, so the listener always gets a retry
+    // instead of being left switched off.
+    if (resumeListener && !realtimeUserPaused && realtimeCallback) scheduleRealtimeReconnect(0);
+  }
+}
+
+/** withDevice for anything that changes what the device holds, so the cached overview isn't served stale afterwards. */
+async function withDeviceWrite<T>(fn: (zk: any) => Promise<T>): Promise<T> {
+  try {
+    return await withDevice(fn);
+  } finally {
+    overviewCache.invalidate();
   }
 }
 
@@ -172,7 +265,7 @@ async function withDevice<T>(fn: (zk: any) => Promise<T>): Promise<T> {
 export async function testDeviceConnection(conn: DeviceConnection): Promise<{ ok: true } | { ok: false; error: string }> {
   const zk = new ZKLib(conn.ip, conn.port, CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
   try {
-    await zk.createSocket();
+    await openSocket(zk);
     await zk.getInfo();
     return { ok: true };
   } catch (e) {
@@ -236,43 +329,77 @@ export interface RawAttendanceRecord {
   recordTime: Date;
 }
 
+function mapAttendances(res: any): RawAttendanceRecord[] {
+  return (res?.data ?? []).map((r: any) => ({
+    deviceUserId: String(r.deviceUserId),
+    recordTime: r.recordTime instanceof Date ? r.recordTime : new Date(r.recordTime),
+  }));
+}
+
+async function readUsers(zk: any): Promise<DeviceUser[]> {
+  const rawUsers = await fetchUsersUtf8(zk);
+  return rawUsers.map((u) => ({
+    uid: u.uid,
+    userId: String(u.userId ?? u.uid),
+    name: u.name || `#${u.uid}`,
+    role: u.role ?? 0,
+    cardno: u.cardno ?? 0,
+  }));
+}
+
 /** Pulls every punch currently sitting in the device's own log buffer (does
  * NOT clear it — clearDeviceAttendanceLog is a separate, explicit action). */
 export async function fetchDeviceAttendanceLogs(): Promise<RawAttendanceRecord[]> {
+  return withDevice(async (zk) => mapAttendances(await zk.getAttendances()));
+}
+
+export interface DeviceOverview {
+  info: DeviceInfo;
+  users: DeviceUser[];
+  logs: RawAttendanceRecord[];
+}
+
+/** Everything the device pages show, read over ONE connection. */
+async function loadOverview(): Promise<DeviceOverview> {
   return withDevice(async (zk) => {
-    const res = await zk.getAttendances();
-    return (res?.data ?? []).map((r: any) => ({
-      deviceUserId: String(r.deviceUserId),
-      recordTime: r.recordTime instanceof Date ? r.recordTime : new Date(r.recordTime),
-    }));
+    const info = await zk.getInfo();
+    const users = await readUsers(zk);
+    const logs = mapAttendances(await zk.getAttendances());
+    return {
+      info: {
+        userCounts: info?.userCounts ?? users.length,
+        logCounts: info?.logCounts ?? 0,
+        logCapacity: info?.logCapacity ?? 0,
+      },
+      users,
+      logs,
+    };
   });
 }
 
-export async function getDeviceSnapshot(): Promise<DeviceSnapshot> {
-  try {
-    return await withDevice(async (zk) => {
-      const info = await zk.getInfo();
-      const rawUsers = await fetchUsersUtf8(zk);
-      const users: DeviceUser[] = rawUsers.map((u) => ({
-        uid: u.uid,
-        userId: String(u.userId ?? u.uid),
-        name: u.name || `#${u.uid}`,
-        role: u.role ?? 0,
-        cardno: u.cardno ?? 0,
-      }));
-      return {
-        online: true,
-        info: {
-          userCounts: info?.userCounts ?? users.length,
-          logCounts: info?.logCounts ?? 0,
-          logCapacity: info?.logCapacity ?? 0,
-        },
-        users,
-      };
-    });
-  } catch (e) {
-    return { online: false, error: e instanceof Error ? e.message : String(e) };
-  }
+const OVERVIEW_FRESH_MS = 30_000;
+const overviewCache = createBoundedCache(loadOverview, { freshMs: OVERVIEW_FRESH_MS });
+
+export type DeviceOverviewResult =
+  | ({ online: true; stale: boolean; fetchedAt: number } & DeviceOverview)
+  | { online: false; error: string };
+
+/**
+ * The device's users, counters and full punch log, for the pages that display them. Waits at most
+ * `maxWaitMs`: a slow or unreachable device (power cut, restart) can no longer hang a page. When the
+ * device can't answer in time the last known data comes back with `stale: true`, or `online: false`
+ * if there has never been any.
+ */
+export async function getDeviceOverview(maxWaitMs = 8000): Promise<DeviceOverviewResult> {
+  const r = await overviewCache.get(maxWaitMs);
+  return r.ok
+    ? { online: true, stale: r.stale, fetchedAt: r.fetchedAt, ...r.value }
+    : { online: false, error: r.error };
+}
+
+/** Forces the next getDeviceOverview to read from the device again. */
+export function invalidateDeviceOverview() {
+  overviewCache.invalidate();
 }
 
 // --- Raw protocol payloads (classic ZK "PULL SDK" wire format — same structs
@@ -333,7 +460,7 @@ function encodeUserData72(user: { uid: number; role: number; password: string; n
  * this library's own verified read-side byte layout, not a blind guess.
  */
 export async function updateDeviceUserName(uid: number, newName: string): Promise<void> {
-  await withDevice(async (zk) => {
+  await withDeviceWrite(async (zk) => {
     const users = await fetchUsersUtf8(zk);
     const current = users.find((u) => u.uid === uid);
     if (!current) throw new Error(`Device user uid=${uid} not found`);
@@ -351,12 +478,12 @@ export async function updateDeviceUserName(uid: number, newName: string): Promis
 
 /** Deletes a user (and all their fingerprints/card/password) from the device entirely. */
 export async function deleteDeviceUser(uid: number): Promise<void> {
-  await withDevice((zk) => zk.executeCmd(COMMANDS.CMD_DELETE_USER, uidPayload(uid)));
+  await withDeviceWrite((zk) => zk.executeCmd(COMMANDS.CMD_DELETE_USER, uidPayload(uid)));
 }
 
 /** Deletes one finger's template (0-9) for a user, leaving the user record and other fingers intact. */
 export async function deleteDeviceFingerprint(uid: number, fingerIndex: number): Promise<void> {
-  await withDevice((zk) => zk.executeCmd(COMMANDS.CMD_DELETE_USERTEMP, uidFingerPayload(uid, fingerIndex)));
+  await withDeviceWrite((zk) => zk.executeCmd(COMMANDS.CMD_DELETE_USERTEMP, uidFingerPayload(uid, fingerIndex)));
 }
 
 /**
@@ -366,23 +493,23 @@ export async function deleteDeviceFingerprint(uid: number, fingerIndex: number):
  * payload layout can vary by firmware generation.
  */
 export async function startDeviceEnroll(uid: number, fingerIndex: number): Promise<void> {
-  await withDevice((zk) => zk.executeCmd(COMMANDS.CMD_STARTENROLL, enrollPayload(uid, fingerIndex)));
+  await withDeviceWrite((zk) => zk.executeCmd(COMMANDS.CMD_STARTENROLL, enrollPayload(uid, fingerIndex)));
 }
 
 export async function cancelDeviceCapture(): Promise<void> {
-  await withDevice((zk) => zk.executeCmd(COMMANDS.CMD_CANCELCAPTURE, Buffer.alloc(0)));
+  await withDeviceWrite((zk) => zk.executeCmd(COMMANDS.CMD_CANCELCAPTURE, Buffer.alloc(0)));
 }
 
 export async function restartDevice(): Promise<void> {
-  await withDevice((zk) => zk.executeCmd(COMMANDS.CMD_RESTART, Buffer.alloc(0)));
+  await withDeviceWrite((zk) => zk.executeCmd(COMMANDS.CMD_RESTART, Buffer.alloc(0)));
 }
 
 /** Disabled = device stops accepting punches/verification (screen shows "in use"); re-enable to resume. Fully reversible. */
 export async function setDeviceEnabled(enabled: boolean): Promise<void> {
-  await withDevice((zk) => (enabled ? zk.enableDevice() : zk.disableDevice()));
+  await withDeviceWrite((zk) => (enabled ? zk.enableDevice() : zk.disableDevice()));
 }
 
 /** Wipes the device's own internal attendance log buffer. Irreversible; does not touch our AttendanceLog table. */
 export async function clearDeviceAttendanceLog(): Promise<void> {
-  await withDevice((zk) => zk.clearAttendanceLog());
+  await withDeviceWrite((zk) => zk.clearAttendanceLog());
 }
