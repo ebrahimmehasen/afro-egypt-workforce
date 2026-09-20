@@ -921,6 +921,7 @@ export const ar: Dictionary = {
     syncNewPunches: "اتسجّل {count} بصمة جديدة",
     loadingDeviceData: "جاري تحميل بيانات الجهاز...",
     retry: "إعادة المحاولة",
+    refreshData: "تحديث بيانات الجهاز",
     staleNotice: "الجهاز غير متصل دلوقتي. دي آخر بيانات وصلتنا ({time}).",
     syncNow: "مزامنة الآن",
     syncImported: "بصمة جديدة اتسجّلت",

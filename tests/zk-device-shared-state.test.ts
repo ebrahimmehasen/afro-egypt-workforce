@@ -45,3 +45,20 @@ describe("device state is shared between module copies", () => {
     expect(second.overviewCache).toBe(first.overviewCache);
   });
 });
+
+describe("withPunchAppended", () => {
+  it("adds the punch and bumps the stored-logs counter, leaving the rest alone", async () => {
+    vi.resetModules();
+    const { withPunchAppended } = await import("@/lib/zk-device");
+    const before = {
+      info: { userCounts: 5, logCounts: 100, logCapacity: 10000 },
+      users: [],
+      logs: [{ deviceUserId: "1", recordTime: new Date("2026-09-20T06:00:00Z") }],
+    };
+    const punch = { deviceUserId: "2", recordTime: new Date("2026-09-20T07:00:00Z") };
+    const after = withPunchAppended(before, punch);
+    expect(after.logs).toEqual([...before.logs, punch]);
+    expect(after.info).toEqual({ userCounts: 5, logCounts: 101, logCapacity: 10000 });
+    expect(before.logs).toHaveLength(1); // the original is not mutated
+  });
+});

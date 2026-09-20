@@ -886,6 +886,7 @@ export interface Dictionary {
     syncNewPunches: string;
     loadingDeviceData: string;
     retry: string;
+    refreshData: string;
     staleNotice: string;
     syncNow: string;
     syncImported: string;

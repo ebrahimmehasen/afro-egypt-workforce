@@ -921,6 +921,7 @@ export const en: Dictionary = {
     syncNewPunches: "{count} new punch(es) recorded",
     loadingDeviceData: "Loading device data...",
     retry: "Try again",
+    refreshData: "Refresh device data",
     staleNotice: "The device is offline right now. This is the last data we received ({time}).",
     syncNow: "Sync now",
     syncImported: "New punches imported",

@@ -144,5 +144,10 @@ export function createBoundedCache<T>(
     if (entry) entry = { ...entry, outdated: true };
   }
 
-  return { get, invalidate };
+  /** Applies a change to the cached value in place (e.g. a punch that just arrived), keeping its age. */
+  function update(fn: (value: T) => T) {
+    if (entry) entry = { ...entry, value: fn(entry.value) };
+  }
+
+  return { get, invalidate, update };
 }

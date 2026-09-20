@@ -8,7 +8,7 @@ import { useT } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
 
 /** Drops the cached device data and reloads the page so it reads from the device again. */
-export function RetryButton() {
+export function RetryButton({ label }: { label?: string }) {
   const t = useT();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -27,7 +27,7 @@ export function RetryButton() {
       }
     >
       <RefreshCw className={`h-4 w-4 ${pending ? "animate-spin" : ""}`} />
-      {t.biometricDevice.retry}
+      {label ?? t.biometricDevice.retry}
     </Button>
   );
 }

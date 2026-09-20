@@ -9,7 +9,7 @@ const target = vi.hoisted(() => ({ port: 0 }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     biometricDeviceSettings: {
-      upsert: async () => ({ ip: "127.0.0.1", port: target.port, commPassword: 0 }),
+      findUnique: async () => ({ id: "singleton", ip: "127.0.0.1", port: target.port, commPassword: 0 }),
     },
   },
 }));

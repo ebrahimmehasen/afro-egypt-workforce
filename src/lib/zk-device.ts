@@ -32,12 +32,23 @@ export interface DeviceUser {
 
 /** Connection settings row — auto-seeded on first read with the device IP found during setup. */
 export async function getDeviceConnection(): Promise<DeviceConnection> {
-  const row = await prisma.biometricDeviceSettings.upsert({
-    where: { id: SINGLETON },
-    update: {},
-    create: { id: SINGLETON, ip: "192.168.1.201", port: 4370, commPassword: 0 },
-  });
-  return { ip: row.ip, port: row.port, commPassword: row.commPassword };
+  // A plain read. This used to be an upsert on every call, and every Prisma write broadcasts "data
+  // changed" to each open tab, which refreshes its page (see LiveRefresh) — so simply rendering the
+  // device page re-rendered it, over and over, with a device read each time the cache ran out.
+  const existing = await prisma.biometricDeviceSettings.findUnique({ where: { id: SINGLETON } });
+  if (existing) return { ip: existing.ip, port: existing.port, commPassword: existing.commPassword };
+
+  try {
+    const row = await prisma.biometricDeviceSettings.create({
+      data: { id: SINGLETON, ip: "192.168.1.201", port: 4370, commPassword: 0 },
+    });
+    return { ip: row.ip, port: row.port, commPassword: row.commPassword };
+  } catch (e) {
+    // two first-ever calls raced; the other one created it
+    const row = await prisma.biometricDeviceSettings.findUnique({ where: { id: SINGLETON } });
+    if (row) return { ip: row.ip, port: row.port, commPassword: row.commPassword };
+    throw e;
+  }
 }
 
 export async function saveDeviceConnection(conn: DeviceConnection): Promise<void> {
@@ -173,7 +184,10 @@ async function connectRealtimeNow(): Promise<void> {
     await openSocket(zk);
     try {
       await zk.zklibTcp.getRealTimeLogs((raw: { userId: string; attTime: Date }) => {
-        S.realtimeCallback?.({ deviceUserId: String(raw.userId), recordTime: raw.attTime });
+        const record = { deviceUserId: String(raw.userId), recordTime: raw.attTime };
+        // keep the cached overview current, so it doesn't need re-reading from the device to show this punch
+        S.overviewCache?.update((o) => withPunchAppended(o, record));
+        S.realtimeCallback?.(record);
       });
     } catch (e) {
       try {
@@ -426,7 +440,19 @@ async function loadOverview(): Promise<DeviceOverview> {
   });
 }
 
-const OVERVIEW_FRESH_MS = 30_000;
+/** The overview with one more punch on the end — what a real-time event does to it. */
+export function withPunchAppended(overview: DeviceOverview, record: RawAttendanceRecord): DeviceOverview {
+  return {
+    ...overview,
+    logs: [...overview.logs, record],
+    info: { ...overview.info, logCounts: overview.info.logCounts + 1 },
+  };
+}
+
+// Long on purpose: punches are folded in live (see withPunchAppended) and every device write invalidates it,
+// so the only thing a re-read adds is users added at the device's own menu. Reading means pausing the
+// listener and pulling the whole punch log, which is not something to do every half minute.
+const OVERVIEW_FRESH_MS = 10 * 60_000;
 const overviewCache = (S.overviewCache ??= createBoundedCache(loadOverview, { freshMs: OVERVIEW_FRESH_MS }));
 
 export type DeviceOverviewResult =

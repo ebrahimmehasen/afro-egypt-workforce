@@ -151,6 +151,25 @@ describe("createBoundedCache", () => {
     expect(load).toHaveBeenCalledTimes(2);
   });
 
+  it("update() changes the cached value in place without making it look newer", async () => {
+    let t = 0;
+    const load = vi.fn(async () => ({ n: 1 }));
+    const cache = createBoundedCache(load, { freshMs: 30_000, now: () => t });
+    await cache.get(5000);
+    t = 20_000;
+    cache.update((v) => ({ n: v.n + 1 }));
+    expect(await cache.get(5000)).toMatchObject({ value: { n: 2 }, fetchedAt: 0, stale: false });
+    expect(load).toHaveBeenCalledTimes(1);
+    t = 31_000; // still ages out on its original schedule
+    expect(await cache.get(5000)).toMatchObject({ value: { n: 1 }, fetchedAt: 31_000 });
+  });
+
+  it("update() before anything has loaded does nothing", async () => {
+    const cache = createBoundedCache(async () => "loaded", { freshMs: 30_000 });
+    cache.update(() => "patched");
+    expect(await cache.get(5000)).toMatchObject({ value: "loaded" });
+  });
+
   it("recovers on the next call after a failed load", async () => {
     let ok = false;
     const load = vi.fn(async () => {

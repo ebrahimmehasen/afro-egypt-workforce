@@ -107,9 +107,12 @@ export async function DeviceDataSection() {
       {online && (
         <Card>
           <CardContent className="p-4">
-            <div className="mb-4">
-              <h2 className="text-base font-semibold text-foreground">{t.biometricDevice.usersTitle}</h2>
-              <p className="text-sm text-muted-foreground">{t.biometricDevice.usersDesc}</p>
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-foreground">{t.biometricDevice.usersTitle}</h2>
+                <p className="text-sm text-muted-foreground">{t.biometricDevice.usersDesc}</p>
+              </div>
+              <RetryButton label={t.biometricDevice.refreshData} />
             </div>
             <DeviceUsersTable users={overview.users} employees={db.employees} punchCounts={punchCounts} />
           </CardContent>
