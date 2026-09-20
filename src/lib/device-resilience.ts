@@ -23,6 +23,36 @@ export function reconnectDelay(attempt: number): number {
   return Math.min(30_000, 5_000 * 2 ** Math.max(0, attempt));
 }
 
+export type RealtimeStatus = "connected" | "paused" | "reconnecting";
+
+/** How long the listener may be down before it's reported as disconnected. */
+export const STATUS_GRACE_MS = 20_000;
+
+/**
+ * What to tell the user about the live connection. The listener is switched off on purpose for a moment
+ * around every operation run against the device, and after a blip it normally comes back within seconds —
+ * neither deserves a red "disconnected". So it reads as disconnected only once a reconnect attempt has
+ * actually failed, or it has been down longer than the grace period.
+ */
+export function realtimeStatus(s: {
+  active: boolean;
+  userPaused: boolean;
+  /** Device operations currently running (the listener is off while they do). */
+  opsRunning: number;
+  downSince: number | null;
+  /** Reconnect attempts that have failed since the listener last worked. */
+  failedAttempts: number;
+  now: number;
+  graceMs?: number;
+}): RealtimeStatus {
+  if (s.active) return "connected";
+  if (s.userPaused) return "paused";
+  if (s.failedAttempts > 0) return "reconnecting";
+  if (s.opsRunning > 0) return "connected";
+  if (s.downSince !== null && s.now - s.downSince < (s.graceMs ?? STATUS_GRACE_MS)) return "connected";
+  return "reconnecting";
+}
+
 export type CachedResult<T> =
   | { ok: true; value: T; fetchedAt: number; stale: boolean }
   | { ok: false; error: string };

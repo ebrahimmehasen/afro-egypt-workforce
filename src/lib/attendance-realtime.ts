@@ -1,4 +1,4 @@
-import { startRealtimeListener, stopRealtimeListener, isRealtimeListenerActive, isRealtimeListenerPaused, RawAttendanceRecord } from "@/lib/zk-device";
+import { startRealtimeListener, stopRealtimeListener, isRealtimeListenerActive, getRealtimeConnectionStatus, RawAttendanceRecord } from "@/lib/zk-device";
 import { ingestOneRecord } from "@/lib/attendance-ingest";
 import { syncDeviceAttendance } from "@/lib/attendance-sync";
 
@@ -71,7 +71,5 @@ export async function resumeAttendanceRealtime(): Promise<void> {
 }
 
 export function attendanceRealtimeStatus(): "connected" | "paused" | "reconnecting" {
-  if (isRealtimeListenerActive()) return "connected";
-  if (isRealtimeListenerPaused()) return "paused";
-  return "reconnecting";
+  return getRealtimeConnectionStatus();
 }

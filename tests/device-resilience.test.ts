@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createBoundedCache, createMutex, reconnectDelay } from "@/lib/device-resilience";
+import { STATUS_GRACE_MS, createBoundedCache, createMutex, realtimeStatus, reconnectDelay } from "@/lib/device-resilience";
 
 const never = <T>() => new Promise<T>(() => {});
 const deferred = <T>() => {
@@ -161,5 +161,39 @@ describe("createBoundedCache", () => {
     expect(await cache.get(5000)).toMatchObject({ ok: false });
     ok = true;
     expect(await cache.get(5000)).toMatchObject({ ok: true, value: "back" });
+  });
+});
+
+describe("realtimeStatus", () => {
+  const base = { active: false, userPaused: false, opsRunning: 0, downSince: 1_000, failedAttempts: 0, now: 1_000 };
+
+  it("is connected while the socket is open", () => {
+    expect(realtimeStatus({ ...base, active: true })).toBe("connected");
+  });
+
+  it("reports a manual pause as paused, whatever else is going on", () => {
+    expect(realtimeStatus({ ...base, userPaused: true, failedAttempts: 3 })).toBe("paused");
+  });
+
+  it("stays connected while one of our own device operations has the listener switched off", () => {
+    // e.g. the page reading the device: takes as long as the punch log is big, nothing is wrong
+    expect(realtimeStatus({ ...base, opsRunning: 1, now: 1_000 + 5 * STATUS_GRACE_MS })).toBe("connected");
+  });
+
+  it("stays connected during the short window right after it goes down", () => {
+    expect(realtimeStatus({ ...base, now: 1_000 + STATUS_GRACE_MS - 1 })).toBe("connected");
+  });
+
+  it("turns to reconnecting once it has been down past the grace period", () => {
+    expect(realtimeStatus({ ...base, now: 1_000 + STATUS_GRACE_MS })).toBe("reconnecting");
+  });
+
+  it("turns to reconnecting immediately when a reconnect attempt has failed", () => {
+    expect(realtimeStatus({ ...base, failedAttempts: 1 })).toBe("reconnecting");
+    expect(realtimeStatus({ ...base, failedAttempts: 1, opsRunning: 1 })).toBe("reconnecting");
+  });
+
+  it("reads as reconnecting if it was never started", () => {
+    expect(realtimeStatus({ ...base, downSince: null })).toBe("reconnecting");
   });
 });

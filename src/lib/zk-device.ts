@@ -2,7 +2,7 @@
 const ZKLib = require("node-zklib");
 const { COMMANDS, REQUEST_DATA } = require("node-zklib/constants");
 import { prisma } from "@/lib/prisma";
-import { createBoundedCache, createMutex, reconnectDelay } from "@/lib/device-resilience";
+import { createBoundedCache, createMutex, reconnectDelay, realtimeStatus, RealtimeStatus } from "@/lib/device-resilience";
 
 const SINGLETON = "singleton";
 // A device on the same LAN answers in milliseconds, so waiting longer to connect only makes
@@ -100,17 +100,22 @@ let reconnectAttempt = 0;
 // on the next successful connect. Our own pause/resume around an operation
 // deliberately doesn't set it.
 let realtimeGap = false;
+// When the listener last went down, and how many of our own device operations are running (the
+// listener is switched off on purpose while one runs). Only used to report an honest status.
+let realtimeDownSince: number | null = null;
+let deviceOpsRunning = 0;
 
 function attachRealtimeSocketHandlers(zk: any) {
   const socket = zk?.zklibTcp?.socket;
   if (!socket) return;
-  // A device that loses power never closes its end, so without keep-alive this socket would look
-  // connected forever while nothing arrives. With it, a dead peer surfaces as an error within seconds
-  // and the reconnect + catch-up path takes over.
-  socket.setKeepAlive(true, 15_000);
+  // Deliberately NO TCP keep-alive here: the device doesn't answer the probes, so enabling it made the OS
+  // kill a perfectly healthy connection every ~30s (idle + failed probes) and the listener flapped forever.
+  // A device that loses power without closing its end is caught by the periodic catch-up instead, which
+  // makes a fresh connection and so notices it's gone.
   const onDrop = () => {
     if (realtimeZk !== zk) return; // a newer connection already replaced this one
     realtimeZk = null;
+    realtimeDownSince = Date.now();
     realtimeGap = true;
     if (!realtimeUserPaused && realtimeCallback) scheduleRealtimeReconnect();
   };
@@ -156,6 +161,7 @@ async function connectRealtimeNow(): Promise<void> {
       throw e;
     }
     realtimeZk = zk;
+    realtimeDownSince = null;
     attachRealtimeSocketHandlers(zk);
   });
 
@@ -180,6 +186,7 @@ export async function startRealtimeListener(
     realtimeGap = true;
   }
   realtimeUserPaused = false;
+  realtimeDownSince ??= Date.now();
   if (realtimeReconnectTimer) {
     clearTimeout(realtimeReconnectTimer);
     realtimeReconnectTimer = null;
@@ -188,6 +195,7 @@ export async function startRealtimeListener(
     await connectRealtimeNow();
   } catch (e) {
     realtimeGap = true;
+    reconnectAttempt += 1;
     scheduleRealtimeReconnect();
     throw e;
   }
@@ -207,6 +215,7 @@ export async function stopRealtimeListener(opts: { userInitiated?: boolean } = {
   const zk = realtimeZk;
   realtimeZk = null;
   if (zk) {
+    realtimeDownSince = Date.now();
     try {
       await zk.disconnect();
     } catch {
@@ -223,25 +232,42 @@ export function isRealtimeListenerPaused(): boolean {
   return realtimeUserPaused;
 }
 
+/** The status to show — see realtimeStatus for why it isn't just "is the socket open right now". */
+export function getRealtimeConnectionStatus(): RealtimeStatus {
+  return realtimeStatus({
+    active: isRealtimeListenerActive(),
+    userPaused: realtimeUserPaused,
+    opsRunning: deviceOpsRunning,
+    downSince: realtimeDownSince,
+    failedAttempts: reconnectAttempt,
+    now: Date.now(),
+  });
+}
+
 /** Opens a short-lived connection, runs `fn`, always disconnects — the device only tolerates one client at a time. */
 async function withDevice<T>(fn: (zk: any) => Promise<T>): Promise<T> {
   let resumeListener = false;
   try {
     return await runExclusive(async () => {
-      resumeListener = isRealtimeListenerActive();
-      if (resumeListener) await stopRealtimeListener();
-
-      const { ip, port } = await getDeviceConnection();
-      const zk = new ZKLib(ip, port, CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
-      await openSocket(zk);
+      deviceOpsRunning += 1;
       try {
-        return await fn(zk);
-      } finally {
+        resumeListener = isRealtimeListenerActive();
+        if (resumeListener) await stopRealtimeListener();
+
+        const { ip, port } = await getDeviceConnection();
+        const zk = new ZKLib(ip, port, CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
+        await openSocket(zk);
         try {
-          await zk.disconnect();
-        } catch {
-          // best-effort close
+          return await fn(zk);
+        } finally {
+          try {
+            await zk.disconnect();
+          } catch {
+            // best-effort close
+          }
         }
+      } finally {
+        deviceOpsRunning -= 1;
       }
     });
   } finally {
