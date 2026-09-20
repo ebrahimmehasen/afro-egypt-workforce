@@ -93,3 +93,11 @@ export function canManageEmployeeFiles(user: SessionLike): boolean {
   if (user.role !== "hr") return false;
   return hasPermission(user, "employees");
 }
+
+/**
+ * The virtual assistant reads whole employee files (national ID, salary, attendance), so it needs the same
+ * grant as the employees module, and it only ever sees the records that grant's department scope allows.
+ */
+export function canUseAssistant(user: SessionLike): boolean {
+  return hasPermission(user, "employees");
+}

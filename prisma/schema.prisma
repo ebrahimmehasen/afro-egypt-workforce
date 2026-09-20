@@ -170,6 +170,8 @@ model User {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
+  assistantMessages AssistantMessage[]
+
   @@index([employeeId])
   @@index([departmentId])
 }
@@ -505,6 +507,24 @@ model EmployeeAcknowledgment {
 
   @@unique([employeeId, key])
   @@index([employeeId])
+}
+
+// ---------------------------------------------------------------------------
+// AI assistant
+// ---------------------------------------------------------------------------
+
+/// One turn of a user's running conversation with the virtual assistant. Each user has a single
+/// ongoing thread (ordered by createdAt). Only what was asked and answered is stored; the data the
+/// assistant looked up to answer is read fresh every time and never kept here.
+model AssistantMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String // "user" | "assistant"
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 // ---------------------------------------------------------------------------

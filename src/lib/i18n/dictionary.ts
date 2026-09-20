@@ -671,6 +671,29 @@ export interface Dictionary {
       confidentiality: string;
     };
   };
+  assistant: {
+    title: string;
+    hoverLabel: string;
+    subtitle: string;
+    placeholder: string;
+    send: string;
+    thinking: string;
+    clear: string;
+    clearTitle: string;
+    clearConfirm: string;
+    empty: string;
+    suggestions: string[];
+    disclaimer: string;
+    close: string;
+    notAllowed: string;
+    errorGeneric: string;
+    errorNotConfigured: string;
+    errorBusy: string;
+    errorRateLimited: string;
+    errorTimeout: string;
+    errorTooLong: string;
+    auditAsk: string;
+  };
   filePreview: {
     view: string;
     download: string;

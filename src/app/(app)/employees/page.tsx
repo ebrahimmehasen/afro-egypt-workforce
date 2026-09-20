@@ -2,11 +2,12 @@ import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { employeesInScope, viewerScope } from "@/lib/scope";
 import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
-import { hasPermission } from "@/lib/permissions";
+import { canUseAssistant, hasPermission } from "@/lib/permissions";
 import { getT, format } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmployeesTable } from "@/components/employees/employees-table";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
+import { EmployeeAssistant } from "@/components/assistant/employee-assistant";
 
 export default async function EmployeesPage() {
   const db = await getDb();
@@ -36,6 +37,7 @@ export default async function EmployeesPage() {
         shifts={db.shifts}
         incompleteDocIds={incompleteDocIds}
       />
+      {canUseAssistant(user) && <EmployeeAssistant />}
     </div>
   );
 }
