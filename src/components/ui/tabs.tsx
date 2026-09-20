@@ -4,8 +4,18 @@ import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/components/providers/locale-provider";
 
-const Tabs = TabsPrimitive.Root;
+// Radix falls back to dir="ltr" when there is no DirectionProvider, which overrides
+// the page's rtl and flips the tab order (and everything inside the tabs) in Arabic.
+const Tabs = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Root>
+>(({ dir, ...props }, ref) => {
+  const locale = useLocale();
+  return <TabsPrimitive.Root ref={ref} dir={dir ?? (locale === "ar" ? "rtl" : "ltr")} {...props} />;
+});
+Tabs.displayName = TabsPrimitive.Root.displayName;
 
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,

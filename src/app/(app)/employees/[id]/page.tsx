@@ -10,8 +10,10 @@ import { getLocale } from "@/lib/i18n/locale";
 import { intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { requestStatusLabel, deductionTypeLabel } from "@/lib/i18n/labels";
-import { canManageEmployeeFiles } from "@/lib/permissions";
+import { canManageEmployeeFiles, hasPermission } from "@/lib/permissions";
 import { missingDocumentTypes } from "@/lib/documents";
+import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
+import { DeleteEmployeeButton } from "@/components/employees/delete-employee-button";
 import { DocumentsPanel } from "@/components/employees/documents-panel";
 import { AcknowledgmentsPanel } from "@/components/employees/acknowledgments-panel";
 import { FileWarning } from "lucide-react";
@@ -60,6 +62,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   const acknowledgments = db.employeeAcknowledgments.filter((a) => a.employeeId === employee.id);
   const missingDocs = missingDocumentTypes(documents);
   const canManageDocs = canManageEmployeeFiles(user);
+  const canEdit = hasPermission(user, "employees");
 
   return (
     <div className="flex flex-col gap-6">
@@ -104,6 +107,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
           <TabsTrigger value="overtime">{t.employees.tabOvertime}</TabsTrigger>
           <TabsTrigger value="deductions">{t.employees.tabDeductions}</TabsTrigger>
           <TabsTrigger value="payroll">{t.employees.tabPayroll}</TabsTrigger>
+          {canEdit && <TabsTrigger value="actions">{t.common.actions}</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="documents" className="flex flex-col gap-4">
@@ -292,6 +296,23 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
             </CardContent>
           </Card>
         </TabsContent>
+
+        {canEdit && (
+          <TabsContent value="actions">
+            <Card>
+              <CardContent className="flex flex-wrap items-center gap-3 p-5">
+                <EmployeeFormDialog
+                  departments={db.departments}
+                  shifts={db.shifts}
+                  employee={employee}
+                  lenient={user.role === "admin"}
+                  labeledTrigger
+                />
+                <DeleteEmployeeButton id={employee.id} name={employee.name} labeledTrigger redirectTo="/employees" />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

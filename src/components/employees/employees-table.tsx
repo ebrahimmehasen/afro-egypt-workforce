@@ -2,10 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Eye, Users, FileWarning } from "lucide-react";
+import { Search, Users, FileWarning } from "lucide-react";
 import { Employee, Department, Shift } from "@/lib/types";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MultiSelectFilter } from "@/components/shared/multi-select-filter";
 import {
@@ -16,8 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
-import { DeleteEmployeeButton } from "@/components/employees/delete-employee-button";
+import { ClickableRow } from "@/components/shared/clickable-row";
 import { EmptyState } from "@/components/shared/empty-state";
 import { formatEGP } from "@/lib/constants";
 import { translateLabel } from "@/lib/i18n/data-labels";
@@ -42,15 +40,11 @@ export function EmployeesTable({
   employees,
   departments,
   shifts,
-  canEdit,
-  isAdmin = false,
   incompleteDocIds = [],
 }: {
   employees: Employee[];
   departments: Department[];
   shifts: Shift[];
-  canEdit: boolean;
-  isAdmin?: boolean;
   incompleteDocIds?: string[];
 }) {
   const t = useT();
@@ -146,16 +140,26 @@ export function EmployeesTable({
                 <TableHead>{t.employees.colShift}</TableHead>
                 <TableHead>{t.employees.colBasicSalary}</TableHead>
                 <TableHead>{t.employees.colStatus}</TableHead>
-                <TableHead className="text-end">{t.common.actions}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((e) => (
-                <TableRow key={e.id} className={isNewHire(e.hireDate, todayStr) ? "bg-gold-400/15 hover:bg-gold-400/25" : undefined}>
+                <ClickableRow
+                  key={e.id}
+                  href={`/employees/${e.employeeNumber}`}
+                  className={isNewHire(e.hireDate, todayStr) ? "bg-gold-400/15 hover:bg-gold-400/25" : undefined}
+                >
                   <TableCell dir="ltr" className="font-mono text-xs tabular-nums">{e.employeeNumber}</TableCell>
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-1.5">
-                      {e.name}
+                      {/* a real link keeps keyboard and middle-click working; the row click covers the rest */}
+                      <Link
+                        href={`/employees/${e.employeeNumber}`}
+                        onClick={(ev) => ev.stopPropagation()}
+                        className="hover:underline"
+                      >
+                        {e.name}
+                      </Link>
                       {incompleteDocs.has(e.id) && (
                         <FileWarning className="h-3.5 w-3.5 text-warning" aria-label={t.documents.incomplete} />
                       )}
@@ -166,22 +170,7 @@ export function EmployeesTable({
                   <TableCell>{translateLabel(shiftMap.get(e.shiftId) ?? "", locale)}</TableCell>
                   <TableCell className="tabular-nums">{formatEGP(e.basicSalary, locale)}</TableCell>
                   <TableCell><Badge variant={STATUS_VARIANT[e.status]}>{STATUS_LABEL[e.status]}</Badge></TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <Link href={`/employees/${e.employeeNumber}`}>
-                        <Button variant="ghost" size="icon" aria-label={t.common.view}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      {canEdit && (
-                        <>
-                          <EmployeeFormDialog departments={departments} shifts={shifts} employee={e} lenient={isAdmin} />
-                          <DeleteEmployeeButton id={e.id} name={e.name} />
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
+                </ClickableRow>
               ))}
             </TableBody>
           </Table>

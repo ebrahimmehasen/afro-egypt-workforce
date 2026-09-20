@@ -43,10 +43,13 @@ export function EmployeeFormDialog({
   shifts,
   employee,
   lenient = false,
+  labeledTrigger = false,
 }: {
   departments: Department[];
   shifts: Shift[];
   employee?: Employee;
+  /** Edit trigger as a text button instead of an icon — for the profile's Actions tab. */
+  labeledTrigger?: boolean;
   /** Admin editing: the browser-side format/required rules are dropped too (the server takes it as typed). */
   lenient?: boolean;
 }) {
@@ -62,7 +65,12 @@ export function EmployeeFormDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {employee ? (
+        {employee && labeledTrigger ? (
+          <Button variant="outline" className="gap-2">
+            <Pencil className="h-4 w-4" />
+            {t.employees.editEmployee}
+          </Button>
+        ) : employee ? (
           <Button variant="ghost" size="icon" aria-label={t.common.edit}>
             <Pencil className="h-4 w-4" />
           </Button>
