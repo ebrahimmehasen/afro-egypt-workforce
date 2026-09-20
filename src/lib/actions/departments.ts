@@ -15,10 +15,16 @@ const departmentSchema = z.object({
   managerName: z.string().min(2),
 });
 
+/** The head must be a real, current employee — the form offers a list, this enforces it server-side. */
+async function isActiveEmployeeName(name: string) {
+  return (await prisma.employee.count({ where: { name, deletedAt: null, status: { not: "terminated" } } })) > 0;
+}
+
 export async function createDepartment(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const t = await getT();
   const parsed = departmentSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
+  if (!(await isActiveEmployeeName(parsed.data.managerName))) return { error: t.validation.managerRequired };
   const actor = await getSession();
   const payload = { id: nextId("DEP"), ...parsed.data };
 
@@ -48,6 +54,7 @@ export async function updateDepartment(_prev: ActionState, formData: FormData): 
   const id = String(formData.get("id") ?? "");
   const parsed = departmentSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
+  if (!(await isActiveEmployeeName(parsed.data.managerName))) return { error: t.validation.managerRequired };
   const before = await prisma.department.findFirst({ where: { id, deletedAt: null } });
   if (!before) return { error: t.validation.departmentNotFound };
   const actor = await getSession();

@@ -222,6 +222,7 @@ export interface Dictionary {
     editDepartment: string;
     formName: string;
     formManager: string;
+    selectManager: string;
     deleteTitle: string;
     deleteConfirm: string;
     deleteInUse: string;

@@ -21,6 +21,11 @@ export default async function DepartmentsPage() {
   const canEdit = hasPermission(user, "departments");
   const rates = await getAttendanceByDepartment(viewerScope(user, db.employees));
 
+  const managerOptions = db.employees
+    .filter((e) => e.status !== "terminated")
+    .map((e) => ({ id: e.id, name: e.name, employeeNumber: e.employeeNumber }))
+    .sort((a, b) => a.name.localeCompare(b.name, locale === "ar" ? "ar" : "en"));
+
   const rows = db.departments.map((dept) => {
     const employees = db.employees.filter((e) => e.departmentId === dept.id);
     const payrollRecords = db.payrollRecords.filter((r) => employees.some((e) => e.id === r.employeeId));
@@ -34,7 +39,7 @@ export default async function DepartmentsPage() {
       <PageHeader
         title={t.departments.title}
         description={format(t.departments.totalCount, { count: db.departments.length })}
-        actions={canEdit ? <DepartmentFormDialog /> : null}
+        actions={canEdit ? <DepartmentFormDialog employees={managerOptions} /> : null}
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -53,7 +58,7 @@ export default async function DepartmentsPage() {
                 </div>
                 {canEdit && (
                   <div className="flex items-center">
-                    <DepartmentFormDialog department={dept} />
+                    <DepartmentFormDialog department={dept} employees={managerOptions} />
                     <DeleteDepartmentButton id={dept.id} name={translateLabel(dept.name, locale)} />
                   </div>
                 )}

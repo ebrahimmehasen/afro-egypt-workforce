@@ -20,8 +20,25 @@ function SubmitButton({ label }: { label: string }) {
   return <Button type="submit" disabled={pending}>{pending ? t.common.saving : label}</Button>;
 }
 
-export function DepartmentFormDialog({ department }: { department?: Department }) {
+const selectCls = "h-10 rounded-md border border-input bg-background px-3 text-sm";
+
+export interface ManagerOption {
+  id: string;
+  name: string;
+  employeeNumber: string;
+}
+
+export function DepartmentFormDialog({
+  department,
+  employees,
+}: {
+  department?: Department;
+  employees: ManagerOption[];
+}) {
   const t = useT();
+  // A legacy free-typed manager that isn't an employee can't be pre-selected —
+  // leave it blank so the form forces a real pick.
+  const currentManager = employees.some((e) => e.name === department?.managerName) ? department?.managerName : "";
   const [open, setOpen] = useState(false);
   const action = department ? updateDepartment : createDepartment;
   const [state, formAction] = useActionState(action, {});
@@ -48,7 +65,12 @@ export function DepartmentFormDialog({ department }: { department?: Department }
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="managerName">{t.departments.formManager}</Label>
-            <Input id="managerName" name="managerName" defaultValue={department?.managerName} required />
+            <select id="managerName" name="managerName" defaultValue={currentManager} className={selectCls} required>
+              <option value="">— {t.departments.selectManager} —</option>
+              {employees.map((e) => (
+                <option key={e.id} value={e.name}>{e.name} — {e.employeeNumber}</option>
+              ))}
+            </select>
           </div>
           <DialogFooter>
             <SubmitButton label={department ? t.common.save : t.common.add} />
