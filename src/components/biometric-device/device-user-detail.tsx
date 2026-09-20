@@ -275,14 +275,14 @@ function HistorySection({ history }: { history: DevicePunchEntry[] }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t.attendance.rawColTimestamp}</TableHead>
+                  <TableHead className="text-center">{t.attendance.rawColTimestamp}</TableHead>
                   <TableHead>{t.attendance.rawColType}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {history.map((log, i) => (
                   <TableRow key={`${log.timestamp}-${i}`}>
-                    <TableCell dir="ltr" className="tabular-nums text-xs">
+                    <TableCell dir={locale === "ar" ? "rtl" : "ltr"} className="text-center tabular-nums text-xs">
                       {new Date(log.timestamp).toLocaleString(intlLocale(locale))}
                     </TableCell>
                     <TableCell>
