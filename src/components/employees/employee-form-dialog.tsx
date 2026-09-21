@@ -7,6 +7,7 @@ import { createEmployee, updateEmployee } from "@/lib/actions/employees";
 import { useActionFeedback, keepFilledFields } from "@/hooks/use-action-feedback";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { translateLabel } from "@/lib/i18n/data-labels";
+import { format } from "@/lib/i18n/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,15 +39,39 @@ function SubmitButton({ label }: { label: string }) {
   );
 }
 
+export interface PayTypeOption {
+  id: string;
+  code?: string | null;
+  name: string;
+  basis: "monthly" | "daily";
+  dayDivisor: number;
+  workStart: string | null;
+  workEnd: string | null;
+  overtimeStart: string | null;
+}
+
+export interface ScheduleOption {
+  id: string;
+  name: string;
+}
+
+type ScheduleMode = "schedule" | "custom" | "shift";
+
 export function EmployeeFormDialog({
   departments,
   shifts,
+  payTypes,
+  schedules,
   employee,
   lenient = false,
   labeledTrigger = false,
 }: {
   departments: Department[];
   shifts: Shift[];
+  /** Pay types offered (the employee's own is included even if it has since been retired). */
+  payTypes: PayTypeOption[];
+  /** Fixed schedules offered (likewise). */
+  schedules: ScheduleOption[];
   employee?: Employee;
   /** Edit trigger as a text button instead of an icon — for the profile's Actions tab. */
   labeledTrigger?: boolean;
@@ -56,7 +81,30 @@ export function EmployeeFormDialog({
   const t = useT();
   const locale = useLocale();
   const [open, setOpen] = useState(false);
-  const [salaryType, setSalaryType] = useState<"monthly" | "daily">(employee?.salaryType ?? "monthly");
+  // an older employee without a pay type is on the built-in one for their pay basis
+  const initialPayType =
+    payTypes.find((p) => p.id === employee?.payTypeId) ??
+    payTypes.find((p) => p.code === (employee?.salaryType ?? "monthly")) ??
+    payTypes[0];
+  const [payTypeId, setPayTypeId] = useState(initialPayType?.id ?? "");
+  const payType = payTypes.find((p) => p.id === payTypeId);
+  const salaryType = payType?.basis ?? employee?.salaryType ?? "monthly";
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(
+    employee?.customWorkStart ? "custom" : employee?.workScheduleId ? "schedule" : employee ? "shift" : "schedule",
+  );
+  // custom times start from the employee's own, else the pay type's (a daily worker's day, say)
+  const customDefaults =
+    employee?.customWorkStart && employee.payTypeId === payTypeId
+      ? { start: employee.customWorkStart, end: employee.customWorkEnd ?? "", overtime: employee.customOvertimeStart ?? "" }
+      : { start: payType?.workStart ?? "", end: payType?.workEnd ?? "", overtime: payType?.overtimeStart ?? "" };
+
+  function choosePayType(id: string) {
+    setPayTypeId(id);
+    const chosen = payTypes.find((p) => p.id === id);
+    // a daily worker's times are set on them: open the custom times, filled from the pay type
+    if (chosen?.basis === "daily" && !employee) setScheduleMode("custom");
+  }
+
   const action = employee ? updateEmployee : createEmployee;
   const [state, formAction] = useActionState(action, {});
   useActionFeedback(state, () => setOpen(false));
@@ -81,7 +129,7 @@ export function EmployeeFormDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{employee ? t.employees.editEmployee : t.employees.addEmployee}</DialogTitle>
           <DialogDescription>{lenient ? t.employees.adminNoValidation : t.common.allFieldsRequired}</DialogDescription>
@@ -116,39 +164,88 @@ export function EmployeeFormDialog({
             <Input id="hireDate" name="hireDate" type="date" defaultValue={employee?.hireDate} className={bad("hireDate")} required />
           </div>
 
+          {/* Pay type: its rules (divisor, multipliers, Thursday rule…) come from Settings. The basis it
+              sets — full salary or paid days — goes along as salaryType for the older code paths. */}
           <div className="flex flex-col gap-1.5">
-            <Label>{t.employees.formShift}</Label>
-            <Select name="shiftId" defaultValue={employee?.shiftId ?? shifts[0]?.id}>
-              <SelectTrigger className={bad("shiftId")}><SelectValue /></SelectTrigger>
+            <Label>{t.employees.payType}</Label>
+            <Select name="payTypeId" value={payTypeId} onValueChange={choosePayType}>
+              <SelectTrigger className={bad("payTypeId")}><SelectValue /></SelectTrigger>
               <SelectContent>
-                {shifts.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{translateLabel(s.name, locale)}</SelectItem>
+                {payTypes.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <input type="hidden" name="salaryType" value={salaryType} />
+            {payType && <p className="text-xs text-muted-foreground">{format(t.employees.payTypeHint, { divisor: payType.dayDivisor })}</p>}
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label>{t.employees.formSalaryType}</Label>
-            <Select
-              name="salaryType"
-              value={salaryType}
-              onValueChange={(v) => setSalaryType(v as "monthly" | "daily")}
-            >
+            <Label>{t.employees.scheduleMode}</Label>
+            <Select name="scheduleMode" value={scheduleMode} onValueChange={(v) => setScheduleMode(v as ScheduleMode)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="monthly">{t.employees.salaryMonthly}</SelectItem>
-                <SelectItem value="daily">{t.employees.salaryDaily}</SelectItem>
+                <SelectItem value="schedule">{t.employees.modeSchedule}</SelectItem>
+                <SelectItem value="custom">{t.employees.modeCustom}</SelectItem>
+                <SelectItem value="shift">{t.employees.modeShift}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Both pay types keep the salary: per the bylaws a salaried employee's day is it over 30, a
-              daily worker's over 26. A daily worker may also have their own day rate, which then wins. */}
+          {scheduleMode === "schedule" && (
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <Label>{t.employees.workSchedule}</Label>
+              <Select name="workScheduleId" defaultValue={employee?.workScheduleId ?? schedules[0]?.id}>
+                <SelectTrigger className={bad("workScheduleId")}><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {schedules.map((s) => (
+                    <SelectItem key={s.id} value={s.id}><span dir="ltr">{s.name}</span></SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {scheduleMode === "custom" && (
+            <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-3" key={`custom-${payTypeId}`}>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="customWorkStart">{t.employees.customStart}</Label>
+                <Input id="customWorkStart" name="customWorkStart" type="time" defaultValue={customDefaults.start} className={bad("customWorkStart")} required />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="customWorkEnd">{t.employees.customEnd}</Label>
+                <Input id="customWorkEnd" name="customWorkEnd" type="time" defaultValue={customDefaults.end} className={bad("customWorkEnd")} required />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="customOvertimeStart">{t.employees.customOvertimeStart}</Label>
+                <Input id="customOvertimeStart" name="customOvertimeStart" type="time" defaultValue={customDefaults.overtime} className={bad("customOvertimeStart")} />
+                <p className="text-xs text-muted-foreground">{t.employees.customOvertimeHint}</p>
+              </div>
+            </div>
+          )}
+
+          {/* The shift stays on every employee (older records need it); it only sets the times in "by shift" mode. */}
+          {scheduleMode === "shift" ? (
+            <div className="flex flex-col gap-1.5">
+              <Label>{t.employees.formShift}</Label>
+              <Select name="shiftId" defaultValue={employee?.shiftId ?? shifts[0]?.id}>
+                <SelectTrigger className={bad("shiftId")}><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {shifts.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{translateLabel(s.name, locale)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <input type="hidden" name="shiftId" value={employee?.shiftId ?? shifts[0]?.id ?? ""} />
+          )}
+
+          {/* Every pay type keeps the salary: a day's pay is it over the pay type's divisor. A daily worker
+              may also have their own day rate, which then wins. */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="basicSalary">{t.employees.formBasicSalary}</Label>
             <Input id="basicSalary" name="basicSalary" type="number" min={0} defaultValue={employee?.basicSalary} className={bad("basicSalary")} required={!lenient && salaryType === "monthly"} />
-            <p className="text-xs text-muted-foreground">{salaryType === "monthly" ? t.employees.payHintMonthly : t.employees.payHintDaily}</p>
           </div>
           {salaryType === "daily" && (
             <div className="flex flex-col gap-1.5">

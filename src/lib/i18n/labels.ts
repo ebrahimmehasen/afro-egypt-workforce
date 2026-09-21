@@ -61,6 +61,8 @@ export function deductionTypeLabel(type: DeductionType, t: Dictionary): string {
     late: t.deductionTypes.late,
     absence: t.deductionTypes.absence,
     early_leave: t.deductionTypes.earlyLeave,
+    permission: t.deductionTypes.permission,
+    unauthorized_exit: t.deductionTypes.unauthorizedExit,
     penalty: t.deductionTypes.penalty,
     advance: t.deductionTypes.advance,
     admin_deduction: t.deductionTypes.adminDeduction,
@@ -155,4 +157,18 @@ export function payrollBreakdownRows(record: PayrollRecord, t: Dictionary): { ea
       ...(record.otherDeductions ? [{ label: t.payslip.otherDeductions, amount: record.otherDeductions }] : []),
     ],
   };
+}
+
+/** What an addition on the overtime list is: overtime, weekly-day-off or holiday work, Thursday time. */
+export function overtimeKindLabel(kind: string | undefined, t: Dictionary): string {
+  switch (kind) {
+    case "friday":
+      return t.overtime.kindFriday;
+    case "holiday":
+      return t.overtime.kindHoliday;
+    case "thursday_extra":
+      return t.overtime.kindThursday;
+    default:
+      return t.overtime.kindOvertime;
+  }
 }

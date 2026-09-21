@@ -97,7 +97,12 @@ export function DeductionsTable({
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="tabular-nums font-medium text-destructive">-{formatEGP(d.amount, locale)}</TableCell>
+                <TableCell className="tabular-nums font-medium text-destructive">
+                  -{formatEGP(d.amount, locale)}
+                  {d.editedBy && d.originalAmount != null && (
+                    <div className="text-xs font-normal text-muted-foreground">{format(t.dayPay.original, { value: formatEGP(d.originalAmount, locale) })}</div>
+                  )}
+                </TableCell>
                 <TableCell>{d.date}</TableCell>
                 <TableCell className="max-w-[220px] truncate text-muted-foreground">{d.reason}</TableCell>
                 {canManage && (

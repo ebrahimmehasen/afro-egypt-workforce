@@ -8,7 +8,8 @@ const worker = { id: "w1", status: "active", hireDate: "2020-01-01", shiftId: "m
 const run = (over: Partial<Parameters<typeof absenceCandidates>[0]> = {}) =>
   absenceCandidates({
     employees: [worker],
-    shifts: [morning],
+    shiftFor: () => morning,
+    weeklyOffDays: [5], // Friday, as set in the settings
     recorded: new Set(),
     today: "2026-09-21",
     now: new Date("2026-09-21T12:00:00"),
@@ -16,10 +17,11 @@ const run = (over: Partial<Parameters<typeof absenceCandidates>[0]> = {}) =>
     ...over,
   });
 
-describe("isWorkday", () => {
-  it("treats Friday as the only day off", () => {
-    expect(isWorkday("2026-09-25")).toBe(false); // Friday
-    for (const day of ["2026-09-19", "2026-09-20", "2026-09-21", "2026-09-24", "2026-09-26"]) expect(isWorkday(day)).toBe(true);
+describe("isWorkday (weekly days off from settings)", () => {
+  it("treats the configured days off (Friday here) as not working days", () => {
+    expect(isWorkday("2026-09-25", [], [5])).toBe(false); // Friday
+    expect(isWorkday("2026-09-26", [], [5, 6])).toBe(false); // Saturday, when it is set as a day off too
+    for (const day of ["2026-09-19", "2026-09-20", "2026-09-21", "2026-09-24", "2026-09-26"]) expect(isWorkday(day, [], [5])).toBe(true);
   });
 });
 
@@ -46,7 +48,7 @@ describe("absenceCandidates", () => {
       holidays: [{ from: "2026-09-22", to: "2026-09-23" }],
     }).map((c) => c.date);
     expect(days).toEqual(["2026-09-21", "2026-09-24"]);
-    expect(isWorkday("2026-09-22", [{ from: "2026-09-22", to: "2026-09-23" }])).toBe(false);
+    expect(isWorkday("2026-09-22", [{ from: "2026-09-22", to: "2026-09-23" }], [5])).toBe(false);
   });
 
   it("fills in earlier working days that were missed, skipping Friday", () => {

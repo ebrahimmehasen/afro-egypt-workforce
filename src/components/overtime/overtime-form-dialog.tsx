@@ -1,6 +1,5 @@
 "use client";
 
-import { overtimeHourlyRate } from "@/lib/pay-rules";
 import { useFormStatus } from "react-dom";
 import { useActionState, useState } from "react";
 import { Plus } from "lucide-react";
@@ -26,13 +25,13 @@ function SubmitButton() {
   return <Button type="submit" disabled={pending}>{pending ? t.common.saving : t.overtime.submit}</Button>;
 }
 
-export function OvertimeFormDialog({ employees }: { employees: Employee[] }) {
+export function OvertimeFormDialog({ employees, defaultRates }: { employees: Employee[]; defaultRates: Record<string, number> }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [employeeId, setEmployeeId] = useState(employees[0]?.id);
   const employee = employees.find((e) => e.id === employeeId);
-  // the bylaws: an overtime hour is the hourly wage (a day's pay over 10 hours) times one and a half
-  const defaultRate = employee ? overtimeHourlyRate(employee) : 0;
+  // an overtime hour: the hourly wage × the overtime multiplier of the employee's pay type (from settings)
+  const defaultRate = employee ? defaultRates[employee.id] ?? 0 : 0;
   const [state, formAction] = useActionState(createOvertime, {});
   useActionFeedback(state, () => setOpen(false));
 

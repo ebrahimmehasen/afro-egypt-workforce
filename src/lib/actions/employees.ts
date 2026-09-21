@@ -10,6 +10,7 @@ import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
 import { generateEmployeeNumber } from "@/lib/employee-number";
 import { invalidFieldsError } from "@/lib/validation";
+import { refreshPayCalculations } from "@/lib/pay-refresh";
 
 const employeeSchema = z
   .object({
@@ -45,7 +46,64 @@ type EmployeePayload = Omit<z.infer<typeof employeeSchema>, "phone" | "address" 
   qualification: string | null;
   militaryStatus: z.infer<typeof employeeSchema>["militaryStatus"] | null;
   nationalId: string | null;
+  /** The pay setup; absent on payloads saved before pay types existed, which then leave it unchanged. */
+  pay?: PaySetup;
 };
+
+/** Which pay type's rules apply, and the employee's working times: a fixed schedule or custom times. */
+interface PaySetup {
+  payTypeId: string;
+  workScheduleId: string | null;
+  customWorkStart: string | null;
+  customWorkEnd: string | null;
+  customOvertimeStart: string | null;
+}
+
+const TIME = /^([01]?\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Reads the pay part of the employee form. The pay type decides the pay basis (salaryType). The working
+ * times are one of: a fixed schedule, custom times (start, end, overtime start — what a daily worker gets),
+ * or "shift" to keep following the employee's shift as before. Returns nothing when the form has no pay
+ * fields at all, so an older client or a replayed request doesn't wipe anything.
+ */
+async function readPaySetup(raw: Record<string, unknown>): Promise<{ pay: PaySetup; basis: "monthly" | "daily" } | { fields: string[] } | null> {
+  const payTypeId = typeof raw.payTypeId === "string" ? raw.payTypeId : "";
+  if (!payTypeId) return null;
+  const payType = await prisma.payType.findUnique({ where: { id: payTypeId } });
+  if (!payType) return { fields: ["payTypeId"] };
+
+  const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const mode = text(raw.scheduleMode) ?? "schedule";
+  const pay: PaySetup = { payTypeId, workScheduleId: null, customWorkStart: null, customWorkEnd: null, customOvertimeStart: null };
+
+  if (mode === "schedule") {
+    const id = text(raw.workScheduleId);
+    if (!id || !(await prisma.workSchedule.findUnique({ where: { id } }))) return { fields: ["workScheduleId"] };
+    pay.workScheduleId = id;
+  } else if (mode === "custom") {
+    const start = text(raw.customWorkStart);
+    const end = text(raw.customWorkEnd);
+    const overtime = text(raw.customOvertimeStart);
+    const bad = [
+      !start || !TIME.test(start) ? "customWorkStart" : null,
+      !end || !TIME.test(end) ? "customWorkEnd" : null,
+      overtime && !TIME.test(overtime) ? "customOvertimeStart" : null,
+    ].filter(Boolean) as string[];
+    if (bad.length) return { fields: bad };
+    Object.assign(pay, { customWorkStart: start, customWorkEnd: end, customOvertimeStart: overtime });
+  }
+  // mode "shift": no schedule and no custom times — the pay type's times, then the shift, apply
+  return { pay, basis: payType.basis };
+}
+
+/** Adds the pay setup to a payload, or reports which pay field is wrong. */
+async function withPaySetup(payload: EmployeePayload, raw: Record<string, unknown>): Promise<EmployeePayload | { fields: string[] }> {
+  const setup = await readPaySetup(raw);
+  if (!setup) return payload;
+  if ("fields" in setup) return setup;
+  return { ...payload, salaryType: setup.basis, pay: setup.pay };
+}
 
 /** The schema reports the salary rule on `salaryType`; the input to fix is the amount field. */
 const salaryField = (raw: Record<string, unknown>) => (field: string) =>
@@ -115,7 +173,9 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
   }
 
   const actor = await getSession();
-  const payload: EmployeePayload = { id, ...parsed.data };
+  const withPay = await withPaySetup({ id, ...parsed.data }, raw);
+  if ("fields" in withPay) return invalidFieldsError(t, withPay.fields.map((f) => ({ path: [f] }) as never));
+  const payload: EmployeePayload = withPay;
 
   return gate(
     {
@@ -134,7 +194,7 @@ export async function applyCreateEmployee(payload: EmployeePayload, actorName: s
   if (payload.nationalId && (await prisma.employee.findUnique({ where: { nationalId: payload.nationalId } }))) {
     return { error: t.validation.nationalIdTaken, fields: ["nationalId"] };
   }
-  const { id, allowances, hireDate, dailyRate, salaryType, nationalId, ...rest } = payload;
+  const { id, allowances, hireDate, dailyRate, salaryType, nationalId, pay, ...rest } = payload;
 
   const department = await prisma.department.findUnique({ where: { id: rest.departmentId } });
   if (!department) return { error: t.validation.invalidData };
@@ -151,6 +211,7 @@ export async function applyCreateEmployee(payload: EmployeePayload, actorName: s
           ...rest,
           nationalId,
           salaryType,
+          ...(pay ?? {}),
           dailyRate: salaryType === "daily" ? dailyRate ?? null : null,
           hireDate: new Date(`${hireDate}T00:00:00.000Z`),
           allowancesTotal: allowances,
@@ -188,6 +249,10 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
     payload = { id, ...parsed.data };
   }
 
+  const withPay = await withPaySetup(payload, raw);
+  if ("fields" in withPay) return invalidFieldsError(t, withPay.fields.map((f) => ({ path: [f] }) as never));
+  payload = withPay;
+
   if (payload.nationalId) {
     const nidOwner = await prisma.employee.findUnique({ where: { nationalId: payload.nationalId } });
     if (nidOwner && nidOwner.id !== id) return { error: t.validation.nationalIdTaken, fields: ["nationalId"] };
@@ -208,7 +273,7 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
 
 export async function applyUpdateEmployee(payload: EmployeePayload, actorName: string): Promise<ActionState> {
   const t = await getT();
-  const { id, allowances, hireDate, dailyRate, salaryType, nationalId, ...rest } = payload;
+  const { id, allowances, hireDate, dailyRate, salaryType, nationalId, pay, ...rest } = payload;
 
   const before = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
   if (!before) return { error: t.validation.employeeNotFound };
@@ -232,6 +297,7 @@ export async function applyUpdateEmployee(payload: EmployeePayload, actorName: s
           ...rest,
           nationalId,
           salaryType,
+          ...(pay ?? {}),
           dailyRate: salaryType === "daily" ? dailyRate ?? null : null,
           hireDate: new Date(`${hireDate}T00:00:00.000Z`),
           allowancesTotal: allowances,
@@ -244,6 +310,8 @@ export async function applyUpdateEmployee(payload: EmployeePayload, actorName: s
 
   revalidatePath("/employees");
   revalidatePath(`/employees/${before.employeeNumber}`);
+  // salary, pay type or schedule may have changed: days not yet approved follow the new setup
+  refreshPayCalculations();
   return { success: true, message: t.employees.savedEdits };
 }
 

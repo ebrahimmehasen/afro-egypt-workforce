@@ -42,8 +42,9 @@ export default async function PayrollPage({
   const canEdit = hasPermission(user, "payroll");
 
   const { period: periodParam } = await searchParams;
-  // the pay month runs 26th to 25th, so from the 26th on the current one is already next month's
-  const ym = payPeriodOf(today());
+  // the pay month starts on a set day (settings), so from that day on the current one is already next month's
+  const startDay = db.payrollSettings.payPeriodStartDay;
+  const ym = payPeriodOf(today(), startDay);
   let period = periodParam ? db.payrollPeriods.find((p) => p.id === periodParam) : undefined;
   if (!period) {
     period =
@@ -77,7 +78,7 @@ export default async function PayrollPage({
 
   const dayFmt = new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "long", timeZone: "UTC" });
   const showDay = (day: string) => dayFmt.format(new Date(`${day}T00:00:00Z`));
-  const range = period ? payPeriodRange(period.year, period.month) : null;
+  const range = period ? payPeriodRange(period.year, period.month, startDay) : null;
   const payDay = period ? payday(period.year, period.month) : null;
 
   return (

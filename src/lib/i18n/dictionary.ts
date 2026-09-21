@@ -182,8 +182,17 @@ export interface Dictionary {
     salaryDaily: string;
     formDailyRate: string;
     formDailyHours: string;
-    payHintMonthly: string;
-    payHintDaily: string;
+    payType: string;
+    payTypeHint: string;
+    scheduleMode: string;
+    modeSchedule: string;
+    modeCustom: string;
+    modeShift: string;
+    workSchedule: string;
+    customStart: string;
+    customEnd: string;
+    customOvertimeStart: string;
+    customOvertimeHint: string;
     dailyRateOptional: string;
     salaryTypeCol: string;
     paidDaysCol: string;
@@ -345,6 +354,22 @@ export interface Dictionary {
     noRecords: string;
     approved: string;
     rejected: string;
+    updated: string;
+    deleted: string;
+    editTitle: string;
+    editSystemHint: string;
+    colKind: string;
+    colMultiplier: string;
+    kindOvertime: string;
+    kindFriday: string;
+    kindHoliday: string;
+    kindThursday: string;
+    fromSystem: string;
+    systemEdited: string;
+    original: string;
+    deleteTitle: string;
+    deleteConfirm: string;
+    deleteSystemConfirm: string;
   };
   deductions: {
     title: string;
@@ -524,21 +549,122 @@ export interface Dictionary {
     colTimestamp: string;
     noEntries: string;
   };
-  bylaws: {
+  paySettings: {
+    payTypesTitle: string;
+    payTypesDesc: string;
+    addPayType: string;
+    editPayType: string;
+    builtIn: string;
+    retired: string;
+    inactive: string;
+    employeesOn: string;
+    basisMonthly: string;
+    basisDaily: string;
+    fieldName: string;
+    fieldBasis: string;
+    fieldHoursPerDay: string;
+    hoursPerDayHint: string;
+    fieldWorkStart: string;
+    fieldWorkEnd: string;
+    fieldOvertimeStart: string;
+    overtimeStartHint: string;
+    fieldActive: string;
+    fieldAutoApprove: string;
+    fieldThursdayEnabled: string;
+    fieldThursdayEnd: string;
+    sectionTimes: string;
+    sectionRules: string;
+    sectionThursday: string;
+    sectionAbsence: string;
+    schedulesTitle: string;
+    schedulesDesc: string;
+    addSchedule: string;
+    editSchedule: string;
+    scheduleName: string;
+    scheduleNameHint: string;
+    scheduleStart: string;
+    scheduleEnd: string;
+    scheduleOvertimeStart: string;
+    scheduleActive: string;
+    noSchedules: string;
+    rulesTitle: string;
+    rulesDesc: string;
+    colRule: string;
+    colCurrent: string;
+    colUnit: string;
+    colDescription: string;
+    editRule: string;
+    unitTimes: string;
+    unitMinutes: string;
+    unitDays: string;
+    unitHours: string;
+    unitDivisor: string;
+    thursdayRuleOn: string;
+    thursdayRuleOff: string;
+    autoApproveOn: string;
+    autoApproveOff: string;
+    rules: Record<
+      | "lateMultiplier"
+      | "overtimeMultiplier"
+      | "overtimeMinimumMinutes"
+      | "overtimeStepMinutes"
+      | "permissionMultiplier"
+      | "unauthorizedExitMultiplier"
+      | "fridayMultiplier"
+      | "holidayMultiplier"
+      | "thursdayExtraMultiplier"
+      | "graceMinutes"
+      | "dayDivisor"
+      | "permittedAbsenceDays"
+      | "unpermittedAbsenceDays"
+      | "leaveNoticeHours",
+      { label: string; desc: string }
+    >;
+    generalTitle: string;
+    generalDesc: string;
+    weeklyOffDays: string;
+    payPeriodStartDay: string;
+    payPeriodStartDayHint: string;
+    weekdays: string[];
+    saved: string;
+    deleted: string;
+    retiredInUse: string;
+    builtInCantDelete: string;
+    thursdayEndRequired: string;
+    deletePayTypeTitle: string;
+    deletePayTypeConfirm: string;
+    deleteScheduleTitle: string;
+    deleteScheduleConfirm: string;
+    recalcNote: string;
+  };
+  dayPay: {
     title: string;
-    description: string;
-    hours: string;
-    grace: string;
-    late: string;
-    earlyLeave: string;
-    absencePermitted: string;
-    absenceUnpermitted: string;
-    overtime: string;
-    dayRate: string;
-    payMonth: string;
-    weekOff: string;
-    automatic: string;
-    documents: string;
+    desc: string;
+    colDate: string;
+    colIn: string;
+    colOut: string;
+    colWorked: string;
+    colLate: string;
+    colOvertime: string;
+    colMultiplier: string;
+    colOvertimeDue: string;
+    colDeductions: string;
+    colAdditions: string;
+    colNet: string;
+    autoCalculated: string;
+    editedBy: string;
+    removedBy: string;
+    original: string;
+    noDays: string;
+    hoursShort: string;
+    minutesShort: string;
+    payHours: string;
+    weeklyOff: string;
+    holiday: string;
+    thursday: string;
+    onePunch: string;
+    notPostedYet: string;
+    rulesUsed: string;
   };
   holidays: {
     title: string;
@@ -786,6 +912,8 @@ export interface Dictionary {
     late: string;
     absence: string;
     earlyLeave: string;
+    permission: string;
+    unauthorizedExit: string;
     penalty: string;
     advance: string;
     adminDeduction: string;
@@ -861,6 +989,16 @@ export interface Dictionary {
     editAttendanceSettings: string;
     editPayrollSettings: string;
     addHoliday: string;
+    editOvertime: string;
+    deleteOvertime: string;
+    addPayType: string;
+    editPayType: string;
+    editPayRule: string;
+    deletePayType: string;
+    addWorkSchedule: string;
+    editWorkSchedule: string;
+    deleteWorkSchedule: string;
+    editGeneralPaySettings: string;
     editDeduction: string;
     systemDeductions: string;
     deleteHoliday: string;

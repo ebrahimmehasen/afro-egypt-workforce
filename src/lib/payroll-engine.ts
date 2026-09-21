@@ -1,5 +1,4 @@
 import { Deduction, Employee, PayrollRecord } from "@/lib/types";
-import { dayRate } from "@/lib/pay-rules";
 
 export interface PayrollInputs {
   employee: Employee;
@@ -7,9 +6,11 @@ export interface PayrollInputs {
   approvedOvertimeAmount: number;
   incentives: number;
   bonuses: number;
+  /** A day's pay, from the employee's pay type (salary / its day divisor, or a daily worker's own rate). */
+  dayRate: number;
   /** Daily workers only: the days paid at the day rate this pay month. Ignored for salaried employees. */
   paidDays: number;
-  /** Every deduction for the pay month: the ones the system posted from attendance (late, absence, early
+  /** Every deduction for the pay month: the ones the system posted from attendance (late, absence, leaving
    * leave) and the ones entered by hand (penalties, advances…). */
   deductions: Deduction[];
 }
@@ -17,9 +18,9 @@ export interface PayrollInputs {
 /**
  * Pure payroll calculation. Never hardcode a final salary.
  *
- * The base, by pay type (see pay-rules.ts):
+ * The base, by the pay type's basis:
  *  - salaried ("monthly"): the full `basicSalary`;
- *  - daily worker: `paidDays × day rate` (the salary over 26, or their own day rate).
+ *  - daily worker: `paidDays × day rate` (from the pay type: the salary over its divisor, or their own rate).
  * Everything taken off — absence, lateness, early leave, penalties, advances — comes from the deductions
  * posted for the month, so what the deductions page shows is exactly what the payslip takes.
  */
@@ -32,15 +33,17 @@ export function calculatePayrollRecord(periodId: string, inputs: PayrollInputs):
   const incentives = inputs.incentives;
   const bonuses = inputs.bonuses;
 
-  const dailyRateApplied = isDaily ? Math.round(dayRate(employee)) : undefined;
+  const dailyRateApplied = isDaily ? Math.round(inputs.dayRate) : undefined;
   // "basicSalary" on the record = the base pay for this pay month.
-  const basicSalary = isDaily ? Math.round(inputs.paidDays * dayRate(employee)) : employee.basicSalary;
+  const basicSalary = isDaily ? Math.round(inputs.paidDays * inputs.dayRate) : employee.basicSalary;
 
   const grossSalary = basicSalary + allowances + overtimeAmount + incentives + bonuses;
 
   const lateDeduction = sumByType(inputs.deductions, "late");
   const absenceDeduction = sumByType(inputs.deductions, "absence");
-  const earlyLeaveDeduction = sumByType(inputs.deductions, "early_leave");
+  // time missed at the end of the day, however it was charged: with a permission or without one
+  const earlyLeaveDeduction =
+    sumByType(inputs.deductions, "early_leave") + sumByType(inputs.deductions, "permission") + sumByType(inputs.deductions, "unauthorized_exit");
   const penalties = sumByType(inputs.deductions, "penalty");
   const advances = sumByType(inputs.deductions, "advance");
   const otherDeductions = sumByType(inputs.deductions, "admin_deduction") + sumByType(inputs.deductions, "other");

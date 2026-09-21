@@ -9,6 +9,7 @@ import { gate } from "@/lib/change-requests";
 import { hasPermission } from "@/lib/permissions";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
+import { refreshPayCalculations } from "@/lib/pay-refresh";
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 /** A holiday longer than this is almost certainly a typo in the dates. */
@@ -29,6 +30,8 @@ const daysBetween = (from: string, to: string) => Math.round((dateOnly(to).getTi
 
 function revalidateAttendance() {
   for (const path of ["/settings", "/dashboard", "/attendance", "/reports"]) revalidatePath(path);
+  // a holiday changes how its days are paid (worked hours × the holiday multiplier, no absence)
+  refreshPayCalculations();
 }
 
 async function mayEditSettings() {

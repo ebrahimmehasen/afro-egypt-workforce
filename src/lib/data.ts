@@ -1,3 +1,4 @@
+import { FALLBACK_PAY_PERIOD_START_DAY, FALLBACK_WEEKLY_OFF_DAYS } from "@/lib/pay-defaults";
 import { prisma } from "@/lib/prisma";
 import { Store } from "@/lib/store";
 import { withOpenShift } from "@/lib/attendance-engine";
@@ -30,11 +31,13 @@ const DEFAULT_ATTENDANCE_SETTINGS = {
   lateDeductionPerMinute: 5,
   earlyLeaveDeductionPerMinute: 5,
   absenceDeductionDays: 1,
+  weeklyOffDays: FALLBACK_WEEKLY_OFF_DAYS,
 };
 const DEFAULT_PAYROLL_SETTINGS = {
   overtimeHourlyMultiplier: 1.5,
   workingDaysPerMonth: 26,
   workingHoursPerDay: 8,
+  payPeriodStartDay: FALLBACK_PAY_PERIOD_START_DAY,
 };
 
 /**
@@ -70,7 +73,8 @@ export async function getDb(): Promise<Store> {
     prisma.shift.findMany({ where: { deletedAt: null }, orderBy: { id: "asc" } }),
     prisma.dailyAttendance.findMany({ orderBy: { date: "asc" } }),
     prisma.leave.findMany({ orderBy: { createdAt: "desc" } }),
-    prisma.overtime.findMany({ orderBy: { createdAt: "desc" } }),
+    // a system addition someone removed is kept only so it isn't posted again - it no longer counts
+    prisma.overtime.findMany({ where: { voidedAt: null }, orderBy: [{ date: "desc" }, { createdAt: "desc" }] }),
     // a system deduction someone removed is kept only so it isn't posted again - it no longer counts
     prisma.deduction.findMany({ where: { voidedAt: null }, orderBy: [{ date: "desc" }, { createdAt: "desc" }] }),
     prisma.allowance.findMany(),
@@ -111,6 +115,7 @@ export async function getDb(): Promise<Store> {
           lateDeductionPerMinute: attendanceSettings.lateDeductionPerMinute,
           earlyLeaveDeductionPerMinute: attendanceSettings.earlyLeaveDeductionPerMinute,
           absenceDeductionDays: attendanceSettings.absenceDeductionDays,
+          weeklyOffDays: attendanceSettings.weeklyOffDays,
         }
       : DEFAULT_ATTENDANCE_SETTINGS,
     payrollSettings: payrollSettings
@@ -118,6 +123,7 @@ export async function getDb(): Promise<Store> {
           overtimeHourlyMultiplier: payrollSettings.overtimeHourlyMultiplier,
           workingDaysPerMonth: payrollSettings.workingDaysPerMonth,
           workingHoursPerDay: payrollSettings.workingHoursPerDay,
+          payPeriodStartDay: payrollSettings.payPeriodStartDay,
         }
       : DEFAULT_PAYROLL_SETTINGS,
   };

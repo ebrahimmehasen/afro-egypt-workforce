@@ -215,9 +215,6 @@ export function computeFromActuals(
   };
 }
 
-/** The factory's weekly day off: Friday only (0 = Sunday … 5 = Friday). */
-export const WEEKLY_DAYS_OFF: readonly number[] = [5];
-
 /**
  * Absences are recorded from this day on. The days before it were when the fingerprint device was being
  * set up and people were still being linked to it, so a missing punch then doesn't mean someone was
@@ -234,9 +231,9 @@ export function isHoliday(day: string, holidays: readonly HolidayRange[]): boole
   return holidays.some((h) => day >= h.from && day <= h.to);
 }
 
-/** Not the weekly day off and not a public holiday. */
-export function isWorkday(day: string, holidays: readonly HolidayRange[] = []): boolean {
-  return !WEEKLY_DAYS_OFF.includes(new Date(`${day}T00:00:00Z`).getUTCDay()) && !isHoliday(day, holidays);
+/** Not a weekly day off (from settings: 0 = Sunday … 5 = Friday) and not a public holiday. */
+export function isWorkday(day: string, holidays: readonly HolidayRange[], weeklyOffDays: readonly number[]): boolean {
+  return !weeklyOffDays.includes(new Date(`${day}T00:00:00Z`).getUTCDay()) && !isHoliday(day, holidays);
 }
 
 /**
@@ -255,7 +252,9 @@ export function absenceCandidates(opts: {
     /** the day they were linked to the device, if known — nothing before it counts */
     linkedOn?: string | null;
   }[];
-  shifts: Shift[];
+  /** the employee's working hours for that day (their schedule, with the pay type's grace) */
+  shiftFor: (employeeId: string, day: string) => Shift | undefined;
+  weeklyOffDays: readonly number[];
   /** "employeeId|yyyy-MM-dd" for every day that already has a record */
   recorded: Set<string>;
   today: string;
@@ -267,11 +266,13 @@ export function absenceCandidates(opts: {
   const out: { employeeId: string; date: string }[] = [];
   for (const e of opts.employees) {
     if (e.status !== "active" || !e.biometricDeviceUserId) continue;
-    const shift = opts.shifts.find((s) => s.id === e.shiftId);
-    if (!shift) continue;
+
+
     const start = [from, e.hireDate, e.linkedOn ?? from].sort().at(-1)!;
     for (let day = start; day <= opts.today; day = addDays(day, 1)) {
-      if (!isWorkday(day, opts.holidays) || opts.recorded.has(`${e.id}|${day}`)) continue;
+      if (!isWorkday(day, opts.holidays ?? [], opts.weeklyOffDays) || opts.recorded.has(`${e.id}|${day}`)) continue;
+      const shift = opts.shiftFor(e.id, day);
+      if (!shift) continue;
       const { scheduledStart } = getShiftWindow(day, shift);
       if (opts.now.getTime() < scheduledStart.getTime() + shift.gracePeriodMinutes * 60_000) continue;
       out.push({ employeeId: e.id, date: day });

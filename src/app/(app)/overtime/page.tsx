@@ -6,6 +6,8 @@ import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
 import { OvertimeFormDialog } from "@/components/overtime/overtime-form-dialog";
 import { OvertimeTable } from "@/components/overtime/overtime-table";
+import { loadPayContext, rulesFor, scheduleFor } from "@/lib/pay-context";
+import { hourlyRate } from "@/lib/pay-engine";
 
 export default async function OvertimePage({
   searchParams,
@@ -23,18 +25,29 @@ export default async function OvertimePage({
 
   const sorted = [...records].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
+  // the default rate offered for a manual entry: the hourly wage × the overtime multiplier of the employee's
+  // pay type, both from settings
+  const ctx = await loadPayContext();
+  const defaultRates = Object.fromEntries(
+    employees.map((e) => {
+      const rules = rulesFor(ctx, e);
+      return [e.id, Math.round(hourlyRate(rules, scheduleFor(ctx, e), e) * rules.overtimeMultiplier)];
+    }),
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title={t.overtime.title}
         description={t.overtime.description}
-        actions={<OvertimeFormDialog employees={employees} />}
+        actions={<OvertimeFormDialog employees={employees} defaultRates={defaultRates} />}
       />
       <OvertimeTable
         key={initialStatus}
         records={sorted}
         employees={db.employees}
         canApprove={hasPermission(user, "overtime")}
+        canManage={hasPermission(user, "overtime")}
         initialStatus={initialStatus}
       />
     </div>

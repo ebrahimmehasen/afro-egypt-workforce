@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recalculateDailyAttendance } from "@/lib/attendance-service";
-import { shiftDaysForPunch } from "@/lib/attendance-engine";
-import { punchWindow } from "@/lib/attendance-ingest";
-import { toShift } from "@/lib/serialize";
-import { localDay } from "@/lib/today";
+import { punchDays, punchWindow } from "@/lib/attendance-ingest";
+import { loadPayContext } from "@/lib/pay-context";
 
 /**
  * Biometric punch ingestion (ZKTeco and similar).
@@ -55,15 +53,12 @@ export async function POST(req: NextRequest) {
 
   const device = deviceId ? await prisma.device.findUnique({ where: { id: deviceId } }) : null;
 
-  const shiftRow = await prisma.shift.findUnique({ where: { id: employee.shiftId } });
-  const days = shiftRow ? shiftDaysForPunch(at, toShift(shiftRow)) : [localDay(at)];
+  const ctx = await loadPayContext();
+  const { days, shift } = punchDays(ctx, employee, at);
   const resolvedType =
     punchType ??
     ((await prisma.attendanceLog.count({
-      where: {
-        employeeId: employee.id,
-        timestamp: shiftRow ? { ...punchWindow(days[0], toShift(shiftRow)), lt: at } : { lt: at, gte: new Date(`${days[0]}T00:00:00`) },
-      },
+      where: { employeeId: employee.id, timestamp: { ...punchWindow(days[0], shift), lt: at } },
     })) === 0
       ? "in"
       : "out");
@@ -81,7 +76,7 @@ export async function POST(req: NextRequest) {
   });
 
   let daily = null;
-  for (const day of days) daily = await recalculateDailyAttendance(employee.id, day);
+  for (const day of days) daily = await recalculateDailyAttendance(employee.id, day, ctx);
   const dateStr = days[days.length - 1];
 
   return NextResponse.json({

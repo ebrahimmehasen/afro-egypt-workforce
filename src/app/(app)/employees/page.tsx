@@ -7,6 +7,7 @@ import { getT, format } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmployeesTable } from "@/components/employees/employees-table";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
+import { employeeFormOptions, loadPayContext } from "@/lib/pay-context";
 import { EmployeeAssistant } from "@/components/assistant/employee-assistant";
 
 export default async function EmployeesPage() {
@@ -16,6 +17,7 @@ export default async function EmployeesPage() {
   const canEdit = hasPermission(user, "employees");
 
   const employees = employeesInScope(viewerScope(user, db.employees), db.employees);
+  const formOptions = employeeFormOptions(await loadPayContext());
 
   const incompleteDocIds = employees
     .filter(
@@ -29,7 +31,7 @@ export default async function EmployeesPage() {
       <PageHeader
         title={t.employees.title}
         description={format(t.employees.totalCount, { count: employees.length })}
-        actions={canEdit ? <EmployeeFormDialog departments={db.departments} shifts={db.shifts} /> : null}
+        actions={canEdit ? <EmployeeFormDialog departments={db.departments} shifts={db.shifts} {...formOptions} /> : null}
       />
       <EmployeesTable
         employees={employees}

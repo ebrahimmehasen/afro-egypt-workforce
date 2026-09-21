@@ -84,6 +84,7 @@ describe.skipIf(!sampleLoaded)("sample-seeded database", () => {
       incentives: 0,
       bonuses: 0,
       paidDays: monthAttendance.length,
+      dayRate: employee.basicSalary / 30,
       deductions: [],
     });
 

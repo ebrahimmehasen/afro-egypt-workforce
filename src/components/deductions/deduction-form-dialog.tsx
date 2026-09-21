@@ -1,5 +1,6 @@
 "use client";
 
+import { deductionTypeLabel } from "@/lib/i18n/labels";
 import { useFormStatus } from "react-dom";
 import { useActionState, useState } from "react";
 import { Plus } from "lucide-react";
@@ -25,23 +26,13 @@ function SubmitButton() {
   return <Button type="submit" disabled={pending}>{pending ? t.common.saving : t.deductions.submitDeduction}</Button>;
 }
 
-const DEDUCTION_TYPES: DeductionType[] = ["late", "absence", "early_leave", "penalty", "advance", "admin_deduction", "other"];
+const DEDUCTION_TYPES: DeductionType[] = ["late", "absence", "early_leave", "permission", "unauthorized_exit", "penalty", "advance", "admin_deduction", "other"];
 
 export function DeductionFormDialog({ employees }: { employees: Employee[] }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(createDeduction, {});
   useActionFeedback(state, () => setOpen(false));
-
-  const typeLabels: Record<DeductionType, string> = {
-    late: t.deductionTypes.late,
-    absence: t.deductionTypes.absence,
-    early_leave: t.deductionTypes.earlyLeave,
-    penalty: t.deductionTypes.penalty,
-    advance: t.deductionTypes.advance,
-    admin_deduction: t.deductionTypes.adminDeduction,
-    other: t.deductionTypes.other,
-  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -66,7 +57,7 @@ export function DeductionFormDialog({ employees }: { employees: Employee[] }) {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {DEDUCTION_TYPES.map((value) => (
-                  <SelectItem key={value} value={value}>{typeLabels[value]}</SelectItem>
+                  <SelectItem key={value} value={value}>{deductionTypeLabel(value, t)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

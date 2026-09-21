@@ -93,6 +93,8 @@ enum DeductionType {
   late
   absence
   early_leave
+  permission
+  unauthorized_exit
   penalty
   advance
   admin_deduction
@@ -236,6 +238,18 @@ model Employee {
   hireDate              DateTime       @db.Date
   shiftId               String
   shift                 Shift          @relation(fields: [shiftId], references: [id])
+  /// The pay type whose rules (multipliers, day divisor, Thursday rule…) apply to this employee. Null on rows
+  /// saved before pay types existed: those resolve by `salaryType` to the built-in type with that code.
+  payTypeId             String?
+  payType               PayType?       @relation(fields: [payTypeId], references: [id])
+  /// A fixed work schedule, or custom times below (custom wins when set). Neither: the pay type's own times,
+  /// and failing those the shift.
+  workScheduleId        String?
+  workSchedule          WorkSchedule?  @relation(fields: [workScheduleId], references: [id])
+  customWorkStart       String? // "08:00"
+  customWorkEnd         String? // "18:30"
+  customOvertimeStart   String? // null = from the work end
+  /// Mirrors the pay type's basis ("monthly" = full salary, "daily" = paid days), kept for older code paths.
   salaryType            SalaryType     @default(monthly)
   basicSalary           Int            // monthly: the full salary. daily: fallback only — dailyRate is authoritative
   dailyRate             Int?           // required when salaryType = daily — pay for one worked day
@@ -280,6 +294,83 @@ model Employee {
   @@index([departmentId])
   @@index([shiftId])
   @@index([status])
+  @@index([payTypeId])
+  @@index([workScheduleId])
+}
+
+/// A pay type (نوع الأجر) and every rule used to calculate its pay. Nothing about pay is fixed in code: each
+/// number here is edited from /settings, and a new type can be added with rules of its own. Soft-deleted
+/// (deletedAt) so employees and past calculations that used a type keep resolving it.
+model PayType {
+  id                         String     @id @default(cuid())
+  /// "monthly" / "daily" for the two built-in types that pre-existing employees resolve to by salaryType.
+  code                       String?    @unique
+  name                       String
+  /// How the base pay is formed: the full salary ("monthly") or paid days × day rate ("daily").
+  basis                      SalaryType @default(monthly)
+  /// A day's pay = salary / this (30 for salaried, 26 for daily, …).
+  dayDivisor                 Float      @default(30)
+  /// Hours a day's pay covers, for the hourly rate. Null = from the schedule (work start → overtime start).
+  hoursPerDay                Float?
+  /// Default times for employees of this type (used when an employee has no schedule or custom times).
+  workStart                  String?
+  workEnd                    String?
+  overtimeStart              String?
+  /// Minutes of lateness tolerated before any of it counts.
+  graceMinutes               Float      @default(0)
+  /// Each late minute costs this many minutes of pay.
+  lateMultiplier             Float      @default(1.5)
+  /// Each counted overtime hour pays this many hours.
+  overtimeMultiplier         Float      @default(1.5)
+  /// Overtime shorter than this is not counted at all.
+  overtimeMinimumMinutes     Int        @default(60)
+  /// Counted overtime is taken in whole steps of this many minutes (60 = whole hours, 30 = half hours).
+  overtimeStepMinutes        Int        @default(30)
+  /// System-calculated overtime is approved straight away; off = it waits for approval.
+  overtimeAutoApprove        Boolean    @default(true)
+  /// Each hour missed on an approved permission for the rest of the day costs this many hours.
+  permissionMultiplier       Float      @default(1)
+  /// Each hour missed by leaving without permission costs this many hours.
+  unauthorizedExitMultiplier Float      @default(1.5)
+  /// Each hour worked on the weekly day off pays this many hours.
+  fridayMultiplier           Float      @default(2)
+  /// Each hour worked on a public holiday pays this many hours.
+  holidayMultiplier          Float      @default(2)
+  /// Thursday rule: the day ends at thursdayWorkEnd, and time worked from then until the usual overtime start
+  /// pays thursdayExtraMultiplier (normal time), not overtime.
+  thursdayRuleEnabled        Boolean    @default(false)
+  thursdayWorkEnd            String?
+  thursdayExtraMultiplier    Float      @default(1)
+  /// Days of pay a day off costs: on approved leave asked for leaveNoticeHours ahead, and otherwise.
+  permittedAbsenceDays       Float      @default(1)
+  unpermittedAbsenceDays     Float      @default(2)
+  leaveNoticeHours           Int        @default(48)
+  active                     Boolean    @default(true)
+  sortOrder                  Int        @default(0)
+  deletedAt                  DateTime?
+  createdAt                  DateTime   @default(now())
+  updatedAt                  DateTime   @updatedAt
+
+  employees Employee[]
+}
+
+/// A fixed work schedule employees can be put on (08:00 → 16:30 …). Managed from /settings; soft-deleted so
+/// employees who were on one keep their times.
+model WorkSchedule {
+  id            String    @id @default(cuid())
+  name          String
+  startTime     String
+  endTime       String
+  /// Null = overtime starts at the end time.
+  overtimeStart String?
+  /// Offered when adding or editing an employee.
+  active        Boolean   @default(true)
+  sortOrder     Int       @default(0)
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  employees Employee[]
 }
 
 // ---------------------------------------------------------------------------
@@ -379,6 +470,22 @@ model Overtime {
   status     RequestStatus @default(pending)
   approvedBy String?
   notes      String?       @db.Text
+  /// What the addition is: "overtime", "friday" (work on the weekly day off), "holiday", "thursday_extra"
+  /// (Thursday time after the short day, at normal rate). Entries made by hand are "overtime".
+  kind           String    @default("overtime")
+  /// The pay-hours multiplier the system applied (1.5 …). Null on entries made by hand.
+  multiplier     Float?
+  /// Posted by the system from attendance; systemKey "<employeeId>|<yyyy-MM-dd>|<kind>" keeps it to one.
+  autoGenerated  Boolean   @default(false)
+  systemKey      String?   @unique
+  /// What the system calculated, kept when someone edits it.
+  originalHours  Float?
+  originalAmount Int?
+  editedBy       String?
+  editedAt       DateTime?
+  /// A system entry someone removed: kept (not deleted) so the system doesn't post it again.
+  voidedBy       String?
+  voidedAt       DateTime?
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
@@ -400,6 +507,8 @@ model Deduction {
   /// deduction is posted once and kept in step with that day. Null for deductions entered by a person.
   systemKey     String?       @unique
   /// Set when someone edits a system deduction by hand: from then on the system leaves it as they set it.
+  /// What the system calculated, kept when someone edits the amount.
+  originalAmount Int?
   editedBy      String?
   editedAt      DateTime?
   /// A system deduction someone removed. Kept (not deleted) so the system doesn't post it again.
@@ -598,6 +707,8 @@ model AttendanceSettings {
   lateDeductionPerMinute       Int    @default(5)
   earlyLeaveDeductionPerMinute Int    @default(5)
   absenceDeductionDays         Int    @default(1)
+  /// The weekly day(s) off, comma-separated day numbers (0 = Sunday … 5 = Friday).
+  weeklyOffDays                String @default("5")
 }
 
 model PayrollSettings {
@@ -605,6 +716,8 @@ model PayrollSettings {
   overtimeHourlyMultiplier Float  @default(1.5)
   workingDaysPerMonth      Int    @default(26)
   workingHoursPerDay       Int    @default(8)
+  /// The pay month runs from this day of the month before up to the day before it in the named month.
+  payPeriodStartDay        Int    @default(26)
 }
 
 /// Connection settings for the ZKTeco biometric device managed from /biometric-device.

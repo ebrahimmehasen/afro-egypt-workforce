@@ -15,7 +15,7 @@ import { applyCreateDeduction, applyDeleteDeduction, applyUpdateDeduction } from
 import { applyCreateAllowance, applyDeleteAllowance } from "@/lib/actions/allowances";
 import { applyCorrectAttendance } from "@/lib/actions/attendance";
 import { applyDecideLeave } from "@/lib/actions/leaves";
-import { applyDecideOvertime } from "@/lib/actions/overtime";
+import { applyDecideOvertime, applyDeleteOvertime, applyUpdateOvertime } from "@/lib/actions/overtime";
 import { applyAddHoliday, applyDeleteHoliday } from "@/lib/actions/holidays";
 import {
   applyOpenPayrollPeriod, applyCalculatePayroll, applyApprovePayrollPeriod, applyClosePayrollPeriod,
@@ -47,6 +47,8 @@ const APPLIERS: Record<string, (payload: unknown, actorName: string) => Promise<
   "attendance.correct": (p, a) => applyCorrectAttendance(p as never, a),
   "leaves.decide": (p, a) => applyDecideLeave(p as never, a),
   "overtime.decide": (p, a) => applyDecideOvertime(p as never, a),
+  "overtime.update": (p, a) => applyUpdateOvertime(p as never, a),
+  "overtime.delete": (p, a) => applyDeleteOvertime(p as never, a),
   "payroll.openPeriod": (p, a) => applyOpenPayrollPeriod(p as never, a),
   "payroll.calculate": (p, a) => applyCalculatePayroll(p as never, a),
   "payroll.approve": (p, a) => applyApprovePayrollPeriod(p as never, a),

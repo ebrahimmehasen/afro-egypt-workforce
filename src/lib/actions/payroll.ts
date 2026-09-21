@@ -8,6 +8,8 @@ import { getSession } from "@/lib/auth";
 import { gate } from "@/lib/change-requests";
 import { calculatePayrollRecord } from "@/lib/payroll-engine";
 import { dailyPaidDays, payPeriodRange } from "@/lib/pay-rules";
+import { dayRate } from "@/lib/pay-engine";
+import { kindOf, loadPayContext, rulesFor } from "@/lib/pay-context";
 import { ABSENCE_TRACKING_FROM } from "@/lib/attendance-engine";
 import { dayStr } from "@/lib/serialize";
 import { addDays } from "@/lib/today";
@@ -19,10 +21,10 @@ const MONTHS_AR = [
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
 ];
 
-/** The pay month as a half-open date range for queries: from the 26th of the month before, up to (not
- * including) the 26th of this one. */
-function payMonthRange(year: number, month: number) {
-  const { from, to } = payPeriodRange(year, month);
+/** The pay month as a half-open date range for queries: from its start day in the month before, up to (not
+ * including) that day in this one. The start day comes from the payroll settings. */
+function payMonthRange(year: number, month: number, startDay: number) {
+  const { from, to } = payPeriodRange(year, month, startDay);
   return { from: new Date(`${from}T00:00:00.000Z`), to: new Date(`${addDays(to, 1)}T00:00:00.000Z`) };
 }
 
@@ -103,8 +105,9 @@ export async function applyCalculatePayroll(payload: CalculatePayrollPayload, ac
   if (!period) return { error: t.validation.periodNotFound };
   if (period.status === "closed") return { error: t.validation.periodClosed };
 
-  // the pay month: the 26th of the month before through the 25th (see pay-rules.ts)
-  const { from, to } = payMonthRange(period.year, period.month);
+  // every rule comes from settings: the pay month's start day, each employee's pay type, the days off
+  const ctx = await loadPayContext();
+  const { from, to } = payMonthRange(period.year, period.month, ctx.payPeriodStartDay);
 
   const activeEmployees = await prisma.employee.findMany({ where: { deletedAt: null, status: { in: ["active", "on_leave"] } } });
 
@@ -124,15 +127,18 @@ export async function applyCalculatePayroll(payload: CalculatePayrollPayload, ac
             ],
           },
         }),
-        tx.overtime.findMany({ where: { employeeId: employee.id, status: "approved", date: { gte: from, lt: to } } }),
+        // approved additions: overtime and weekly-day-off / holiday / Thursday work; a removed system one no longer counts
+        tx.overtime.findMany({ where: { employeeId: employee.id, status: "approved", voidedAt: null, date: { gte: from, lt: to } } }),
         // every deduction of the month, the system's (absence, lateness, early leave) and the manual ones;
         // a system deduction someone removed no longer counts
         tx.deduction.findMany({ where: { employeeId: employee.id, date: { gte: from, lt: to }, voidedAt: null } }),
       ]);
 
+      const rules = rulesFor(ctx, employee);
       const paidDays = dailyPaidDays(
         monthAttendance.map((a) => ({ date: dayStr(a.date), status: a.status })),
         ABSENCE_TRACKING_FROM,
+        (date) => kindOf(ctx, date) !== "workday",
       );
 
       const allowancesTotal = empAllowances
@@ -151,7 +157,7 @@ export async function applyCalculatePayroll(payload: CalculatePayrollPayload, ac
           jobTitle: employee.jobTitle,
           hireDate: employee.hireDate.toISOString().slice(0, 10),
           shiftId: employee.shiftId,
-          salaryType: employee.salaryType,
+          salaryType: rules.basis,
           basicSalary: employee.basicSalary,
           dailyRate: employee.dailyRate ?? undefined,
           dailyWorkingHours: employee.dailyWorkingHours,
@@ -163,6 +169,7 @@ export async function applyCalculatePayroll(payload: CalculatePayrollPayload, ac
         approvedOvertimeAmount,
         incentives,
         bonuses,
+        dayRate: dayRate(rules, employee),
         paidDays,
         deductions: periodDeductions.map((d) => ({
           id: d.id,
