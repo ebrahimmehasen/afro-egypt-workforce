@@ -1,6 +1,7 @@
 import { startRealtimeListener, stopRealtimeListener, isRealtimeListenerActive, getRealtimeConnectionStatus, RawAttendanceRecord } from "@/lib/zk-device";
 import { ingestOneRecord } from "@/lib/attendance-ingest";
 import { syncDeviceAttendance } from "@/lib/attendance-sync";
+import { recordAbsences } from "@/lib/attendance-service";
 
 // Shared through globalThis for the same reason as the listener state in zk-device.ts: this module can be
 // compiled into more than one bundle, and "start once" / "don't overlap" must hold for the whole process.
@@ -27,6 +28,10 @@ async function catchUp(reason: string) {
   try {
     const r = await syncDeviceAttendance();
     console.log(`[attendance-realtime] catch-up (${reason}): ${r.imported} new punch(es)`);
+    // Only right after a successful sync: then every punch the device has is already in, so someone with
+    // no record on a working day really didn't punch. While the device is unreachable nothing is marked.
+    const absent = await recordAbsences();
+    if (absent > 0) console.log(`[attendance-realtime] recorded ${absent} day(s) with no punch (absent or on leave)`);
   } catch (e) {
     console.error(`[attendance-realtime] catch-up (${reason}) failed:`, e instanceof Error ? e.message : e);
   } finally {

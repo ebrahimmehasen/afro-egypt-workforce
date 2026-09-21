@@ -247,6 +247,9 @@ model Employee {
   /// linkDeviceUserAction in src/lib/actions/biometric-device.ts). Unique so one
   /// device user can never be linked to two employees at once.
   biometricDeviceUserId String?        @unique
+  /// When that link was made - absences are only recorded from this day on, since before it the person
+  /// had no way to punch. Null for links made before this was tracked.
+  biometricLinkedAt     DateTime?
   status                EmployeeStatus @default(active)
   phone                 String?
   address               String?         @db.Text

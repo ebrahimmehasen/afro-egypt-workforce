@@ -215,6 +215,60 @@ export function computeFromActuals(
   };
 }
 
+/** The factory's weekly day off: Friday only (0 = Sunday … 5 = Friday). */
+export const WEEKLY_DAYS_OFF: readonly number[] = [5];
+
+/**
+ * Absences are recorded from this day on. The days before it were when the fingerprint device was being
+ * set up and people were still being linked to it, so a missing punch then doesn't mean someone was
+ * absent — and payroll deducts absent days, so they must not be counted.
+ */
+export const ABSENCE_TRACKING_FROM = "2026-09-21";
+
+export function isWorkday(day: string): boolean {
+  return !WEEKLY_DAYS_OFF.includes(new Date(`${day}T00:00:00Z`).getUTCDay());
+}
+
+/**
+ * Which employee-days should now be recorded: someone linked to the fingerprint device who has no record
+ * for a working day at all never punched, so they were absent (or on leave — recalculation tells the two
+ * apart). Today counts only once their shift has started and its grace period has passed. People who
+ * aren't on the device are left out: without a device they can't punch, so no punch says nothing.
+ */
+export function absenceCandidates(opts: {
+  employees: {
+    id: string;
+    status: string;
+    hireDate: string;
+    shiftId: string;
+    biometricDeviceUserId?: string | null;
+    /** the day they were linked to the device, if known — nothing before it counts */
+    linkedOn?: string | null;
+  }[];
+  shifts: Shift[];
+  /** "employeeId|yyyy-MM-dd" for every day that already has a record */
+  recorded: Set<string>;
+  today: string;
+  now: Date;
+  from?: string;
+}): { employeeId: string; date: string }[] {
+  const from = opts.from ?? ABSENCE_TRACKING_FROM;
+  const out: { employeeId: string; date: string }[] = [];
+  for (const e of opts.employees) {
+    if (e.status !== "active" || !e.biometricDeviceUserId) continue;
+    const shift = opts.shifts.find((s) => s.id === e.shiftId);
+    if (!shift) continue;
+    const start = [from, e.hireDate, e.linkedOn ?? from].sort().at(-1)!;
+    for (let day = start; day <= opts.today; day = addDays(day, 1)) {
+      if (!isWorkday(day) || opts.recorded.has(`${e.id}|${day}`)) continue;
+      const { scheduledStart } = getShiftWindow(day, shift);
+      if (opts.now.getTime() < scheduledStart.getTime() + shift.gracePeriodMinutes * 60_000) continue;
+      out.push({ employeeId: e.id, date: day });
+    }
+  }
+  return out;
+}
+
 /**
  * How long after a shift's scheduled end a single check-in still counts as "at work" rather than a
  * forgotten check-out — covers people staying on for overtime.

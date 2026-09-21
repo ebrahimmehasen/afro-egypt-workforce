@@ -194,9 +194,13 @@ export async function linkDeviceUserAction(deviceUserId: string, employeeId: str
         where: { biometricDeviceUserId: deviceUserId, id: { not: employeeId }, deletedAt: null },
       });
       if (conflict) {
-        await tx.employee.update({ where: { id: conflict.id }, data: { biometricDeviceUserId: null } });
+        await tx.employee.update({ where: { id: conflict.id }, data: { biometricDeviceUserId: null, biometricLinkedAt: null } });
       }
-      await tx.employee.update({ where: { id: employeeId }, data: { biometricDeviceUserId: deviceUserId } });
+      await tx.employee.update({
+        where: { id: employeeId },
+        // a re-link to the same device user keeps its original date
+        data: { biometricDeviceUserId: deviceUserId, ...(employee.biometricDeviceUserId === deviceUserId ? {} : { biometricLinkedAt: new Date() }) },
+      });
     });
   } catch (e) {
     return { error: e instanceof Error ? e.message : t.biometricDevice.deviceUnreachable };
@@ -235,7 +239,7 @@ export async function unlinkDeviceUserAction(deviceUserId: string) {
   if (!employee) return { error: t.validation.employeeNotFound };
 
   const { deleted } = await removeDeviceUserAttendance(employee.id, deviceUserId);
-  await prisma.employee.update({ where: { id: employee.id }, data: { biometricDeviceUserId: null } });
+  await prisma.employee.update({ where: { id: employee.id }, data: { biometricDeviceUserId: null, biometricLinkedAt: null } });
   await logDeviceAction(t, t.auditActions.unlinkDeviceUser, `${employee.name} (${deviceUserId}) — ${deleted} ${t.biometricDevice.recordsRemoved}`);
   revalidatePath(PATH);
   revalidatePath(`/employees/${employee.employeeNumber}`);

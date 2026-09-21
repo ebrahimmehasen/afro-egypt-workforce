@@ -1,7 +1,7 @@
-import { PUNCH_WINDOW_MS, computeDailyAttendance, getShiftWindow } from "@/lib/attendance-engine";
-import { addDays } from "@/lib/today";
+import { ABSENCE_TRACKING_FROM, PUNCH_WINDOW_MS, absenceCandidates, computeDailyAttendance, getShiftWindow } from "@/lib/attendance-engine";
+import { addDays, localDay } from "@/lib/today";
 import { prisma } from "@/lib/prisma";
-import { toDailyAttendance, toShift } from "@/lib/serialize";
+import { dayStr, toDailyAttendance, toShift } from "@/lib/serialize";
 import { DailyAttendance } from "@/lib/types";
 
 /** yyyy-MM-dd for each calendar day in [from, to] inclusive. */
@@ -108,4 +108,36 @@ export async function recalculateDailyAttendance(
   });
 
   return toDailyAttendance(row);
+}
+
+/**
+ * Records the day for every linked employee who hasn't punched on a working day (see absenceCandidates):
+ * absent, or leave if they have an approved one. Only writes days that have no record yet, so it is
+ * cheap to run often and never touches a day that already exists. A punch that turns up later simply
+ * recalculates that day into present or late.
+ */
+export async function recordAbsences(now: Date = new Date()): Promise<number> {
+  const todayStr = localDay(now);
+  const [employees, shifts, rows] = await Promise.all([
+    prisma.employee.findMany({ where: { deletedAt: null, status: "active", biometricDeviceUserId: { not: null } } }),
+    prisma.shift.findMany({ where: { deletedAt: null } }),
+    prisma.dailyAttendance.findMany({
+      where: { date: { gte: new Date(`${ABSENCE_TRACKING_FROM}T00:00:00.000Z`) } },
+      select: { employeeId: true, date: true },
+    }),
+  ]);
+
+  const candidates = absenceCandidates({
+    employees: employees.map((e) => ({
+      ...e,
+      hireDate: dayStr(e.hireDate),
+      linkedOn: e.biometricLinkedAt ? localDay(e.biometricLinkedAt) : null,
+    })),
+    shifts: shifts.map(toShift),
+    recorded: new Set(rows.map((r) => `${r.employeeId}|${dayStr(r.date)}`)),
+    today: todayStr,
+    now,
+  });
+  for (const c of candidates) await recalculateDailyAttendance(c.employeeId, c.date);
+  return candidates.length;
 }
