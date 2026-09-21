@@ -195,6 +195,26 @@ export function computeFromActuals(
 }
 
 /**
+ * How long after a shift's scheduled end a single check-in still counts as "at work" rather than a
+ * forgotten check-out — covers people staying on for overtime.
+ */
+export const OPEN_SHIFT_GRACE_MS = 4 * 60 * 60_000;
+
+/**
+ * A day with only a check-in is stored as `missing_punch`, which is the truth once the shift is over.
+ * While the shift is still running, though, that person simply hasn't left yet: they are present (or
+ * late), and counting them as a missing punch left the dashboard at zero present all morning. So on
+ * read, an uncorrected one-punch day whose shift hasn't ended (plus the grace above) shows as present or
+ * late; after that it goes back to `missing_punch` for HR to review, with nothing to recompute.
+ */
+export function withOpenShift(record: DailyAttendance, now: Date = new Date()): DailyAttendance {
+  if (record.status !== "missing_punch" || !record.actualIn || record.actualOut || record.correctedAt) return record;
+  const end = new Date(record.scheduledEnd).getTime();
+  if (Number.isNaN(end) || now.getTime() >= end + OPEN_SHIFT_GRACE_MS) return record;
+  return { ...record, status: record.deductibleLateMinutes > 0 ? "late" : "present" };
+}
+
+/**
  * Groups of AttendanceStatus that belong together when a KPI (e.g. dashboard's
  * "present today") counts more than one literal status. Shared between the KPI
  * selectors and any status filter UI so a filtered list always matches the

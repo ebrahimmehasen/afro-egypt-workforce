@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Store } from "@/lib/store";
+import { withOpenShift } from "@/lib/attendance-engine";
 import { AttendanceLog, AuditLogEntry } from "@/lib/types";
 import {
   toAllowance,
@@ -85,7 +86,8 @@ export async function getDb(): Promise<Store> {
     employees: employees.map(toEmployee),
     departments: departments.map(toDepartment),
     shifts: shifts.map(toShift),
-    dailyAttendance: dailyAttendance.map(toDailyAttendance),
+    // one-punch days of a shift still running read as present, see withOpenShift
+    dailyAttendance: dailyAttendance.map((a) => withOpenShift(toDailyAttendance(a))),
     leaves: leaves.map(toLeave),
     overtime: overtime.map(toOvertime),
     deductions: deductions.map(toDeduction),
