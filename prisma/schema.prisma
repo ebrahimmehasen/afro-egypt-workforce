@@ -608,3 +608,15 @@ model BiometricDeviceSettings {
   commPassword Int      @default(0)
   updatedAt    DateTime @updatedAt
 }
+
+/// A public holiday (or any factory-wide day off besides Friday), one row per holiday, which may span
+/// several days (e.g. Eid). Nobody is recorded absent on these days; whoever works still punches as usual.
+model Holiday {
+  id        String   @id @default(cuid())
+  name      String
+  from      DateTime @db.Date
+  to        DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  @@index([from, to])
+}

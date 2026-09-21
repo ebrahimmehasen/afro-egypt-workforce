@@ -16,6 +16,7 @@ import { applyCreateAllowance, applyDeleteAllowance } from "@/lib/actions/allowa
 import { applyCorrectAttendance } from "@/lib/actions/attendance";
 import { applyDecideLeave } from "@/lib/actions/leaves";
 import { applyDecideOvertime } from "@/lib/actions/overtime";
+import { applyAddHoliday, applyDeleteHoliday } from "@/lib/actions/holidays";
 import {
   applyOpenPayrollPeriod, applyCalculatePayroll, applyApprovePayrollPeriod, applyClosePayrollPeriod,
 } from "@/lib/actions/payroll";
@@ -52,6 +53,8 @@ const APPLIERS: Record<string, (payload: unknown, actorName: string) => Promise<
   "settings.company": (p, a) => applyUpdateCompanySettings(p as never, a),
   "settings.attendance": (p, a) => applyUpdateAttendanceSettings(p as never, a),
   "settings.payroll": (p, a) => applyUpdatePayrollSettings(p as never, a),
+  "settings.holiday.add": (p, a) => applyAddHoliday(p as never, a),
+  "settings.holiday.delete": (p, a) => applyDeleteHoliday(p as never, a),
 };
 
 async function guard() {

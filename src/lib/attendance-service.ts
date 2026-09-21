@@ -118,13 +118,14 @@ export async function recalculateDailyAttendance(
  */
 export async function recordAbsences(now: Date = new Date()): Promise<number> {
   const todayStr = localDay(now);
-  const [employees, shifts, rows] = await Promise.all([
+  const [employees, shifts, rows, holidays] = await Promise.all([
     prisma.employee.findMany({ where: { deletedAt: null, status: "active", biometricDeviceUserId: { not: null } } }),
     prisma.shift.findMany({ where: { deletedAt: null } }),
     prisma.dailyAttendance.findMany({
       where: { date: { gte: new Date(`${ABSENCE_TRACKING_FROM}T00:00:00.000Z`) } },
       select: { employeeId: true, date: true },
     }),
+    prisma.holiday.findMany({ where: { to: { gte: new Date(`${ABSENCE_TRACKING_FROM}T00:00:00.000Z`) } } }),
   ]);
 
   const candidates = absenceCandidates({
@@ -137,6 +138,7 @@ export async function recordAbsences(now: Date = new Date()): Promise<number> {
     recorded: new Set(rows.map((r) => `${r.employeeId}|${dayStr(r.date)}`)),
     today: todayStr,
     now,
+    holidays: holidays.map((h) => ({ from: dayStr(h.from), to: dayStr(h.to) })),
   });
   for (const c of candidates) await recalculateDailyAttendance(c.employeeId, c.date);
   return candidates.length;

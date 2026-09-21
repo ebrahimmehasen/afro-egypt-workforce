@@ -225,8 +225,18 @@ export const WEEKLY_DAYS_OFF: readonly number[] = [5];
  */
 export const ABSENCE_TRACKING_FROM = "2026-09-21";
 
-export function isWorkday(day: string): boolean {
-  return !WEEKLY_DAYS_OFF.includes(new Date(`${day}T00:00:00Z`).getUTCDay());
+export interface HolidayRange {
+  from: string;
+  to: string;
+}
+
+export function isHoliday(day: string, holidays: readonly HolidayRange[]): boolean {
+  return holidays.some((h) => day >= h.from && day <= h.to);
+}
+
+/** Not the weekly day off and not a public holiday. */
+export function isWorkday(day: string, holidays: readonly HolidayRange[] = []): boolean {
+  return !WEEKLY_DAYS_OFF.includes(new Date(`${day}T00:00:00Z`).getUTCDay()) && !isHoliday(day, holidays);
 }
 
 /**
@@ -251,6 +261,7 @@ export function absenceCandidates(opts: {
   today: string;
   now: Date;
   from?: string;
+  holidays?: readonly HolidayRange[];
 }): { employeeId: string; date: string }[] {
   const from = opts.from ?? ABSENCE_TRACKING_FROM;
   const out: { employeeId: string; date: string }[] = [];
@@ -260,7 +271,7 @@ export function absenceCandidates(opts: {
     if (!shift) continue;
     const start = [from, e.hireDate, e.linkedOn ?? from].sort().at(-1)!;
     for (let day = start; day <= opts.today; day = addDays(day, 1)) {
-      if (!isWorkday(day) || opts.recorded.has(`${e.id}|${day}`)) continue;
+      if (!isWorkday(day, opts.holidays) || opts.recorded.has(`${e.id}|${day}`)) continue;
       const { scheduledStart } = getShiftWindow(day, shift);
       if (opts.now.getTime() < scheduledStart.getTime() + shift.gracePeriodMinutes * 60_000) continue;
       out.push({ employeeId: e.id, date: day });

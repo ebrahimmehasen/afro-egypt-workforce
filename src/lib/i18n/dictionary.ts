@@ -511,6 +511,27 @@ export interface Dictionary {
     colTimestamp: string;
     noEntries: string;
   };
+  holidays: {
+    title: string;
+    description: string;
+    name: string;
+    namePlaceholder: string;
+    from: string;
+    to: string;
+    toHint: string;
+    add: string;
+    adding: string;
+    empty: string;
+    days: string;
+    oneDay: string;
+    past: string;
+    deleteTitle: string;
+    deleteConfirm: string;
+    added: string;
+    deleted: string;
+    endBeforeStart: string;
+    tooLong: string;
+  };
   settings: {
     title: string;
     description: string;
@@ -810,6 +831,8 @@ export interface Dictionary {
     editCompanySettings: string;
     editAttendanceSettings: string;
     editPayrollSettings: string;
+    addHoliday: string;
+    deleteHoliday: string;
     editDeviceConnection: string;
     deleteDeviceUser: string;
     deleteDeviceFingerprint: string;

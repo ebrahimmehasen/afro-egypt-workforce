@@ -37,6 +37,18 @@ describe("absenceCandidates", () => {
     expect(run({ today: "2026-09-25", now: new Date("2026-09-25T12:00:00"), from: "2026-09-25" })).toEqual([]);
   });
 
+  it("never marks a public holiday, whether one day or several", () => {
+    expect(run({ holidays: [{ from: "2026-09-21", to: "2026-09-21" }] })).toEqual([]);
+    const days = run({
+      from: "2026-09-21",
+      today: "2026-09-24",
+      now: new Date("2026-09-24T12:00:00"),
+      holidays: [{ from: "2026-09-22", to: "2026-09-23" }],
+    }).map((c) => c.date);
+    expect(days).toEqual(["2026-09-21", "2026-09-24"]);
+    expect(isWorkday("2026-09-22", [{ from: "2026-09-22", to: "2026-09-23" }])).toBe(false);
+  });
+
   it("fills in earlier working days that were missed, skipping Friday", () => {
     const days = run({ from: "2026-09-24", today: "2026-09-26", now: new Date("2026-09-26T12:00:00") }).map((c) => c.date);
     expect(days).toEqual(["2026-09-24", "2026-09-26"]);
