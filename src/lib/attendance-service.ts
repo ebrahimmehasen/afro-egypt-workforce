@@ -1,17 +1,13 @@
-import { computeDailyAttendance, getShiftWindow } from "@/lib/attendance-engine";
+import { PUNCH_WINDOW_MS, computeDailyAttendance, getShiftWindow } from "@/lib/attendance-engine";
+import { addDays } from "@/lib/today";
 import { prisma } from "@/lib/prisma";
 import { toDailyAttendance, toShift } from "@/lib/serialize";
 import { DailyAttendance } from "@/lib/types";
 
 /** yyyy-MM-dd for each calendar day in [from, to] inclusive. */
-function datesInRange(from: string, to: string): string[] {
+export function datesInRange(from: string, to: string): string[] {
   const out: string[] = [];
-  const cur = new Date(`${from}T00:00:00`);
-  const end = new Date(`${to}T00:00:00`);
-  while (cur <= end) {
-    out.push(cur.toISOString().slice(0, 10));
-    cur.setDate(cur.getDate() + 1);
-  }
+  for (let day = from; day <= to; day = addDays(day, 1)) out.push(day);
   return out;
 }
 
@@ -47,8 +43,8 @@ export async function recalculateDailyAttendance(
 
   const { scheduledStart, scheduledEnd } = getShiftWindow(date, shift);
   // widen the window a little so early / very-late punches are still attributed to this shift
-  const windowStart = new Date(scheduledStart.getTime() - 6 * 60 * 60 * 1000);
-  const windowEnd = new Date(scheduledEnd.getTime() + 6 * 60 * 60 * 1000);
+  const windowStart = new Date(scheduledStart.getTime() - PUNCH_WINDOW_MS);
+  const windowEnd = new Date(scheduledEnd.getTime() + PUNCH_WINDOW_MS);
 
   const rawLogs = await prisma.attendanceLog.findMany({
     where: { employeeId, timestamp: { gte: windowStart, lte: windowEnd } },

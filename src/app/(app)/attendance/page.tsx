@@ -41,7 +41,7 @@ export default async function AttendancePage({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <DateNav date={date} />
         <div className="grid grid-cols-3 gap-2 sm:flex sm:gap-3">
-          <KpiCard label={t.attendance.present} value={summary.present + summary.late} icon={UserCheck} tone="success" href={`/attendance?date=${date}&status=present`} />
+          <KpiCard label={t.attendance.present} value={summary.present + summary.late + summary.earlyLeave} icon={UserCheck} tone="success" href={`/attendance?date=${date}&status=present`} />
           <KpiCard label={t.attendance.late} value={summary.late} icon={Clock3} tone="warning" href={`/attendance?date=${date}&status=late`} />
           <KpiCard label={t.attendance.absent} value={summary.absent} icon={UserX} tone="destructive" href={`/attendance?date=${date}&status=absent`} />
           <KpiCard label={t.attendance.onLeave} value={summary.leave} icon={CalendarClock} tone="primary" href={`/attendance?date=${date}&status=leave`} />

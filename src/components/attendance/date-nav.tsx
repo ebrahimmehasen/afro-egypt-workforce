@@ -6,12 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocale, useT } from "@/components/providers/locale-provider";
-
-function shiftDate(date: string, days: number) {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
+import { addDays } from "@/lib/today";
 
 export function DateNav({ date }: { date: string }) {
   const t = useT();
@@ -34,7 +29,7 @@ export function DateNav({ date }: { date: string }) {
         variant="outline"
         size="icon"
         disabled={isPending}
-        onClick={() => go(shiftDate(date, -1))}
+        onClick={() => go(addDays(date, -1))}
         aria-label={t.attendance.prevDay}
       >
         <Prev className="h-4 w-4" />
@@ -50,7 +45,7 @@ export function DateNav({ date }: { date: string }) {
         variant="outline"
         size="icon"
         disabled={isPending}
-        onClick={() => go(shiftDate(date, 1))}
+        onClick={() => go(addDays(date, 1))}
         aria-label={t.attendance.nextDay}
       >
         <Next className="h-4 w-4" />

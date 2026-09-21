@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/data";
 import { Scope, scopedSnapshot } from "@/lib/scope";
-import { today } from "@/lib/today";
+import { addDays, today } from "@/lib/today";
 import { AttendanceStatus, DailyAttendance } from "@/lib/types";
 import { ATTENDANCE_STATUS_GROUPS } from "@/lib/attendance-engine";
 
@@ -20,8 +20,10 @@ export async function getTodayAttendance(scope: Scope, date: string = today()): 
 
 export async function getTodayKpis(scope: Scope, date: string = today()) {
   const db = await snapshot(scope);
-  const dayRecords = db.dailyAttendance.filter((a) => a.date === date);
-  const totalEmployees = db.employees.filter((e) => e.status === "active").length;
+  // the same people the attendance page counts for the day: active employees only
+  const activeIds = new Set(db.employees.filter((e) => e.status === "active").map((e) => e.id));
+  const dayRecords = db.dailyAttendance.filter((a) => a.date === date && activeIds.has(a.employeeId));
+  const totalEmployees = activeIds.size;
 
   const count = (status: AttendanceStatus) => dayRecords.filter((a) => a.status === status).length;
 
@@ -81,13 +83,10 @@ export async function getMonthlyKpis(scope: Scope, year: number, month: number) 
 
 export async function getAttendanceTrend(scope: Scope, days = 14, endDate: string = today()) {
   const db = await snapshot(scope);
-  const end = new Date(`${endDate}T00:00:00`);
   const trend: { date: string; present: number; late: number; absent: number }[] = [];
 
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(end);
-    d.setDate(d.getDate() - i);
-    const iso = d.toISOString().slice(0, 10);
+    const iso = addDays(endDate, -i);
     const dayRecords = db.dailyAttendance.filter((a) => a.date === iso);
     if (dayRecords.length === 0) continue;
     trend.push({
@@ -107,7 +106,8 @@ export async function getAttendanceByDepartment(scope: Scope, date: string = tod
     ? db.departments
     : db.departments.filter((dept) => db.employees.some((e) => e.departmentId === dept.id));
   return departments.map((dept) => {
-    const deptEmployeeIds = db.employees.filter((e) => e.departmentId === dept.id).map((e) => e.id);
+    // people who left don't count towards a department's attendance rate
+    const deptEmployeeIds = db.employees.filter((e) => e.departmentId === dept.id && e.status === "active").map((e) => e.id);
     const records = dayRecords.filter((a) => deptEmployeeIds.includes(a.employeeId));
     const present = records.filter((a) => ATTENDANCE_STATUS_GROUPS.present!.includes(a.status)).length;
     return {

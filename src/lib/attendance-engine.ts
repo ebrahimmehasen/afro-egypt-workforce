@@ -1,4 +1,5 @@
 import { AttendanceLog, AttendanceStatus, DailyAttendance, Shift } from "@/lib/types";
+import { addDays, localDay } from "@/lib/today";
 
 function toMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
@@ -14,6 +15,26 @@ export function getShiftWindow(date: string, shift: Shift) {
     end.setDate(end.getDate() + 1);
   }
   return { scheduledStart: start, scheduledEnd: end };
+}
+
+/** How far outside a shift's scheduled times a punch is still counted towards that shift. */
+export const PUNCH_WINDOW_MS = 6 * 60 * 60_000;
+
+/**
+ * The shift day(s) a punch belongs to: every day whose shift window (widened by PUNCH_WINDOW_MS, the
+ * same window recalculation reads) contains it. A day shift's punch is simply its own day, but an
+ * evening shift's check-out after midnight belongs to the day before, and a night shift's check-in
+ * before midnight to the day after — so the calendar day of the punch alone isn't enough.
+ */
+export function shiftDaysForPunch(at: Date, shift: Shift): string[] {
+  const own = localDay(at);
+  const days = [addDays(own, -1), own, addDays(own, 1)].filter((day) => {
+    const { scheduledStart, scheduledEnd } = getShiftWindow(day, shift);
+    return (
+      at.getTime() >= scheduledStart.getTime() - PUNCH_WINDOW_MS && at.getTime() <= scheduledEnd.getTime() + PUNCH_WINDOW_MS
+    );
+  });
+  return days.length > 0 ? days : [own];
 }
 
 export interface ComputeDailyAttendanceInput {

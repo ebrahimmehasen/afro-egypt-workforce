@@ -1,5 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { recalculateDailyAttendance } from "@/lib/attendance-service";
+import { PUNCH_WINDOW_MS, getShiftWindow, shiftDaysForPunch } from "@/lib/attendance-engine";
+import { toShift } from "@/lib/serialize";
+import { Shift } from "@/lib/types";
+
+/** The stretch of time whose punches count towards one shift day — the same one recalculation reads. */
+export function punchWindow(day: string, shift: Shift): { gte: Date; lte: Date } {
+  const { scheduledStart, scheduledEnd } = getShiftWindow(day, shift);
+  return { gte: new Date(scheduledStart.getTime() - PUNCH_WINDOW_MS), lte: new Date(scheduledEnd.getTime() + PUNCH_WINDOW_MS) };
+}
 
 /**
  * Pure DB-side half of attendance ingestion — no device I/O here, so both
@@ -20,7 +29,7 @@ export interface IngestOutcome {
 export async function ingestOneRecord(deviceUserId: string, recordTime: Date): Promise<IngestOutcome> {
   const employee = await prisma.employee.findFirst({
     where: { biometricDeviceUserId: deviceUserId, deletedAt: null },
-    select: { id: true },
+    select: { id: true, shift: true },
   });
   if (!employee) return { imported: false, reason: "unlinked" };
 
@@ -30,11 +39,10 @@ export async function ingestOneRecord(deviceUserId: string, recordTime: Date): P
   });
   if (existing) return { imported: false, reason: "duplicate" };
 
-  const dateStr = recordTime.toISOString().slice(0, 10);
-  const dayStart = new Date(`${dateStr}T00:00:00.000Z`);
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-  const priorToday = await prisma.attendanceLog.count({
-    where: { employeeId: employee.id, timestamp: { gte: dayStart, lt: dayEnd } },
+  const shift = toShift(employee.shift);
+  const days = shiftDaysForPunch(recordTime, shift);
+  const priorInShift = await prisma.attendanceLog.count({
+    where: { employeeId: employee.id, timestamp: { ...punchWindow(days[0], shift), lt: recordTime } },
   });
 
   await prisma.attendanceLog.create({
@@ -42,12 +50,12 @@ export async function ingestOneRecord(deviceUserId: string, recordTime: Date): P
       employeeId: employee.id,
       deviceUserId,
       timestamp: recordTime,
-      punchType: priorToday === 0 ? "in" : "out",
+      punchType: priorInShift === 0 ? "in" : "out",
       source: "biometric",
     },
   });
 
-  await recalculateDailyAttendance(employee.id, dateStr);
+  for (const day of days) await recalculateDailyAttendance(employee.id, day);
   return { imported: true };
 }
 
@@ -64,11 +72,12 @@ export async function ingestOneRecord(deviceUserId: string, recordTime: Date): P
 export async function removeDeviceUserAttendance(employeeId: string, deviceUserId: string): Promise<{ deleted: number; daysRecalculated: number }> {
   const rows = await prisma.attendanceLog.findMany({
     where: { employeeId, deviceUserId, source: "biometric" },
-    select: { timestamp: true },
+    select: { timestamp: true, employee: { select: { shift: true } } },
   });
   if (rows.length === 0) return { deleted: 0, daysRecalculated: 0 };
 
-  const dates = new Set(rows.map((r) => r.timestamp.toISOString().slice(0, 10)));
+  const shift = toShift(rows[0].employee.shift);
+  const dates = new Set(rows.flatMap((r) => shiftDaysForPunch(r.timestamp, shift)));
 
   const { count } = await prisma.attendanceLog.deleteMany({
     where: { employeeId, deviceUserId, source: "biometric" },

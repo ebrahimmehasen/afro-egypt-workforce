@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { FileBarChart } from "lucide-react";
 import { DailyAttendance, Department, Employee } from "@/lib/types";
-import { today } from "@/lib/today";
+import { addDays, today } from "@/lib/today";
 import { attendanceStatusLabel } from "@/lib/i18n/labels";
 import { intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
@@ -20,11 +20,6 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { format } from "@/lib/i18n/format";
 import { AttendanceStatus } from "@/lib/types";
 
-function addDays(date: string, days: number) {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 const STATUS_OPTIONS: AttendanceStatus[] = [
   "present", "late", "absent", "leave", "mission", "excused_absence", "early_leave", "missing_punch",

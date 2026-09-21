@@ -4,6 +4,7 @@ import { requireAccess } from "@/lib/auth";
 import { getDb } from "@/lib/data";
 import { getT } from "@/lib/i18n";
 import { getDeviceOverview } from "@/lib/zk-device";
+import { localDay } from "@/lib/today";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { RetryButton } from "@/components/biometric-device/retry-button";
@@ -68,7 +69,7 @@ export default async function BiometricDeviceUserPage({
     .sort((a, b) => a.recordTime.getTime() - b.recordTime.getTime());
   const seenToday = new Map<string, number>();
   const history: DevicePunchEntry[] = userLogs.map((r): DevicePunchEntry => {
-    const dateKey = r.recordTime.toISOString().slice(0, 10);
+    const dateKey = localDay(r.recordTime);
     const priorToday = seenToday.get(dateKey) ?? 0;
     seenToday.set(dateKey, priorToday + 1);
     return { timestamp: r.recordTime.toISOString(), punchType: priorToday === 0 ? "in" : "out" };
