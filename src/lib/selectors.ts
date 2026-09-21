@@ -41,21 +41,12 @@ export async function getTodayKpis(scope: Scope, date: string = today()) {
 export async function getMonthlyKpis(scope: Scope, year: number, month: number) {
   const db = await snapshot(scope);
   const prefix = `${year}-${String(month).padStart(2, "0")}`;
-  const monthAttendance = db.dailyAttendance.filter((a) => a.date.startsWith(prefix));
-
-  const attendanceSettings = db.attendanceSettings;
-  const payrollSettings = db.payrollSettings;
-
-  let lateCost = 0;
-  let absenceCost = 0;
-  for (const a of monthAttendance) {
-    const employee = db.employees.find((e) => e.id === a.employeeId);
-    if (!employee) continue;
-    lateCost += a.deductibleLateMinutes * attendanceSettings.lateDeductionPerMinute;
-    if (a.status === "absent") {
-      absenceCost += employee.basicSalary / payrollSettings.workingDaysPerMonth;
-    }
-  }
+  // what absence and lateness actually cost this month: the deductions posted for them (by the system from
+  // attendance, per the bylaws, or edited by hand)
+  const monthDeductions = db.deductions.filter((d) => d.date.startsWith(prefix));
+  const sumOf = (type: string) => monthDeductions.filter((d) => d.type === type).reduce((s, d) => s + d.amount, 0);
+  const lateCost = sumOf("late");
+  const absenceCost = sumOf("absence");
 
   const overtimeTotal = db.overtime
     .filter((o) => o.date.startsWith(prefix) && o.status === "approved")

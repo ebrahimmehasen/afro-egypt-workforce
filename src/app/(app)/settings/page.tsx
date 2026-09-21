@@ -3,7 +3,8 @@ import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
-import { CompanySettingsForm, AttendanceSettingsForm, PayrollSettingsForm } from "@/components/settings/settings-forms";
+import { CompanySettingsForm } from "@/components/settings/settings-forms";
+import { BylawsCard } from "@/components/settings/bylaws-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { HolidaysCard } from "@/components/settings/holidays-card";
 import { prisma } from "@/lib/prisma";
@@ -38,8 +39,7 @@ export default async function SettingsPage() {
         holidays={holidays.map((h) => ({ id: h.id, name: h.name, from: dayStr(h.from), to: dayStr(h.to) }))}
         today={today()}
       />
-      <AttendanceSettingsForm settings={db.attendanceSettings} />
-      <PayrollSettingsForm settings={db.payrollSettings} />
+      <BylawsCard t={t} />
     </div>
   );
 }

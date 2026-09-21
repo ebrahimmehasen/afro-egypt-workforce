@@ -143,27 +143,21 @@ export function EmployeeFormDialog({
             </Select>
           </div>
 
-          {salaryType === "monthly" ? (
-            <>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="basicSalary">{t.employees.formBasicSalary}</Label>
-                <Input id="basicSalary" name="basicSalary" type="number" min={0} defaultValue={employee?.basicSalary} className={bad("basicSalary")} required={!lenient} />
-              </div>
-              <input type="hidden" name="dailyWorkingHours" value={employee?.dailyWorkingHours ?? 8} />
-            </>
-          ) : (
-            <>
-              <input type="hidden" name="basicSalary" value={0} />
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="dailyRate">{t.employees.formDailyRate}</Label>
-                <Input id="dailyRate" name="dailyRate" type="number" min={0} defaultValue={employee?.dailyRate} className={bad("dailyRate")} required={!lenient} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="dailyWorkingHours">{t.employees.formDailyHours}</Label>
-                <Input id="dailyWorkingHours" name="dailyWorkingHours" type="number" min={1} step="0.5" defaultValue={employee?.dailyWorkingHours ?? 8} className={bad("dailyWorkingHours")} />
-              </div>
-            </>
+          {/* Both pay types keep the salary: per the bylaws a salaried employee's day is it over 30, a
+              daily worker's over 26. A daily worker may also have their own day rate, which then wins. */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="basicSalary">{t.employees.formBasicSalary}</Label>
+            <Input id="basicSalary" name="basicSalary" type="number" min={0} defaultValue={employee?.basicSalary} className={bad("basicSalary")} required={!lenient && salaryType === "monthly"} />
+            <p className="text-xs text-muted-foreground">{salaryType === "monthly" ? t.employees.payHintMonthly : t.employees.payHintDaily}</p>
+          </div>
+          {salaryType === "daily" && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="dailyRate">{t.employees.formDailyRate}</Label>
+              <Input id="dailyRate" name="dailyRate" type="number" min={0} defaultValue={employee?.dailyRate} className={bad("dailyRate")} />
+              <p className="text-xs text-muted-foreground">{t.employees.dailyRateOptional}</p>
+            </div>
           )}
+          <input type="hidden" name="dailyWorkingHours" value={employee?.dailyWorkingHours ?? 10} />
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="allowances">{t.employees.formAllowances}</Label>

@@ -50,6 +50,7 @@ export function LeaveFormDialog({ employees }: { employees: Employee[] }) {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>{t.leaves.dialogTitle}</DialogTitle></DialogHeader>
+        <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">{t.leaves.noticeHint}</p>
         <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label>{t.common.employee}</Label>

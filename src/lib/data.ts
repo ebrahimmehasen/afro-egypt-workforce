@@ -71,7 +71,8 @@ export async function getDb(): Promise<Store> {
     prisma.dailyAttendance.findMany({ orderBy: { date: "asc" } }),
     prisma.leave.findMany({ orderBy: { createdAt: "desc" } }),
     prisma.overtime.findMany({ orderBy: { createdAt: "desc" } }),
-    prisma.deduction.findMany({ orderBy: { createdAt: "desc" } }),
+    // a system deduction someone removed is kept only so it isn't posted again - it no longer counts
+    prisma.deduction.findMany({ where: { voidedAt: null }, orderBy: [{ date: "desc" }, { createdAt: "desc" }] }),
     prisma.allowance.findMany(),
     prisma.payrollPeriod.findMany({ orderBy: [{ year: "desc" }, { month: "desc" }] }),
     prisma.payrollRecord.findMany(),

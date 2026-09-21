@@ -21,7 +21,7 @@ const employeeSchema = z
     salaryType: z.enum(["monthly", "daily"]).default("monthly"),
     basicSalary: z.coerce.number().min(0).default(0),
     dailyRate: z.coerce.number().min(0).optional(),
-    dailyWorkingHours: z.coerce.number().positive().default(8),
+    dailyWorkingHours: z.coerce.number().positive().default(10),
     allowances: z.coerce.number().min(0).default(0),
     status: z.enum(["active", "on_leave", "terminated"]),
     phone: z.string().min(6),
@@ -30,7 +30,8 @@ const employeeSchema = z
     militaryStatus: z.enum(["completed", "exempted", "postponed", "not_applicable"]),
     nationalId: z.string().regex(/^\d{14}$/),
   })
-  .refine((d) => (d.salaryType === "daily" ? (d.dailyRate ?? 0) > 0 : d.basicSalary > 0), {
+  // a salary is always needed (a daily worker's day is it over 26); a daily worker's own day rate can stand in
+  .refine((d) => d.basicSalary > 0 || (d.salaryType === "daily" && (d.dailyRate ?? 0) > 0), {
     path: ["salaryType"],
     message: "salary amount required",
   });
@@ -48,7 +49,7 @@ type EmployeePayload = Omit<z.infer<typeof employeeSchema>, "phone" | "address" 
 
 /** The schema reports the salary rule on `salaryType`; the input to fix is the amount field. */
 const salaryField = (raw: Record<string, unknown>) => (field: string) =>
-  field === "salaryType" ? (raw.salaryType === "daily" ? "dailyRate" : "basicSalary") : field;
+  field === "salaryType" ? "basicSalary" : field;
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 const numOr = (v: unknown, fallback: number) => {

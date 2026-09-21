@@ -83,16 +83,8 @@ describe.skipIf(!sampleLoaded)("sample-seeded database", () => {
       approvedOvertimeAmount: 0,
       incentives: 0,
       bonuses: 0,
-      lateMinutesTotal: monthAttendance.reduce((s, a) => s + a.deductibleLateMinutes, 0),
-      absenceDays: monthAttendance.filter((a) => a.status === "absent").length,
-      paidDays: 0,
-      earlyLeaveMinutesTotal: 0,
+      paidDays: monthAttendance.length,
       deductions: [],
-      settings: {
-        ...settings,
-        lateDeductionPerMinute: attSettings.lateDeductionPerMinute,
-        earlyLeaveDeductionPerMinute: attSettings.earlyLeaveDeductionPerMinute,
-      },
     });
 
     expect(record.grossSalary).toBe(record.basicSalary + allowancesTotal);

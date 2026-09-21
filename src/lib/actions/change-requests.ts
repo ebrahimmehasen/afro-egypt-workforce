@@ -11,7 +11,7 @@ import { ActionState } from "@/hooks/use-action-feedback";
 import { applyCreateDepartment, applyUpdateDepartment, applyDeleteDepartment } from "@/lib/actions/departments";
 import { applyCreateEmployee, applyUpdateEmployee, applyDeleteEmployee } from "@/lib/actions/employees";
 import { applyCreateShift, applyUpdateShift } from "@/lib/actions/shifts";
-import { applyCreateDeduction, applyDeleteDeduction } from "@/lib/actions/deductions";
+import { applyCreateDeduction, applyDeleteDeduction, applyUpdateDeduction } from "@/lib/actions/deductions";
 import { applyCreateAllowance, applyDeleteAllowance } from "@/lib/actions/allowances";
 import { applyCorrectAttendance } from "@/lib/actions/attendance";
 import { applyDecideLeave } from "@/lib/actions/leaves";
@@ -41,6 +41,7 @@ const APPLIERS: Record<string, (payload: unknown, actorName: string) => Promise<
   "shifts.update": (p, a) => applyUpdateShift(p as never, a),
   "deductions.create": (p, a) => applyCreateDeduction(p as never, a),
   "deductions.delete": (p, a) => applyDeleteDeduction(p as never, a),
+  "deductions.update": (p, a) => applyUpdateDeduction(p as never, a),
   "allowances.create": (p, a) => applyCreateAllowance(p as never, a),
   "allowances.delete": (p, a) => applyDeleteAllowance(p as never, a),
   "attendance.correct": (p, a) => applyCorrectAttendance(p as never, a),

@@ -182,6 +182,9 @@ export interface Dictionary {
     salaryDaily: string;
     formDailyRate: string;
     formDailyHours: string;
+    payHintMonthly: string;
+    payHintDaily: string;
+    dailyRateOptional: string;
     salaryTypeCol: string;
     paidDaysCol: string;
     formAllowances: string;
@@ -298,6 +301,7 @@ export interface Dictionary {
     title: string;
     description: string;
     requestNew: string;
+    noticeHint: string;
     dialogTitle: string;
     formType: string;
     formFrom: string;
@@ -376,11 +380,20 @@ export interface Dictionary {
     noAllowances: string;
     deletedDeduction: string;
     deletedAllowance: string;
+    editDeduction: string;
+    editSystemHint: string;
+    fromSystem: string;
+    systemEdited: string;
+    editedBy: string;
+    updatedDeduction: string;
   };
   payroll: {
     title: string;
     description: string;
     employeesCount: string;
+    periodRange: string;
+    incompleteDocsTitle: string;
+    incompleteDocsDesc: string;
     totalNet: string;
     trialNote: string;
     calculate: string;
@@ -510,6 +523,22 @@ export interface Dictionary {
     colReason: string;
     colTimestamp: string;
     noEntries: string;
+  };
+  bylaws: {
+    title: string;
+    description: string;
+    hours: string;
+    grace: string;
+    late: string;
+    earlyLeave: string;
+    absencePermitted: string;
+    absenceUnpermitted: string;
+    overtime: string;
+    dayRate: string;
+    payMonth: string;
+    weekOff: string;
+    automatic: string;
+    documents: string;
   };
   holidays: {
     title: string;
@@ -832,6 +861,8 @@ export interface Dictionary {
     editAttendanceSettings: string;
     editPayrollSettings: string;
     addHoliday: string;
+    editDeduction: string;
+    systemDeductions: string;
     deleteHoliday: string;
     editDeviceConnection: string;
     deleteDeviceUser: string;

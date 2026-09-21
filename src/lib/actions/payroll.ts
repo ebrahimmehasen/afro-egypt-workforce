@@ -7,6 +7,10 @@ import { recordChangeAs, writeAudit } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
 import { gate } from "@/lib/change-requests";
 import { calculatePayrollRecord } from "@/lib/payroll-engine";
+import { dailyPaidDays, payPeriodRange } from "@/lib/pay-rules";
+import { ABSENCE_TRACKING_FROM } from "@/lib/attendance-engine";
+import { dayStr } from "@/lib/serialize";
+import { addDays } from "@/lib/today";
 import { getT } from "@/lib/i18n";
 import { ActionState } from "@/hooks/use-action-feedback";
 
@@ -15,10 +19,11 @@ const MONTHS_AR = [
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
 ];
 
-function monthRange(year: number, month: number) {
-  const from = new Date(Date.UTC(year, month - 1, 1));
-  const to = new Date(Date.UTC(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1));
-  return { from, to };
+/** The pay month as a half-open date range for queries: from the 26th of the month before, up to (not
+ * including) the 26th of this one. */
+function payMonthRange(year: number, month: number) {
+  const { from, to } = payPeriodRange(year, month);
+  return { from: new Date(`${from}T00:00:00.000Z`), to: new Date(`${addDays(to, 1)}T00:00:00.000Z`) };
 }
 
 const openPeriodSchema = z.object({
@@ -98,20 +103,16 @@ export async function applyCalculatePayroll(payload: CalculatePayrollPayload, ac
   if (!period) return { error: t.validation.periodNotFound };
   if (period.status === "closed") return { error: t.validation.periodClosed };
 
-  const { from, to } = monthRange(period.year, period.month);
+  // the pay month: the 26th of the month before through the 25th (see pay-rules.ts)
+  const { from, to } = payMonthRange(period.year, period.month);
 
-  const [activeEmployees, settings, attSettings] = await Promise.all([
-    prisma.employee.findMany({ where: { deletedAt: null, status: { in: ["active", "on_leave"] } } }),
-    prisma.payrollSettings.findUnique({ where: { id: "singleton" } }),
-    prisma.attendanceSettings.findUnique({ where: { id: "singleton" } }),
-  ]);
-  if (!settings || !attSettings) return { error: t.validation.invalidData };
+  const activeEmployees = await prisma.employee.findMany({ where: { deletedAt: null, status: { in: ["active", "on_leave"] } } });
 
   await prisma.$transaction(async (tx) => {
     await tx.payrollRecord.deleteMany({ where: { periodId } });
 
     for (const employee of activeEmployees) {
-      const [monthAttendance, empAllowances, approvedOvertime, manualDeductions] = await Promise.all([
+      const [monthAttendance, empAllowances, approvedOvertime, periodDeductions] = await Promise.all([
         tx.dailyAttendance.findMany({ where: { employeeId: employee.id, date: { gte: from, lt: to } } }),
         tx.allowance.findMany({
           where: {
@@ -124,22 +125,15 @@ export async function applyCalculatePayroll(payload: CalculatePayrollPayload, ac
           },
         }),
         tx.overtime.findMany({ where: { employeeId: employee.id, status: "approved", date: { gte: from, lt: to } } }),
-        tx.deduction.findMany({
-          where: {
-            employeeId: employee.id,
-            date: { gte: from, lt: to },
-            type: { in: ["penalty", "advance", "admin_deduction", "other"] },
-          },
-        }),
+        // every deduction of the month, the system's (absence, lateness, early leave) and the manual ones;
+        // a system deduction someone removed no longer counts
+        tx.deduction.findMany({ where: { employeeId: employee.id, date: { gte: from, lt: to }, voidedAt: null } }),
       ]);
 
-      const lateMinutesTotal = monthAttendance.reduce((s, a) => s + a.deductibleLateMinutes, 0);
-      const absenceDays = monthAttendance.filter((a) => a.status === "absent").length;
-      const earlyLeaveMinutesTotal = monthAttendance.reduce((s, a) => s + a.earlyLeaveMinutes, 0);
-      // A daily worker gets paid for any day they showed up — a single punch
-      // (missing_punch) counts as a full paid day for them (spec §1.2).
-      const PAID_STATUSES = ["present", "late", "early_leave", "missing_punch"];
-      const paidDays = monthAttendance.filter((a) => PAID_STATUSES.includes(a.status)).length;
+      const paidDays = dailyPaidDays(
+        monthAttendance.map((a) => ({ date: dayStr(a.date), status: a.status })),
+        ABSENCE_TRACKING_FROM,
+      );
 
       const allowancesTotal = empAllowances
         .filter((a) => a.type === "transport" || a.type === "meal" || a.type === "fixed")
@@ -169,11 +163,8 @@ export async function applyCalculatePayroll(payload: CalculatePayrollPayload, ac
         approvedOvertimeAmount,
         incentives,
         bonuses,
-        lateMinutesTotal,
-        absenceDays,
         paidDays,
-        earlyLeaveMinutesTotal,
-        deductions: manualDeductions.map((d) => ({
+        deductions: periodDeductions.map((d) => ({
           id: d.id,
           employeeId: d.employeeId,
           type: d.type,
@@ -182,11 +173,6 @@ export async function applyCalculatePayroll(payload: CalculatePayrollPayload, ac
           reason: d.reason,
           createdAt: d.createdAt.toISOString(),
         })),
-        settings: {
-          ...settings,
-          lateDeductionPerMinute: attSettings.lateDeductionPerMinute,
-          earlyLeaveDeductionPerMinute: attSettings.earlyLeaveDeductionPerMinute,
-        },
       });
 
       await tx.payrollRecord.create({ data: { ...result, periodId, employeeId: employee.id } });
