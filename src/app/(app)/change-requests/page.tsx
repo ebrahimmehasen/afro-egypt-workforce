@@ -26,6 +26,8 @@ export default async function ChangeRequestsPage() {
           reviewNote: r.reviewNote,
           createdAt: r.createdAt.toISOString(),
           reviewedAt: r.reviewedAt?.toISOString() ?? null,
+          // what the request will write when approved - shown, field by field, in the details popup
+          payload: r.payload,
         }))}
       />
     </div>

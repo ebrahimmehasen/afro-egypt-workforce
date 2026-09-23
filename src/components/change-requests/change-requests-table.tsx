@@ -14,9 +14,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/shared/empty-state";
+import { payloadRows } from "@/lib/i18n/payload-labels";
 
 type Status = "pending" | "approved" | "rejected";
 
@@ -32,6 +33,8 @@ interface ChangeRequestRow {
   reviewNote: string | null;
   createdAt: string;
   reviewedAt: string | null;
+  /** the values the request will write when approved */
+  payload?: unknown;
 }
 
 const STATUS_VARIANT: Record<Status, "warning" | "success" | "destructive"> = {
@@ -47,6 +50,7 @@ export function ChangeRequestsTable({ requests }: { requests: ChangeRequestRow[]
   const [pending, startTransition] = useTransition();
   const [rejectTarget, setRejectTarget] = useState<ChangeRequestRow | null>(null);
   const [reason, setReason] = useState("");
+  const [details, setDetails] = useState<ChangeRequestRow | null>(null);
 
   const fmt = (iso: string) => new Date(iso).toLocaleString(intlLocale(locale));
 
@@ -90,6 +94,7 @@ export function ChangeRequestsTable({ requests }: { requests: ChangeRequestRow[]
         </TabsList>
 
         <TabsContent value={tab} className="mt-4">
+          <p className="mb-2 text-xs text-muted-foreground">{t.entryDetails.openRow}</p>
           {rows.length === 0 ? (
             <EmptyState icon={ClipboardCheck} title={t.changeRequests.noRequests} />
           ) : (
@@ -108,7 +113,7 @@ export function ChangeRequestsTable({ requests }: { requests: ChangeRequestRow[]
                 </TableHeader>
                 <TableBody>
                   {rows.map((r) => (
-                    <TableRow key={r.id}>
+                    <TableRow key={r.id} onClick={() => setDetails(r)} className="cursor-pointer" title={t.entryDetails.hint}>
                       <TableCell className="font-medium">{r.requestedBy}</TableCell>
                       <TableCell className="text-muted-foreground">{r.module}</TableCell>
                       <TableCell>
@@ -126,7 +131,7 @@ export function ChangeRequestsTable({ requests }: { requests: ChangeRequestRow[]
                         </TableCell>
                       )}
                       {tab === "pending" && (
-                        <TableCell className="text-end">
+                        <TableCell className="text-end" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-1">
                             <Button size="icon" variant="ghost" className="text-success" disabled={pending} onClick={() => approve(r.id)}>
                               <Check className="h-4 w-4" />
@@ -145,6 +150,68 @@ export function ChangeRequestsTable({ requests }: { requests: ChangeRequestRow[]
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={details != null} onOpenChange={(open) => !open && setDetails(null)}>
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t.changeRequests.detailsTitle}</DialogTitle>
+            <DialogDescription>{t.entryDetails.hint}</DialogDescription>
+          </DialogHeader>
+          {details && (
+            <div className="flex flex-col gap-4">
+              <DetailSection title={t.changeRequests.sectionRequest}>
+                <DetailRow label={t.changeRequests.colRequestedBy}>{details.requestedBy}</DetailRow>
+                <DetailRow label={t.changeRequests.colModule}>{details.module}</DetailRow>
+                <DetailRow label={t.changeRequests.colAction}>
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant={STATUS_VARIANT[details.status]}>{details.actionLabel}</Badge>
+                    {details.direct && <Badge variant="secondary">{t.changeRequests.directBadge}</Badge>}
+                  </span>
+                </DetailRow>
+                <DetailRow label={t.changeRequests.colSummary}>{details.summary}</DetailRow>
+                <DetailRow label={t.changeRequests.requestedAt}>{fmt(details.createdAt)}</DetailRow>
+              </DetailSection>
+
+              <DetailSection title={t.changeRequests.sectionData}>
+                {payloadRows(details.payload, t).length === 0 ? (
+                  <p className="py-2 text-sm text-muted-foreground">{t.changeRequests.noPayload}</p>
+                ) : (
+                  <>
+                    <p className="pb-1 text-xs text-muted-foreground">{t.changeRequests.payloadNote}</p>
+                    {payloadRows(details.payload, t).map((row) => (
+                      <DetailRow key={row.label} label={row.label}>{row.value}</DetailRow>
+                    ))}
+                  </>
+                )}
+              </DetailSection>
+
+              <DetailSection title={t.changeRequests.sectionReview}>
+                <DetailRow label={t.common.status}>
+                  <Badge variant={STATUS_VARIANT[details.status]}>
+                    {details.status === "pending" ? t.statuses.pending : details.status === "approved" ? t.statuses.approved : t.statuses.rejected}
+                  </Badge>
+                </DetailRow>
+                <DetailRow label={t.changeRequests.colReviewedBy}>
+                  {details.direct ? t.changeRequests.directNoReview : details.reviewedBy ?? "—"}
+                </DetailRow>
+                {details.reviewedAt && <DetailRow label={t.changeRequests.reviewedAt}>{fmt(details.reviewedAt)}</DetailRow>}
+                {details.reviewNote && <DetailRow label={t.changeRequests.reviewNote}>{details.reviewNote}</DetailRow>}
+              </DetailSection>
+
+              {details.status === "pending" && (
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" disabled={pending} onClick={() => { setDetails(null); setRejectTarget(details); }}>
+                    {t.changeRequests.reject}
+                  </Button>
+                  <Button disabled={pending} onClick={() => { setDetails(null); approve(details.id); }}>
+                    {t.changeRequests.approve}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={rejectTarget != null} onOpenChange={(open) => !open && setRejectTarget(null)}>
         <DialogContent>
@@ -167,5 +234,24 @@ export function ChangeRequestsTable({ requests }: { requests: ChangeRequestRow[]
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/** One "label: value" line inside the details popup. */
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5 border-b border-border py-2 last:border-0 sm:flex-row sm:items-start sm:gap-3">
+      <span className="text-xs text-muted-foreground sm:w-40 sm:shrink-0">{label}</span>
+      <span className="text-sm text-foreground">{children}</span>
+    </div>
+  );
+}
+
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col">
+      <p className="mb-1 text-sm font-semibold text-muted-foreground">{title}</p>
+      {children}
+    </section>
   );
 }

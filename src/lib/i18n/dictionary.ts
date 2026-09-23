@@ -852,6 +852,15 @@ export interface Dictionary {
     notFound: string;
     alreadyReviewed: string;
     applyFailed: string;
+    detailsTitle: string;
+    sectionRequest: string;
+    sectionData: string;
+    sectionReview: string;
+    requestedAt: string;
+    reviewedAt: string;
+    reviewNote: string;
+    noPayload: string;
+    payloadNote: string;
   };
   documents: {
     title: string;
