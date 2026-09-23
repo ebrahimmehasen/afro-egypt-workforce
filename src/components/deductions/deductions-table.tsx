@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { EditDeductionDialog } from "@/components/deductions/edit-deduction-dialog";
+import { DeductionDetailsDialog, EntryContext } from "@/components/shared/entry-details-dialog";
 
 export function DeductionsTable({
   deductions,
@@ -23,6 +24,7 @@ export function DeductionsTable({
   canManage,
   initialMonth = null,
   monthLabel,
+  context = {},
 }: {
   deductions: Deduction[];
   employees: Employee[];
@@ -30,12 +32,15 @@ export function DeductionsTable({
   /** "YYYY-MM" to pre-filter by, e.g. from a dashboard KPI link (`?month=2026-08`). */
   initialMonth?: string | null;
   monthLabel?: string | null;
+  /** per-row extras for the details popup: department, pay type and that day's attendance */
+  context?: Record<string, EntryContext>;
 }) {
   const t = useT();
   const locale = useLocale();
   const empMap = new Map(employees.map((e) => [e.id, e]));
   const [pending, startTransition] = useTransition();
   const [month, setMonth] = useState(initialMonth);
+  const [details, setDetails] = useState<Deduction | null>(null);
 
   const rows = useMemo(
     () => (month ? deductions.filter((d) => d.date.startsWith(month)) : deductions),
@@ -63,6 +68,8 @@ export function DeductionsTable({
         </div>
       )}
 
+      <p className="text-xs text-muted-foreground">{t.entryDetails.openRow}</p>
+
       {rows.length === 0 ? (
         <EmptyState icon={MinusCircle} title={t.deductions.noDeductions} />
       ) : (
@@ -82,7 +89,12 @@ export function DeductionsTable({
           {rows.map((d) => {
             const employee = empMap.get(d.employeeId);
             return (
-              <TableRow key={d.id}>
+              <TableRow
+                key={d.id}
+                onClick={() => setDetails(d)}
+                className="cursor-pointer"
+                title={t.entryDetails.hint}
+              >
                 <TableCell>
                   <div className="font-medium">{employee?.name ?? "-"}</div>
                   {employee && <div dir="ltr" className="text-xs text-muted-foreground">{employee.employeeNumber}</div>}
@@ -106,7 +118,7 @@ export function DeductionsTable({
                 <TableCell>{d.date}</TableCell>
                 <TableCell className="max-w-[220px] truncate text-muted-foreground">{d.reason}</TableCell>
                 {canManage && (
-                  <TableCell className="text-end">
+                  <TableCell className="text-end" onClick={(e) => e.stopPropagation()}>
                     <EditDeductionDialog deduction={d} employeeName={employee?.name ?? "-"} />
                     <Button
                       size="icon"
@@ -132,6 +144,8 @@ export function DeductionsTable({
       </Table>
     </div>
       )}
+
+      <DeductionDetailsDialog deduction={details} ctx={details ? context[details.id] ?? {} : {}} onClose={() => setDetails(null)} />
     </div>
   );
 }

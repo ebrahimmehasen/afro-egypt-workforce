@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { OvertimeFormDialog } from "@/components/overtime/overtime-form-dialog";
 import { OvertimeTable } from "@/components/overtime/overtime-table";
 import { loadPayContext, rulesFor, scheduleFor } from "@/lib/pay-context";
+import { buildEntryContext } from "@/lib/entry-context";
 import { hourlyRate } from "@/lib/pay-engine";
 
 export default async function OvertimePage({
@@ -28,6 +29,8 @@ export default async function OvertimePage({
   // the default rate offered for a manual entry: the hourly wage × the overtime multiplier of the employee's
   // pay type, both from settings
   const ctx = await loadPayContext();
+  // what the details popup shows for each row: department, pay type and that day's attendance
+  const entryContext = buildEntryContext(sorted, db, ctx);
   const defaultRates = Object.fromEntries(
     employees.map((e) => {
       const rules = rulesFor(ctx, e);
@@ -49,6 +52,7 @@ export default async function OvertimePage({
         canApprove={hasPermission(user, "overtime")}
         canManage={hasPermission(user, "overtime")}
         initialStatus={initialStatus}
+        context={entryContext}
       />
     </div>
   );

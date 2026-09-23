@@ -18,6 +18,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
+import { EntryContext, OvertimeDetailsDialog } from "@/components/shared/entry-details-dialog";
 
 const STATUS_OPTIONS: RequestStatus[] = ["pending", "approved", "rejected"];
 
@@ -27,6 +28,7 @@ export function OvertimeTable({
   canApprove,
   canManage = false,
   initialStatus = "all",
+  context = {},
 }: {
   records: Overtime[];
   employees: Employee[];
@@ -35,12 +37,15 @@ export function OvertimeTable({
   canManage?: boolean;
   /** Status filter to pre-select, e.g. from a dashboard KPI link (`?status=approved`). */
   initialStatus?: string;
+  /** per-row extras for the details popup: department, pay type and that day's attendance */
+  context?: Record<string, EntryContext>;
 }) {
   const t = useT();
   const locale = useLocale();
   const empMap = new Map(employees.map((e) => [e.id, e]));
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<string[]>(initialStatus === "all" ? [] : [initialStatus]);
+  const [details, setDetails] = useState<Overtime | null>(null);
 
   const rows = useMemo(
     () => records.filter((o) => status.length === 0 || status.includes(o.status)),
@@ -67,6 +72,8 @@ export function OvertimeTable({
         />
       </div>
 
+      <p className="text-xs text-muted-foreground">{t.entryDetails.openRow}</p>
+
       {rows.length === 0 ? (
         <EmptyState icon={TimerReset} title={t.overtime.noRecords} />
       ) : (
@@ -88,7 +95,7 @@ export function OvertimeTable({
           {rows.map((o) => {
             const employee = empMap.get(o.employeeId);
             return (
-              <TableRow key={o.id}>
+              <TableRow key={o.id} onClick={() => setDetails(o)} className="cursor-pointer" title={t.entryDetails.hint}>
                 <TableCell>
                   <div className="font-medium">{employee?.name ?? "-"}</div>
                   {employee && <div dir="ltr" className="text-xs text-muted-foreground">{employee.employeeNumber}</div>}
@@ -116,7 +123,7 @@ export function OvertimeTable({
                 </TableCell>
                 <TableCell><RequestStatusBadge status={o.status} /></TableCell>
                 {(canApprove || canManage) && (
-                  <TableCell className="text-end">
+                  <TableCell className="text-end" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-1">
                       {canApprove && o.status === "pending" && (
                         <>
@@ -144,6 +151,8 @@ export function OvertimeTable({
       </Table>
       </div>
       )}
+
+      <OvertimeDetailsDialog overtime={details} ctx={details ? context[details.id] ?? {} : {}} onClose={() => setDetails(null)} />
     </div>
   );
 }

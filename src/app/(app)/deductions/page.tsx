@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeductionFormDialog } from "@/components/deductions/deduction-form-dialog";
 import { AllowanceFormDialog } from "@/components/deductions/allowance-form-dialog";
 import { DeductionsTable } from "@/components/deductions/deductions-table";
+import { buildEntryContext } from "@/lib/entry-context";
+import { loadPayContext } from "@/lib/pay-context";
 import { AllowancesTable } from "@/components/deductions/allowances-table";
 
 export default async function DeductionsPage({
@@ -30,6 +32,8 @@ export default async function DeductionsPage({
   const monthLabel = monthPeriod ? translateLabel(monthPeriod.label, locale) : initialMonth;
 
   const deductions = [...db.deductions].sort((a, b) => (a.date < b.date ? 1 : -1));
+  // what the details popup shows for each row: department, pay type and that day's attendance
+  const entryContext = buildEntryContext(deductions, db, await loadPayContext());
   const allowances = [...db.allowances];
 
   // default the bonus month to the open (draft) period, else the real month
@@ -59,6 +63,7 @@ export default async function DeductionsPage({
             canManage={canManage}
             initialMonth={initialMonth}
             monthLabel={monthLabel}
+            context={entryContext}
           />
         </TabsContent>
 
