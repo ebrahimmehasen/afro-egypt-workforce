@@ -212,6 +212,18 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
                 }
               />
               <Field label={t.employees.formAddress} value={employee.address ?? "—"} />
+              {canEdit && (
+                <div className="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center gap-3 border-t border-border pt-4">
+                  <EmployeeFormDialog
+                    departments={db.departments}
+                    shifts={db.shifts}
+                    {...formOptions}
+                    employee={employee}
+                    lenient={user.role === "admin"}
+                    labeledTrigger
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -328,14 +340,6 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
           <TabsContent value="actions">
             <Card>
               <CardContent className="flex flex-wrap items-center gap-3 p-5">
-                <EmployeeFormDialog
-                  departments={db.departments}
-                  shifts={db.shifts}
-                  {...formOptions}
-                  employee={employee}
-                  lenient={user.role === "admin"}
-                  labeledTrigger
-                />
                 <DeleteEmployeeButton id={employee.id} name={employee.name} labeledTrigger redirectTo="/employees" />
               </CardContent>
             </Card>
