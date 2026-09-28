@@ -8,6 +8,7 @@ import { deleteDeduction } from "@/lib/actions/deductions";
 import { formatEGP } from "@/lib/constants";
 import { format } from "@/lib/i18n/format";
 import { deductionTypeLabel } from "@/lib/i18n/labels";
+import { shortDeductionReason } from "@/lib/deduction-reason";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -116,7 +117,9 @@ export function DeductionsTable({
                   )}
                 </TableCell>
                 <TableCell>{d.date}</TableCell>
-                <TableCell className="max-w-[220px] truncate text-muted-foreground">{d.reason}</TableCell>
+                <TableCell className="max-w-[220px] truncate text-muted-foreground" title={d.reason}>
+                  {shortDeductionReason(d.reason)}
+                </TableCell>
                 {canManage && (
                   <TableCell className="text-end" onClick={(e) => e.stopPropagation()}>
                     <EditDeductionDialog deduction={d} employeeName={employee?.name ?? "-"} />
