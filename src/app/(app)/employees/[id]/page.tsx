@@ -7,7 +7,6 @@ import { inScope, viewerScope } from "@/lib/scope";
 import { formatEGP } from "@/lib/constants";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
-import { intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { requestStatusLabel, deductionTypeLabel } from "@/lib/i18n/labels";
 import { canManageEmployeeFiles, canUseAssistant, hasPermission } from "@/lib/permissions";
@@ -26,7 +25,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { AttendanceStatusBadge } from "@/components/shared/status-badge";
 import { DayPayCard } from "@/components/employees/day-pay-card";
 import { prisma } from "@/lib/prisma";
 import { dayStr } from "@/lib/serialize";
@@ -44,8 +42,6 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
 
   const department = db.departments.find((d) => d.id === employee.departmentId);
   const shift = db.shifts.find((s) => s.id === employee.shiftId);
-  const timeFmt = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" }) : "—";
 
   const attendance = db.dailyAttendance
     .filter((a) => a.employeeId === employee.id)
@@ -228,33 +224,6 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
             payTypeName={rules.name}
             times={{ start: schedule.start, end: schedule.end, overtime: schedule.overtimeStart }}
           />
-          <Card>
-            <CardHeader><CardTitle>{t.employees.last20Days}</CardTitle></CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t.reports.colDate}</TableHead>
-                    <TableHead>{t.attendance.colIn}</TableHead>
-                    <TableHead>{t.attendance.colOut}</TableHead>
-                    <TableHead>{t.attendance.colLate} ({t.common.minutes})</TableHead>
-                    <TableHead>{t.common.status}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {attendance.map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell>{a.date}</TableCell>
-                      <TableCell>{timeFmt(a.actualIn)}</TableCell>
-                      <TableCell>{timeFmt(a.actualOut)}</TableCell>
-                      <TableCell className="tabular-nums">{a.deductibleLateMinutes || "—"}</TableCell>
-                      <TableCell><AttendanceStatusBadge status={a.status} /></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="overtime">
