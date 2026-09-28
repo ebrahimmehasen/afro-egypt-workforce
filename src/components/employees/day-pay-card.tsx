@@ -59,8 +59,6 @@ export function DayPayCard({
                 <TableHead>{t.dayPay.colWorked}</TableHead>
                 <TableHead>{t.dayPay.colLate}</TableHead>
                 <TableHead>{t.dayPay.colOvertime}</TableHead>
-                <TableHead>{t.dayPay.colMultiplier}</TableHead>
-                <TableHead>{t.dayPay.colOvertimeDue}</TableHead>
                 <TableHead className="min-w-[16rem]">{t.dayPay.colDeductions} / {t.dayPay.colAdditions}</TableHead>
                 <TableHead>{t.dayPay.colNet}</TableHead>
               </TableRow>
@@ -82,8 +80,6 @@ export function DayPayCard({
                   <TableCell className="tabular-nums">{hours(r.workedMinutes)}</TableCell>
                   <TableCell className="tabular-nums">{r.lateMinutes > 0 ? `${round2(r.lateMinutes)} ${t.dayPay.minutesShort}` : "—"}</TableCell>
                   <TableCell className="tabular-nums">{hours(r.overtimeMinutes)}</TableCell>
-                  <TableCell className="tabular-nums">{r.overtimeMinutes > 0 ? `× ${r.overtimeMultiplier}` : "—"}</TableCell>
-                  <TableCell className="tabular-nums">{r.overtimePayHours > 0 ? `${round2(r.overtimePayHours)} ${t.dayPay.payHours}` : "—"}</TableCell>
                   <TableCell>
                     {r.actualIn && !r.actualOut && r.lines.length === 0 ? (
                       <span className="text-xs text-warning">{t.dayPay.onePunch}</span>
