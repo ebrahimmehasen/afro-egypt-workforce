@@ -45,6 +45,8 @@ export interface PayEmployee {
   customOvertimeStart?: string | null;
   basicSalary: number;
   dailyRate?: number | null;
+  /** "له إضافي" — whether the system may post automatic overtime for this employee. Absent = eligible. */
+  overtimeEligible?: boolean;
 }
 
 export function toPayTypeRules(p: Awaited<ReturnType<typeof prisma.payType.findMany>>[number]): PayTypeRules {

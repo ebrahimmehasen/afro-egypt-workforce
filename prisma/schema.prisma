@@ -254,6 +254,10 @@ model Employee {
   basicSalary           Int            // monthly: the full salary. daily: fallback only — dailyRate is authoritative
   dailyRate             Int?           // required when salaryType = daily — pay for one worked day
   dailyWorkingHours     Float          @default(8) // this employee's contracted daily hours (for hourly rate)
+  /// "له إضافي": whether the system may post automatic overtime for this employee (see computeDayPay).
+  /// A manual overtime entry from /overtime is unaffected either way — this only gates the automatic
+  /// calculation. Defaults true, matching the behaviour every existing employee already had.
+  overtimeEligible      Boolean        @default(true)
   allowancesTotal       Int            @default(0) // quick-display fixed monthly allowances; itemised in Allowance[]
   /// The linked ZKTeco device user's own "User ID" (see BiometricDeviceSettings) -
   /// null when the employee hasn't been linked to a device user yet. Linking/

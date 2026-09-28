@@ -100,6 +100,15 @@ describe("a salaried employee on 08:00 → 16:30", () => {
     expect(ot.amount).toBe(45);
   });
 
+  it("posts no automatic overtime for an employee marked not eligible ('له إضافي' = لا)", () => {
+    const notEligible = day("08:00:00", "18:00:00", { pay: { ...salary, overtimeEligible: false } });
+    expect(item(notEligible, "overtime")).toBeUndefined();
+    // the worked-past-shift-end time is still tracked, just not turned into a paid addition
+    expect(notEligible.overtimeCountedMinutes).toBe(90);
+    // an employee record from before this setting existed (no overtimeEligible at all) keeps its overtime
+    expect(item(day("08:00:00", "18:00:00", { pay: { basicSalary: 6000 } }), "overtime")).toBeDefined();
+  });
+
   it("counts overtime in whole steps only", () => {
     expect(countedOvertimeMinutes(100, { overtimeMinimumMinutes: 60, overtimeStepMinutes: 30 })).toBe(90);
     expect(countedOvertimeMinutes(100, { overtimeMinimumMinutes: 60, overtimeStepMinutes: 60 })).toBe(60);

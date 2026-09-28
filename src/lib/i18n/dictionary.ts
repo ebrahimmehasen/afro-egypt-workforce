@@ -197,6 +197,7 @@ export interface Dictionary {
     salaryTypeCol: string;
     paidDaysCol: string;
     formAllowances: string;
+    overtimeEligible: string;
     sectionPersonal: string;
     formPhone: string;
     formAddress: string;

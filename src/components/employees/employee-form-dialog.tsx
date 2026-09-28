@@ -11,6 +11,7 @@ import { format } from "@/lib/i18n/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -92,6 +93,7 @@ export function EmployeeFormDialog({
   const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(
     employee?.customWorkStart ? "custom" : employee?.workScheduleId ? "schedule" : employee ? "shift" : "schedule",
   );
+  const [overtimeEligible, setOvertimeEligible] = useState(employee?.overtimeEligible ?? true);
   // custom times start from the employee's own, else the pay type's (a daily worker's day, say)
   const customDefaults =
     employee?.customWorkStart && employee.payTypeId === payTypeId
@@ -293,6 +295,16 @@ export function EmployeeFormDialog({
             </div>
           )}
           <input type="hidden" name="dailyWorkingHours" value={employee?.dailyWorkingHours ?? 10} />
+
+          <div className="flex items-center justify-between rounded-lg border border-border p-3 sm:col-span-2">
+            <Label htmlFor="overtimeEligible" className="cursor-pointer">{t.employees.overtimeEligible}</Label>
+            <Switch
+              id="overtimeEligible"
+              name="overtimeEligible"
+              checked={overtimeEligible}
+              onCheckedChange={setOvertimeEligible}
+            />
+          </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="allowances">{t.employees.formAllowances}</Label>

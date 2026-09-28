@@ -208,6 +208,7 @@ export const en: Dictionary = {
     paidDaysCol: "Paid Days",
     formAllowances: "Monthly Allowances (EGP)",
     formBiometricId: "Biometric Device User ID",
+    overtimeEligible: "Eligible for overtime",
     formStatus: "Status",
     statusActive: "Active",
     statusOnLeave: "On Leave",

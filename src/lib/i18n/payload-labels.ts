@@ -26,6 +26,7 @@ export function payloadFieldLabel(key: string, t: Dictionary): string {
     dailyRate: t.employees.formDailyRate,
     dailyWorkingHours: t.employees.formDailyHours,
     allowances: t.employees.formAllowances,
+    overtimeEligible: t.employees.overtimeEligible,
     status: t.common.status,
     phone: t.employees.formPhone,
     address: t.employees.formAddress,

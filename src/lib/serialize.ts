@@ -59,6 +59,7 @@ export function toEmployee(e: PEmployee): Employee {
     basicSalary: e.basicSalary,
     dailyRate: e.dailyRate ?? undefined,
     dailyWorkingHours: e.dailyWorkingHours,
+    overtimeEligible: e.overtimeEligible,
     allowances: e.allowancesTotal,
     biometricDeviceUserId: e.biometricDeviceUserId ?? undefined,
     status: e.status,

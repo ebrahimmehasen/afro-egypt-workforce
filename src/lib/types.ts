@@ -34,6 +34,7 @@ export interface Employee {
   basicSalary: number; // monthly: full salary; daily: fallback only
   dailyRate?: number; // set when salaryType === "daily"
   dailyWorkingHours: number; // contracted daily hours
+  overtimeEligible?: boolean; // "له إضافي" — the system posts automatic overtime when true or unset
   allowances: number; // fixed monthly allowances total (for quick display; itemized in Allowance[])
   biometricDeviceUserId?: string; // linked from /biometric-device, not the employee form
   status: EmployeeStatus;

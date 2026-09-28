@@ -23,6 +23,7 @@ const employeeSchema = z
     basicSalary: z.coerce.number().min(0).default(0),
     dailyRate: z.coerce.number().min(0).optional(),
     dailyWorkingHours: z.coerce.number().positive().default(10),
+    overtimeEligible: z.coerce.boolean().default(true),
     allowances: z.coerce.number().min(0).default(0),
     status: z.enum(["active", "on_leave", "terminated"]),
     phone: z.string().min(6),
@@ -142,6 +143,8 @@ function lenientEmployeePayload(id: string, raw: Record<string, unknown>, before
     basicSalary: numOr(raw.basicSalary, before.basicSalary),
     dailyRate: numOr(raw.dailyRate, before.dailyRate ?? 0) || undefined,
     dailyWorkingHours: numOr(raw.dailyWorkingHours, before.dailyWorkingHours),
+    // the switch is always rendered on this form, so its presence in raw always reflects its real state
+    overtimeEligible: raw.overtimeEligible === "on",
     allowances: numOr(raw.allowances, before.allowancesTotal),
     status: oneOf(raw.status, ["active", "on_leave", "terminated"] as const, before.status),
     phone: str(raw.phone) || null,
@@ -164,7 +167,9 @@ async function nextEmployeeId() {
 export async function createEmployee(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const t = await getT();
   const raw = Object.fromEntries(formData);
-  const parsed = employeeSchema.safeParse(raw);
+  // An unchecked switch is simply absent from FormData, same as a native checkbox — read its true
+  // state explicitly so "off" doesn't get mistaken for "not sent" and fall back to the schema default.
+  const parsed = employeeSchema.safeParse({ ...raw, overtimeEligible: formData.get("overtimeEligible") === "on" });
   if (!parsed.success) return invalidFieldsError(t, parsed.error.issues, salaryField(raw));
   const id = await nextEmployeeId();
 
@@ -244,7 +249,7 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
     const missing = [!department && "departmentId", !shift && "shiftId"].filter(Boolean) as string[];
     if (missing.length) return invalidFieldsError(t, missing.map((f) => ({ path: [f] }) as never));
   } else {
-    const parsed = employeeSchema.safeParse(raw);
+    const parsed = employeeSchema.safeParse({ ...raw, overtimeEligible: formData.get("overtimeEligible") === "on" });
     if (!parsed.success) return invalidFieldsError(t, parsed.error.issues, salaryField(raw));
     payload = { id, ...parsed.data };
   }

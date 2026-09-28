@@ -161,7 +161,8 @@ export interface DayPayInput {
   kind: DayKind;
   schedule: ScheduleTimes;
   rules: PayTypeRules;
-  pay: { basicSalary: number; dailyRate?: number | null };
+  /** overtimeEligible defaults to true — an employee record from before this setting existed. */
+  pay: { basicSalary: number; dailyRate?: number | null; overtimeEligible?: boolean };
   actualIn: Date | null;
   actualOut: Date | null;
   /** An approved permission to leave for the rest of the day. */
@@ -230,7 +231,10 @@ export function computeDayPay(input: DayPayInput): DayPay {
   const overtimeFrom = Math.max(times.overtimeStart.getTime(), actualIn.getTime());
   const overtimeRawMinutes = Math.max(0, (actualOut.getTime() - overtimeFrom) / MS_PER_MIN);
   const overtimeCountedMinutes = countedOvertimeMinutes(overtimeRawMinutes, rules);
-  item("overtime", "addition", overtimeCountedMinutes, rules.overtimeMultiplier);
+  // "له إضافي" = لا: the time worked past the overtime start is still tracked (for the day's own
+  // display), but the system posts nothing for it. A manual overtime entry is a separate flow
+  // entirely (src/lib/actions/overtime.ts) and is never touched by this flag.
+  if (input.pay.overtimeEligible !== false) item("overtime", "addition", overtimeCountedMinutes, rules.overtimeMultiplier);
 
   return { times, hourlyRate: hourly, workedMinutes, lateMinutes, earlyMinutes, overtimeRawMinutes, overtimeCountedMinutes, items };
 }

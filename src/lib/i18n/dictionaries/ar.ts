@@ -208,6 +208,7 @@ export const ar: Dictionary = {
     paidDaysCol: "أيام مدفوعة",
     formAllowances: "البدلات الشهرية (EGP)",
     formBiometricId: "رقم الموظف على جهاز البصمة",
+    overtimeEligible: "له إضافي",
     formStatus: "الحالة",
     statusActive: "نشط",
     statusOnLeave: "في إجازة",
