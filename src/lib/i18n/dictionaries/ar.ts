@@ -674,6 +674,9 @@ export const ar: Dictionary = {
     onePunch: "بصمة واحدة — بانتظار المراجعة",
     notPostedYet: "هيتسجّل بعد نهاية اليوم",
     rulesUsed: "المواعيد: {start} → {end}، بداية الإضافي {overtime}",
+    filterOvertimeOnly: "إضافي فقط",
+    filterLateOnly: "تأخير فقط",
+    noMatch: "لا توجد أيام مطابقة",
   },
   entryDetails: {
     deductionTitle: "تفاصيل الخصم",

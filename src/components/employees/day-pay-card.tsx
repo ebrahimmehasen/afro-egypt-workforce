@@ -1,3 +1,6 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import { Bot } from "lucide-react";
 import { DayPayRow } from "@/lib/day-pay-view";
 import { Dictionary } from "@/lib/i18n/dictionary";
@@ -8,10 +11,17 @@ import { formatEGP } from "@/lib/constants";
 import { AttendanceStatus, DeductionType } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AttendanceStatusBadge } from "@/components/shared/status-badge";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+type DayPayStatusFilter = "all" | "overtime" | "late";
 
 /**
  * Each day's pay as the system calculated it — in, out, hours worked, lateness, overtime and what it's worth,
@@ -36,6 +46,21 @@ export function DayPayCard({
   const lineLabel = (type: string, direction: string) =>
     direction === "addition" ? overtimeKindLabel(type, t) : deductionTypeLabel(type as DeductionType, t);
 
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [status, setStatus] = useState<DayPayStatusFilter>("all");
+
+  const filteredRows = useMemo(() => {
+    return rows
+      .filter((r) => !from || r.date >= from)
+      .filter((r) => !to || r.date <= to)
+      .filter((r) => {
+        if (status === "overtime") return r.overtimeMinutes > 0;
+        if (status === "late") return r.lateMinutes > 0;
+        return true;
+      });
+  }, [rows, from, to, status]);
+
   return (
     <Card>
       <CardHeader>
@@ -46,9 +71,34 @@ export function DayPayCard({
           <span dir="ltr" className="text-xs">{format(t.dayPay.rulesUsed, { start: times.start, end: times.end, overtime: times.overtime })}</span>
         </CardDescription>
       </CardHeader>
+      {rows.length > 0 && (
+        <CardContent className="grid grid-cols-2 gap-3 pb-0 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">{t.common.from}</Label>
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">{t.common.to}</Label>
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">{t.common.status}</Label>
+            <Select value={status} onValueChange={(v) => setStatus(v as DayPayStatusFilter)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t.common.all}</SelectItem>
+                <SelectItem value="overtime">{t.dayPay.filterOvertimeOnly}</SelectItem>
+                <SelectItem value="late">{t.dayPay.filterLateOnly}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      )}
       <CardContent className="overflow-x-auto p-0">
         {rows.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">{t.dayPay.noDays}</p>
+        ) : filteredRows.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">{t.dayPay.noMatch}</p>
         ) : (
           <Table>
             <TableHeader>
@@ -64,7 +114,7 @@ export function DayPayCard({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => (
+              {filteredRows.map((r) => (
                 <TableRow key={r.date} className="align-top">
                   <TableCell className="whitespace-nowrap">
                     <div>{r.date}</div>

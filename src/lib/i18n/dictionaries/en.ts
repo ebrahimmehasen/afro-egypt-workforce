@@ -674,6 +674,9 @@ export const en: Dictionary = {
     onePunch: "One punch — awaiting review",
     notPostedYet: "Posted once the day is over",
     rulesUsed: "Times: {start} → {end}, overtime from {overtime}",
+    filterOvertimeOnly: "Overtime only",
+    filterLateOnly: "Late only",
+    noMatch: "No days match the filter",
   },
   entryDetails: {
     deductionTitle: "Deduction details",

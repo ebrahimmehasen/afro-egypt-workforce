@@ -675,6 +675,9 @@ export interface Dictionary {
     onePunch: string;
     notPostedYet: string;
     rulesUsed: string;
+    filterOvertimeOnly: string;
+    filterLateOnly: string;
+    noMatch: string;
   };
   entryDetails: {
     deductionTitle: string;
