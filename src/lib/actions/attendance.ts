@@ -7,6 +7,7 @@ import { recordChangeAs } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
 import { gate } from "@/lib/change-requests";
 import { computeFromActuals } from "@/lib/attendance-engine";
+import { recalculateDailyAttendance } from "@/lib/attendance-service";
 import { toShift } from "@/lib/serialize";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT, intlLocale } from "@/lib/i18n";
@@ -113,4 +114,84 @@ export async function applyCorrectAttendance(payload: CorrectionPayload, actorNa
   revalidatePath("/audit-log");
 
   return { success: true, message: t.attendance.correctionSaved };
+}
+
+const manualAttendanceSchema = z
+  .object({
+    employeeId: z.string().min(1),
+    date: z.string().min(1),
+    workStart: z.string().min(1),
+    workEnd: z.string().min(1),
+  })
+  // same-day entry only, matching the simple in/out fields the modal collects
+  .refine((d) => d.workEnd > d.workStart, { path: ["workEnd"], message: "end before start" });
+
+type ManualAttendancePayload = z.infer<typeof manualAttendanceSchema>;
+
+/**
+ * Adds a manual "in" and "out" punch for one employee/day and recalculates that day through the exact
+ * same pipeline a real fingerprint punch goes through (`recalculateDailyAttendance`): lateness, worked
+ * hours and overtime all come out of the existing calculation, not a separate one here. An exact-timestamp
+ * duplicate of either punch is skipped, same as a repeated device punch already is.
+ */
+export async function addManualAttendance(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const t = await getT();
+  const parsed = manualAttendanceSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: t.validation.invalidData };
+
+  const { employeeId, date } = parsed.data;
+  const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });
+  if (!employee) return { error: t.validation.invalidData };
+
+  const actor = await getSession();
+
+  return gate(
+    {
+      actionKey: "attendance.addManual",
+      module: t.nav.attendance,
+      actionLabel: t.auditActions.addManualAttendance,
+      summary: `${employee.name} (${employeeId}) — ${date} — ${parsed.data.workStart} → ${parsed.data.workEnd}`,
+      targetId: employeeId,
+    },
+    parsed.data,
+    () => applyAddManualAttendance(parsed.data, actor?.name ?? t.auditActions.system),
+  );
+}
+
+export async function applyAddManualAttendance(payload: ManualAttendancePayload, actorName: string): Promise<ActionState> {
+  const t = await getT();
+  const { employeeId, date, workStart, workEnd } = payload;
+
+  const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });
+  if (!employee) return { error: t.validation.invalidData };
+
+  const inTime = new Date(`${date}T${workStart}:00`);
+  const outTime = new Date(`${date}T${workEnd}:00`);
+
+  await recordChangeAs(
+    actorName,
+    {
+      module: t.nav.attendance,
+      action: t.auditActions.addManualAttendance,
+      newValue: `${employee.name} — ${date} — ${workStart} → ${workEnd}`,
+    },
+    async (tx) => {
+      for (const [timestamp, punchType] of [[inTime, "in"], [outTime, "out"]] as const) {
+        const existing = await tx.attendanceLog.findFirst({ where: { employeeId, timestamp }, select: { id: true } });
+        if (!existing) {
+          await tx.attendanceLog.create({ data: { employeeId, timestamp, punchType, source: "manual_correction" } });
+        }
+      }
+    },
+  );
+
+  // Same recomputation every real punch goes through — late/worked/overtime all come from there.
+  await recalculateDailyAttendance(employeeId, date);
+
+  revalidatePath("/attendance");
+  revalidatePath("/dashboard");
+  revalidatePath(`/employees/${employee.employeeNumber}`);
+  revalidatePath("/audit-log");
+
+  return { success: true, message: t.attendance.manualAttendanceSaved };
 }

@@ -13,7 +13,7 @@ import { applyCreateEmployee, applyUpdateEmployee, applyDeleteEmployee } from "@
 import { applyCreateShift, applyUpdateShift } from "@/lib/actions/shifts";
 import { applyCreateDeduction, applyDeleteDeduction, applyUpdateDeduction } from "@/lib/actions/deductions";
 import { applyCreateAllowance, applyDeleteAllowance } from "@/lib/actions/allowances";
-import { applyCorrectAttendance } from "@/lib/actions/attendance";
+import { applyAddManualAttendance, applyCorrectAttendance } from "@/lib/actions/attendance";
 import { applyDecideLeave } from "@/lib/actions/leaves";
 import { applyDecideOvertime, applyDeleteOvertime, applyUpdateOvertime } from "@/lib/actions/overtime";
 import { applyAddHoliday, applyDeleteHoliday } from "@/lib/actions/holidays";
@@ -45,6 +45,7 @@ const APPLIERS: Record<string, (payload: unknown, actorName: string) => Promise<
   "allowances.create": (p, a) => applyCreateAllowance(p as never, a),
   "allowances.delete": (p, a) => applyDeleteAllowance(p as never, a),
   "attendance.correct": (p, a) => applyCorrectAttendance(p as never, a),
+  "attendance.addManual": (p, a) => applyAddManualAttendance(p as never, a),
   "leaves.decide": (p, a) => applyDecideLeave(p as never, a),
   "overtime.decide": (p, a) => applyDecideOvertime(p as never, a),
   "overtime.update": (p, a) => applyUpdateOvertime(p as never, a),

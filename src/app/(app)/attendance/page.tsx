@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DailyAttendanceTable } from "@/components/attendance/daily-attendance-table";
 import { RawLogsTable } from "@/components/attendance/raw-logs-table";
 import { DateNav } from "@/components/attendance/date-nav";
+import { ManualAttendanceDialog } from "@/components/attendance/manual-attendance-dialog";
 import { attendanceSummary } from "@/lib/attendance-engine";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { UserCheck, UserX, Clock3, Fingerprint, CalendarClock } from "lucide-react";
@@ -36,7 +37,11 @@ export default async function AttendancePage({
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={t.attendance.title} description={t.attendance.description} />
+      <PageHeader
+        title={t.attendance.title}
+        description={t.attendance.description}
+        actions={canCorrect ? <ManualAttendanceDialog employees={employees} /> : null}
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <DateNav date={date} />

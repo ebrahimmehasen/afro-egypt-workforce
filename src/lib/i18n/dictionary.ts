@@ -304,6 +304,15 @@ export interface Dictionary {
     sourceBiometric: string;
     sourceSimulated: string;
     sourceManual: string;
+    addManualAttendance: string;
+    manualAttendanceTitle: string;
+    manualAttendanceDesc: string;
+    manualFormEmployee: string;
+    manualFormDate: string;
+    manualFormStart: string;
+    manualFormEnd: string;
+    manualSubmit: string;
+    manualAttendanceSaved: string;
     noRawLogs: string;
   };
   leaves: {
@@ -1021,6 +1030,7 @@ export interface Dictionary {
     editShift: string;
     simulatePunch: string;
     correctAttendance: string;
+    addManualAttendance: string;
     deleteLeave: string;
     approveLeave: string;
     rejectLeave: string;
