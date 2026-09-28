@@ -48,11 +48,18 @@ export async function recordChangeAs<T>(
   entry: AuditEntry,
   write: (tx: TransactionClient) => Promise<T>,
 ): Promise<T> {
-  return prisma.$transaction(async (tx) => {
-    const result = await write(tx);
-    await tx.auditLogEntry.create({ data: auditData(entry, userName) });
-    return result;
-  });
+  return prisma.$transaction(
+    async (tx) => {
+      const result = await write(tx);
+      await tx.auditLogEntry.create({ data: auditData(entry, userName) });
+      return result;
+    },
+    // Prisma's default maxWait (2s) is too tight on this box: a background job (e.g. the periodic
+    // device-attendance sync) can briefly hold the only free connection, and a save here would then
+    // fail outright with "Unable to start a transaction in the given time" instead of just queuing
+    // for a moment. Widening it lets a save wait a bit longer for a connection instead of erroring.
+    { maxWait: 10_000, timeout: 15_000 },
+  );
 }
 
 /**

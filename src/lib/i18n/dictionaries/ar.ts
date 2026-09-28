@@ -1011,6 +1011,7 @@ export const ar: Dictionary = {
   },
   validation: {
     invalidData: "بيانات غير صحيحة",
+    saveFailed: "تعذّر الحفظ الآن، حاول مرة أخرى بعد لحظات",
     invalidFields: "بيانات غير صحيحة — راجع: {fields}",
     sessionExpired: "انتهت الجلسة — سجّل الدخول من جديد ثم أعد المحاولة",
     fieldProblems: {

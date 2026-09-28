@@ -1011,6 +1011,7 @@ export const en: Dictionary = {
   },
   validation: {
     invalidData: "Invalid data",
+    saveFailed: "Could not save right now — please try again in a moment",
     invalidFields: "Invalid data — please check: {fields}",
     sessionExpired: "Your session has expired — sign in again and retry",
     fieldProblems: {

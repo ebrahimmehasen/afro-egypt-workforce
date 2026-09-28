@@ -992,6 +992,7 @@ export interface Dictionary {
   };
   validation: {
     invalidData: string;
+    saveFailed: string;
     invalidFields: string;
     sessionExpired: string;
     fieldProblems: Record<string, string>;
