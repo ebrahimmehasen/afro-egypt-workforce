@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { Plus, Pencil } from "lucide-react";
 import { createEmployee, updateEmployee } from "@/lib/actions/employees";
 import { useActionFeedback, keepFilledFields } from "@/hooks/use-action-feedback";
@@ -103,6 +103,25 @@ export function EmployeeFormDialog({
     const chosen = payTypes.find((p) => p.id === id);
     // a daily worker's times are set on them: open the custom times, filled from the pay type
     if (chosen?.basis === "daily" && !employee) setScheduleMode("custom");
+  }
+
+  // Daily worker only: Basic Salary and Daily Wage are two views of the same number (day rate = salary
+  // ÷ the pay type's divisor), so editing either one recalculates the other. Kept as plain DOM refs, not
+  // component state, so setting one field's value never triggers the other's onChange — no update loop.
+  const basicSalaryRef = useRef<HTMLInputElement>(null);
+  const dailyRateRef = useRef<HTMLInputElement>(null);
+  const divisor = payType?.dayDivisor ?? 0;
+
+  function syncFromBasicSalary(value: string) {
+    const salary = Number(value);
+    if (!dailyRateRef.current || divisor <= 0 || !value || !Number.isFinite(salary)) return;
+    dailyRateRef.current.value = String(Math.round(salary / divisor));
+  }
+
+  function syncFromDailyRate(value: string) {
+    const rate = Number(value);
+    if (!basicSalaryRef.current || divisor <= 0 || !value || !Number.isFinite(rate)) return;
+    basicSalaryRef.current.value = String(Math.round(rate * divisor));
   }
 
   const action = employee ? updateEmployee : createEmployee;
@@ -245,12 +264,31 @@ export function EmployeeFormDialog({
               may also have their own day rate, which then wins. */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="basicSalary">{t.employees.formBasicSalary}</Label>
-            <Input id="basicSalary" name="basicSalary" type="number" min={0} defaultValue={employee?.basicSalary} className={bad("basicSalary")} required={!lenient && salaryType === "monthly"} />
+            <Input
+              id="basicSalary"
+              name="basicSalary"
+              type="number"
+              min={0}
+              ref={basicSalaryRef}
+              defaultValue={employee?.basicSalary}
+              onChange={salaryType === "daily" ? (e) => syncFromBasicSalary(e.target.value) : undefined}
+              className={bad("basicSalary")}
+              required={!lenient && salaryType === "monthly"}
+            />
           </div>
           {salaryType === "daily" && (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="dailyRate">{t.employees.formDailyRate}</Label>
-              <Input id="dailyRate" name="dailyRate" type="number" min={0} defaultValue={employee?.dailyRate} className={bad("dailyRate")} />
+              <Input
+                id="dailyRate"
+                name="dailyRate"
+                type="number"
+                min={0}
+                ref={dailyRateRef}
+                defaultValue={employee?.dailyRate}
+                onChange={(e) => syncFromDailyRate(e.target.value)}
+                className={bad("dailyRate")}
+              />
               <p className="text-xs text-muted-foreground">{t.employees.dailyRateOptional}</p>
             </div>
           )}
