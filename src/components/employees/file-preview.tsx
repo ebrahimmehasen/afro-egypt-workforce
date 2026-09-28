@@ -29,6 +29,9 @@ export function FilePreview({
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  // Kept here (not in ImageViewer, which lives only while the dialog is open) so reopening
+  // this same document's viewer restores its rotation instead of resetting to 0.
+  const [rotation, setRotation] = useState(0);
   const kind = kindOf(url, mime);
   const filename = name ?? url.split("/").pop() ?? "file";
 
@@ -50,7 +53,9 @@ export function FilePreview({
           </DialogHeader>
 
           {/* images get zoom / rotate / drag here; a PDF keeps the browser's own viewer, which has those tools built in */}
-          {kind === "image" && <ImageViewer src={url} alt={filename} />}
+          {kind === "image" && (
+            <ImageViewer src={url} alt={filename} rotation={rotation} onRotationChange={setRotation} />
+          )}
           {kind === "pdf" && (
             <div className="overflow-hidden rounded-lg border border-border bg-muted/30">
               <iframe src={url} title={filename} className="h-[calc(90vh-14rem)] min-h-64 w-full" />

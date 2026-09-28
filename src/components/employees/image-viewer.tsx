@@ -18,8 +18,22 @@ import {
  * Zoom, rotate and drag an image without leaving the dialog. The image is laid out at its
  * natural size in the middle of the viewport and moved with one CSS transform, so every
  * tool is instant and nothing is re-fetched.
+ *
+ * Rotation is controlled by the parent (which outlives this component across dialog
+ * open/close) so it can be kept per document; zoom and pan reset each time, which is fine
+ * since only the rotation is meant to persist.
  */
-export function ImageViewer({ src, alt }: { src: string; alt: string }) {
+export function ImageViewer({
+  src,
+  alt,
+  rotation,
+  onRotationChange,
+}: {
+  src: string;
+  alt: string;
+  rotation: number;
+  onRotationChange: (rotation: number) => void;
+}) {
   const t = useT();
   const boxRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
@@ -28,7 +42,7 @@ export function ImageViewer({ src, alt }: { src: string; alt: string }) {
   const [view, setView] = useState<ImageView>(INITIAL_VIEW);
   const [dragging, setDragging] = useState(false);
 
-  const fit = natural ? fitScale(box.w, box.h, natural.w, natural.h, view.rotation) : 1;
+  const fit = natural ? fitScale(box.w, box.h, natural.w, natural.h, rotation) : 1;
   const scale = fit * view.zoom;
 
   // The wheel handlers below run outside React's render, so they read the latest geometry from a ref.
@@ -43,9 +57,9 @@ export function ImageViewer({ src, alt }: { src: string; alt: string }) {
     return { w: (sideways ? n.h : n.w) * f * zoom, h: (sideways ? n.w : n.h) * f * zoom };
   }
 
-  function constrain(next: ImageView): ImageView {
+  function constrain(next: ImageView, rotationOverride = rotation): ImageView {
     const { box: b } = geom.current;
-    const v = visualSize(next.zoom, next.rotation);
+    const v = visualSize(next.zoom, rotationOverride);
     return { ...next, ...clampOffset(next.x, next.y, b.w, b.h, v.w, v.h) };
   }
 
@@ -77,7 +91,11 @@ export function ImageViewer({ src, alt }: { src: string; alt: string }) {
   }, []);
 
   const zoomBy = (factor: number) => setView((v) => constrain(zoomAt(v, factor, 0, 0)));
-  const rotateBy = (dir: 1 | -1) => setView((v) => constrain({ ...v, rotation: turn(v.rotation, dir) }));
+  const rotateBy = (dir: 1 | -1) => {
+    const next = turn(rotation, dir);
+    onRotationChange(next);
+    setView((v) => constrain(v, next));
+  };
 
   return (
     <div className="flex flex-col gap-2">
@@ -141,7 +159,7 @@ export function ImageViewer({ src, alt }: { src: string; alt: string }) {
               ? {
                   width: natural.w,
                   height: natural.h,
-                  transform: `translate(calc(-50% + ${view.x}px), calc(-50% + ${view.y}px)) scale(${scale}) rotate(${view.rotation}deg)`,
+                  transform: `translate(calc(-50% + ${view.x}px), calc(-50% + ${view.y}px)) scale(${scale}) rotate(${rotation}deg)`,
                 }
               : { visibility: "hidden" }
           }
