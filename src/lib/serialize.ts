@@ -36,6 +36,7 @@ import type {
   Shift,
 } from "@/lib/types";
 import { parseRequiredDocuments } from "@/lib/documents";
+import { parseRequiredAcknowledgments } from "@/lib/acknowledgments";
 
 export const dayStr = (d: Date): string => d.toISOString().slice(0, 10);
 const iso = (d: Date): string => d.toISOString();
@@ -68,7 +69,10 @@ export function toEmployee(e: PEmployee): Employee {
     qualification: e.qualification ?? undefined,
     militaryStatus: e.militaryStatus ?? undefined,
     nationalId: e.nationalId ?? undefined,
+    gender: e.gender ?? undefined,
+    isDriver: e.isDriver,
     requiredDocuments: parseRequiredDocuments(e.requiredDocuments),
+    requiredAcknowledgments: parseRequiredAcknowledgments(e.requiredAcknowledgments),
     avatarColor: e.avatarColor ?? undefined,
   };
 }

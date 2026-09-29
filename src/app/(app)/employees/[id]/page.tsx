@@ -11,6 +11,7 @@ import { translateLabel } from "@/lib/i18n/data-labels";
 import { requestStatusLabel, deductionTypeLabel } from "@/lib/i18n/labels";
 import { canManageEmployeeFiles, canUseAssistant, hasPermission } from "@/lib/permissions";
 import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
+import { missingAcknowledgmentKeys, requiredAcknowledgmentKeys } from "@/lib/acknowledgments";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
 import { EmployeeAssistant } from "@/components/assistant/employee-assistant";
 import { DeleteEmployeeButton } from "@/components/employees/delete-employee-button";
@@ -64,6 +65,9 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   const acknowledgments = db.employeeAcknowledgments.filter((a) => a.employeeId === employee.id);
   const requiredDocs = requiredDocumentTypes(employee);
   const missingDocs = missingDocumentTypes(documents, requiredDocs);
+  const requiredAcks = requiredAcknowledgmentKeys(employee);
+  const missingAcks = missingAcknowledgmentKeys(acknowledgments, requiredAcks);
+  const missingFilesCount = missingDocs.length + missingAcks.length;
   const canManageDocs = canManageEmployeeFiles(user);
   const canEdit = hasPermission(user, "employees");
 
@@ -124,10 +128,10 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
               <p className="text-sm text-muted-foreground">
                 {translateLabel(employee.jobTitle, locale)} · {translateLabel(department?.name ?? "", locale)}
               </p>
-              {missingDocs.length > 0 && (
+              {missingFilesCount > 0 && (
                 <p className="mt-1 flex items-center gap-1 text-xs font-medium text-warning">
                   <FileWarning className="h-3.5 w-3.5" />
-                  {t.documents.incomplete} ({missingDocs.length})
+                  {t.documents.incomplete} ({missingFilesCount})
                 </p>
               )}
             </div>
@@ -162,6 +166,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
           <AcknowledgmentsPanel
             employeeId={employee.id}
             acknowledgments={acknowledgments}
+            requiredKeys={requiredAcks}
             canManage={canManageDocs}
           />
         </TabsContent>

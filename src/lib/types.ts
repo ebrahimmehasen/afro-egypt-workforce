@@ -17,6 +17,8 @@ export type SalaryType = "monthly" | "daily";
 
 export type MilitaryStatus = "completed" | "exempted" | "postponed" | "not_applicable";
 
+export type Gender = "male" | "female";
+
 export interface Employee {
   id: string; // EMP-1001
   employeeNumber: string; // "<DEPT_CODE>-<seq>", e.g. ACC-001 — display-facing, distinct from id and biometricDeviceUserId
@@ -43,8 +45,17 @@ export interface Employee {
   qualification?: string;
   militaryStatus?: MilitaryStatus;
   nationalId?: string;
-  /** This employee's own required-document list; unset means the company default. */
+  /** Drives the default required-document list (the military certificate is male-only); unset for rows
+   * saved before this existed. */
+  gender?: Gender;
+  /** "سواق" — drives whether a driving licence and a vehicle-receipt acknowledgment are asked for. */
+  isDriver?: boolean;
+  /** This employee's own required-document list; unset means the company default (see
+   * defaultRequiredDocumentTypes in @/lib/documents). */
   requiredDocuments?: EmployeeDocumentType[];
+  /** Same idea, for the signed-acknowledgment checklist (see defaultRequiredAcknowledgmentKeys in
+   * @/lib/acknowledgments). */
+  requiredAcknowledgments?: StandardAcknowledgmentKey[];
   avatarColor?: string;
 }
 
@@ -240,36 +251,51 @@ export type EmployeeDocumentType =
   | "cv"
   | "driving_license"
   | "company_policy"
+  | "experience_certificate"
   | "other";
 
 /**
- * The nine slots the company's own HR-F-04 service-file checklist demands.
- * These are the ones an employee is reported as *missing*.
+ * "المستوى الأول" — the core service-file checklist, asked of every employee regardless of
+ * gender or job. These are the ones reported as *missing* for everyone.
  */
-export const REQUIRED_EMPLOYEE_DOCUMENT_TYPES: EmployeeDocumentType[] = [
-  "national_id_photo",
+export const CORE_REQUIRED_EMPLOYEE_DOCUMENT_TYPES: EmployeeDocumentType[] = [
+  "cv",
   "birth_certificate",
-  "criminal_record",
-  "health_certificate",
-  "work_contract",
-  "social_insurance_form",
-  "job_application_form",
   "qualification_certificate",
+  "criminal_record",
+  "work_experience_certificate",
   "personal_photo",
+  "national_id_photo",
+  "job_application_form",
+  "social_insurance_form",
 ];
 
-/** Uploadable but never demanded — military status is male-only, the rest are extras. */
+/** Kept for any code still importing the old name — the company-wide default with no employee context. */
+export const REQUIRED_EMPLOYEE_DOCUMENT_TYPES = CORE_REQUIRED_EMPLOYEE_DOCUMENT_TYPES;
+
+/**
+ * "المستوى الثالث" — additional paperwork, never demanded by default. `work_contract` and
+ * `company_policy` are kept only so any file already on record stays visible and manageable; the
+ * company now asks for both as signed acknowledgments instead (see @/lib/acknowledgments).
+ */
 export const OPTIONAL_EMPLOYEE_DOCUMENT_TYPES: EmployeeDocumentType[] = [
-  "military_certificate",
-  "work_experience_certificate",
-  "cv",
-  "driving_license",
+  "health_certificate",
+  "experience_certificate",
+  "work_contract",
   "company_policy",
   "other",
 ];
 
+/** Conditionally required (still "المستوى الأول"): military service only applies to men, a
+ * driving licence only to a driver. See defaultRequiredDocumentTypes in @/lib/documents. */
+export const CONDITIONAL_EMPLOYEE_DOCUMENT_TYPES = {
+  military_certificate: "male",
+  driving_license: "driver",
+} as const;
+
 export const EMPLOYEE_DOCUMENT_TYPES: EmployeeDocumentType[] = [
-  ...REQUIRED_EMPLOYEE_DOCUMENT_TYPES,
+  ...CORE_REQUIRED_EMPLOYEE_DOCUMENT_TYPES,
+  ...(Object.keys(CONDITIONAL_EMPLOYEE_DOCUMENT_TYPES) as EmployeeDocumentType[]),
   ...OPTIONAL_EMPLOYEE_DOCUMENT_TYPES,
 ];
 
@@ -286,8 +312,14 @@ export interface EmployeeDocument {
 
 /** The three fixed acknowledgment slots. Custom slots use `key` = "custom-<id>". */
 export const STANDARD_ACKNOWLEDGMENT_KEYS = [
-  "employment_terms",
-  "custody_receipt",
+  // "المستوى الثاني" — required signatures (see defaultRequiredAcknowledgmentKeys in @/lib/acknowledgments).
+  "address_confirmation", // إقرار صحة عنوان
+  "employment_terms", // عقد عمل
+  "work_receipt", // إقرار استلام عمل
+  "internal_bylaws", // اللائحة الداخلية للمصنع
+  "vehicle_receipt", // إقرار استلام عربية — سواق فقط
+  // "المستوى الثالث" and legacy — never required by default.
+  "custody_receipt", // إقرار استلام عهدة
   "confidentiality",
 ] as const;
 export type StandardAcknowledgmentKey = (typeof STANDARD_ACKNOWLEDGMENT_KEYS)[number];

@@ -2,6 +2,7 @@ import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { employeesInScope, viewerScope } from "@/lib/scope";
 import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
+import { missingAcknowledgmentKeys, requiredAcknowledgmentKeys } from "@/lib/acknowledgments";
 import { canUseAssistant, hasPermission } from "@/lib/permissions";
 import { getT, format } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
@@ -20,10 +21,11 @@ export default async function EmployeesPage() {
   const formOptions = employeeFormOptions(await loadPayContext());
 
   const incompleteDocIds = employees
-    .filter(
-      (e) =>
-        missingDocumentTypes(db.employeeDocuments.filter((d) => d.employeeId === e.id), requiredDocumentTypes(e)).length > 0,
-    )
+    .filter((e) => {
+      const missingDocs = missingDocumentTypes(db.employeeDocuments.filter((d) => d.employeeId === e.id), requiredDocumentTypes(e));
+      const missingAcks = missingAcknowledgmentKeys(db.employeeAcknowledgments.filter((a) => a.employeeId === e.id), requiredAcknowledgmentKeys(e));
+      return missingDocs.length > 0 || missingAcks.length > 0;
+    })
     .map((e) => e.id);
 
   return (

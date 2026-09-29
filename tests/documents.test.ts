@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canBeRequired,
+  defaultRequiredDocumentTypes,
   documentsComplete,
   missingDocumentTypes,
   parseRequiredDocuments,
@@ -8,6 +9,7 @@ import {
   withRequirement,
 } from "@/lib/documents";
 import {
+  CORE_REQUIRED_EMPLOYEE_DOCUMENT_TYPES,
   OPTIONAL_EMPLOYEE_DOCUMENT_TYPES,
   REQUIRED_EMPLOYEE_DOCUMENT_TYPES,
   EmployeeDocument,
@@ -88,17 +90,64 @@ describe("per-employee required documents", () => {
 
   it("keeps the canonical order regardless of the order things were toggled in", () => {
     const a = withRequirement(withRequirement([], "cv", true)!, "national_id_photo", true);
-    expect(a).toEqual(["national_id_photo", "cv"]);
+    expect(a).toEqual(["cv", "national_id_photo"]);
   });
 
   it("parses stored JSON defensively", () => {
     expect(parseRequiredDocuments(null)).toBeUndefined();
     expect(parseRequiredDocuments("nope")).toBeUndefined();
-    expect(parseRequiredDocuments(["cv", "made_up", "other", "national_id_photo"])).toEqual(["national_id_photo", "cv"]);
+    expect(parseRequiredDocuments(["cv", "made_up", "other", "national_id_photo"])).toEqual(["cv", "national_id_photo"]);
   });
 
   it("never treats 'other' as requirable", () => {
     expect(canBeRequired("other")).toBe(false);
     expect(canBeRequired("cv")).toBe(true);
+  });
+});
+
+describe("gender/driver-conditional defaults", () => {
+  it("asks for the military certificate only from a man", () => {
+    expect(defaultRequiredDocumentTypes({ gender: "male" })).toContain("military_certificate");
+    expect(defaultRequiredDocumentTypes({ gender: "female" })).not.toContain("military_certificate");
+    expect(defaultRequiredDocumentTypes({})).not.toContain("military_certificate");
+  });
+
+  it("asks for a driving licence only from a driver", () => {
+    expect(defaultRequiredDocumentTypes({ isDriver: true })).toContain("driving_license");
+    expect(defaultRequiredDocumentTypes({ isDriver: false })).not.toContain("driving_license");
+    expect(defaultRequiredDocumentTypes({})).not.toContain("driving_license");
+  });
+
+  it("always asks for the core checklist regardless of gender/driver", () => {
+    for (const t of CORE_REQUIRED_EMPLOYEE_DOCUMENT_TYPES) {
+      expect(defaultRequiredDocumentTypes({})).toContain(t);
+      expect(defaultRequiredDocumentTypes({ gender: "male", isDriver: true })).toContain(t);
+    }
+  });
+
+  it("no longer defaults the legacy work_contract/health_certificate/company_policy into required", () => {
+    const required = defaultRequiredDocumentTypes({ gender: "male", isDriver: true });
+    expect(required).not.toContain("work_contract");
+    expect(required).not.toContain("health_certificate");
+    expect(required).not.toContain("company_policy");
+  });
+
+  it("requiredDocumentTypes uses the employee's own gender/isDriver when no override is set", () => {
+    expect(requiredDocumentTypes({ gender: "male" })).toContain("military_certificate");
+    expect(requiredDocumentTypes({ gender: "female" })).not.toContain("military_certificate");
+    expect(requiredDocumentTypes({ isDriver: true })).toContain("driving_license");
+  });
+
+  it("a per-employee override still wins over the computed default", () => {
+    expect(requiredDocumentTypes({ gender: "male", requiredDocuments: ["cv"] })).toEqual(["cv"]);
+  });
+
+  it("toggling back to the employee's own computed default clears the override (not the static company one)", () => {
+    const driver = { isDriver: true };
+    const withoutLicence = withRequirement(defaultRequiredDocumentTypes(driver), "driving_license", false, defaultRequiredDocumentTypes(driver));
+    expect(withoutLicence).not.toBeNull();
+    expect(withoutLicence).not.toContain("driving_license");
+    const backToDefault = withRequirement(withoutLicence!, "driving_license", true, defaultRequiredDocumentTypes(driver));
+    expect(backToDefault).toBeNull();
   });
 });

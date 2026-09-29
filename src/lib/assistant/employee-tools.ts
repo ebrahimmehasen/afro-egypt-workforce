@@ -2,6 +2,7 @@ import type { Store } from "@/lib/store";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Employee, EmployeeDocumentType } from "@/lib/types";
 import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
+import { missingAcknowledgmentKeys, requiredAcknowledgmentKeys, standardAcknowledgmentLabel } from "@/lib/acknowledgments";
 
 // The read-only tools the assistant can call. Every one works on a Store that has already been narrowed to
 // what the asking user may see (see scopedSnapshot), never on the database directly, and none of them
@@ -72,7 +73,7 @@ export const TOOL_DEFINITIONS = [
     function: {
       name: "get_employee",
       description:
-        "The full file of ONE employee: identity, personal data (national ID, phone, address), pay, documents on file and missing, details still missing, recent attendance, leaves, overtime and deductions.",
+        "The full file of ONE employee: identity, personal data (national ID, phone, address), pay, documents on file and missing, signed acknowledgments on file and missing, details still missing, recent attendance, leaves, overtime and deductions.",
       parameters: {
         type: "object",
         properties: { query: { type: "string", description: "Employee number (e.g. PROD-001) or the name." } },
@@ -85,7 +86,7 @@ export const TOOL_DEFINITIONS = [
     function: {
       name: "find_missing_items",
       description:
-        "Employees ranked by how complete their records are: missing required documents, missing profile data (national ID, phone, address, qualification, salary, department, fingerprint registration) and how many document files they have. Includes company-wide totals. Use sort to get the right end of the list.",
+        "Employees ranked by how complete their records are: missing required documents, missing required signed acknowledgments, missing profile data (national ID, phone, address, qualification, salary, department, fingerprint registration) and how many document files they have. Includes company-wide totals. Use sort to get the right end of the list.",
       parameters: {
         type: "object",
         properties: {
@@ -174,7 +175,14 @@ function documentsFor(ctx: ToolContext, e: Employee) {
   const missing = missingDocumentTypes(docs, required);
   const byType = new Map<EmployeeDocumentType, number>();
   for (const d of docs) byType.set(d.type, (byType.get(d.type) ?? 0) + 1);
-  return { docs, required, missing, byType };
+
+  // The signed-acknowledgment checklist (contract, address confirmation…) — a separate model from
+  // EmployeeDocument, but the same "required vs on file" shape, so it counts toward completeness too.
+  const acks = ctx.db.employeeAcknowledgments.filter((a) => a.employeeId === e.id);
+  const requiredAcks = requiredAcknowledgmentKeys(e);
+  const missingAckLabels = missingAcknowledgmentKeys(acks, requiredAcks).map((k) => standardAcknowledgmentLabel(k, ctx.t));
+
+  return { docs, required, missing, byType, acks, requiredAcks, missingAckLabels };
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -234,7 +242,7 @@ export function getEmployee(ctx: ToolContext, args: { query?: string }) {
   const e = one;
   const { db, today } = ctx;
   const shift = db.shifts.find((s) => s.id === e.shiftId);
-  const { docs, required, missing, byType } = documentsFor(ctx, e);
+  const { docs, required, missing, byType, acks, requiredAcks, missingAckLabels } = documentsFor(ctx, e);
 
   const since30 = addDays(today, -30);
   const attendance = db.dailyAttendance.filter((a) => a.employeeId === e.id && a.date >= since30 && a.date <= today);
@@ -286,6 +294,11 @@ export function getEmployee(ctx: ToolContext, args: { query?: string }) {
       onFile: [...byType.entries()].map(([t, n]) => ({ type: docLabel(ctx, t), files: n })),
       totalFiles: docs.length,
     },
+    acknowledgments: {
+      requiredForThisEmployee: requiredAcks.map((k) => standardAcknowledgmentLabel(k, ctx.t)),
+      missing: missingAckLabels,
+      signedCount: acks.length,
+    },
     missingDetails: missingProfileFields(ctx, e),
     attendanceLast30Days: {
       daysRecorded: attendance.length,
@@ -310,7 +323,7 @@ export function findDataGaps(ctx: ToolContext, args: { department?: string; limi
   const people = ctx.db.employees.filter((e) => e.status !== "terminated" && (!dep || contains(deptName(ctx, e), dep)));
 
   const rows = people.map((e) => {
-    const { missing, required, docs } = documentsFor(ctx, e);
+    const { missing, required, docs, missingAckLabels } = documentsFor(ctx, e);
     const fields = missingProfileFields(ctx, e);
     return {
       ...codeIfNeeded(ctx, e),
@@ -320,8 +333,9 @@ export function findDataGaps(ctx: ToolContext, args: { department?: string; limi
       documentsMissingCount: missing.length,
       documentsRequiredCount: required.length,
       documentFilesOnFile: docs.length,
+      missingAcknowledgments: missingAckLabels,
       missingDetails: fields,
-      itemsMissing: missing.length + fields.length,
+      itemsMissing: missing.length + missingAckLabels.length + fields.length,
     };
   });
 
@@ -337,9 +351,11 @@ export function findDataGaps(ctx: ToolContext, args: { department?: string; limi
         });
 
   const docTally = new Map<string, number>();
+  const ackTally = new Map<string, number>();
   const fieldTally = new Map<string, number>();
   for (const r of rows) {
     for (const d of r.missingDocuments) docTally.set(d, (docTally.get(d) ?? 0) + 1);
+    for (const a of r.missingAcknowledgments) ackTally.set(a, (ackTally.get(a) ?? 0) + 1);
     for (const f of r.missingDetails) fieldTally.set(f, (fieldTally.get(f) ?? 0) + 1);
   }
   const top = (m: Map<string, number>) =>
@@ -350,6 +366,7 @@ export function findDataGaps(ctx: ToolContext, args: { department?: string; limi
     employeesWithMissingItems: withGaps.length,
     employeesComplete: rows.length - withGaps.length,
     mostMissingDocuments: top(docTally),
+    mostMissingAcknowledgments: top(ackTally),
     mostMissingDetails: top(fieldTally),
     sortedBy: sort,
     showing: Math.min(ranked.length, limit),
@@ -385,8 +402,14 @@ export function companyOverview(ctx: ToolContext) {
   const newHires = active.filter((e) => e.hireDate >= cutoff);
 
   const gaps = findDataGaps(ctx, { limit: 1 });
-  const complete = active.filter((e) => documentsFor(ctx, e).missing.length === 0).length;
-  const totalMissingSlots = active.reduce((s, e) => s + documentsFor(ctx, e).missing.length, 0);
+  const complete = active.filter((e) => {
+    const d = documentsFor(ctx, e);
+    return d.missing.length === 0 && d.missingAckLabels.length === 0;
+  }).length;
+  const totalMissingSlots = active.reduce((s, e) => {
+    const d = documentsFor(ctx, e);
+    return s + d.missing.length + d.missingAckLabels.length;
+  }, 0);
 
   const since30 = addDays(today, -30);
   const recent = db.dailyAttendance.filter((a) => a.date >= since30 && a.date <= today);

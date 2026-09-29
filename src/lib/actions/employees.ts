@@ -31,6 +31,10 @@ const employeeSchema = z
     qualification: z.string().min(2),
     militaryStatus: z.enum(["completed", "exempted", "postponed", "not_applicable"]),
     nationalId: z.string().regex(/^\d{14}$/),
+    /** Drives the default required-document list — see defaultRequiredDocumentTypes. */
+    gender: z.enum(["male", "female"]),
+    /** "سواق" — drives the driving-licence / vehicle-receipt requirement. */
+    isDriver: z.coerce.boolean().default(false),
   })
   // a salary is always needed (a daily worker's day is it over 26); a daily worker's own day rate can stand in
   .refine((d) => d.basicSalary > 0 || (d.salaryType === "daily" && (d.dailyRate ?? 0) > 0), {
@@ -40,13 +44,15 @@ const employeeSchema = z
 
 // The personal fields are nullable in the DB (older rows have none), and an
 // admin's edit may legitimately clear them, so the payload allows null there.
-type EmployeePayload = Omit<z.infer<typeof employeeSchema>, "phone" | "address" | "qualification" | "militaryStatus" | "nationalId"> & {
+type EmployeePayload = Omit<z.infer<typeof employeeSchema>, "phone" | "address" | "qualification" | "militaryStatus" | "nationalId" | "gender"> & {
   id: string;
   phone: string | null;
   address: string | null;
   qualification: string | null;
   militaryStatus: z.infer<typeof employeeSchema>["militaryStatus"] | null;
   nationalId: string | null;
+  /** Null for rows saved before this existed; the admin edit path may leave it unset too. */
+  gender?: z.infer<typeof employeeSchema>["gender"];
   /** The pay setup; absent on payloads saved before pay types existed, which then leave it unchanged. */
   pay?: PaySetup;
 };
@@ -152,6 +158,9 @@ function lenientEmployeePayload(id: string, raw: Record<string, unknown>, before
     qualification: str(raw.qualification) || null,
     militaryStatus: oneOf(raw.militaryStatus, ["completed", "exempted", "postponed", "not_applicable"] as const, before.militaryStatus ?? "not_applicable"),
     nationalId: str(raw.nationalId) || null,
+    gender: str(raw.gender) === "male" || str(raw.gender) === "female" ? (str(raw.gender) as "male" | "female") : (before.gender ?? undefined),
+    // the checkbox is always rendered on this form, so its presence in raw always reflects its real state
+    isDriver: raw.isDriver === "on",
   };
 }
 
@@ -169,7 +178,11 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
   const raw = Object.fromEntries(formData);
   // An unchecked switch is simply absent from FormData, same as a native checkbox — read its true
   // state explicitly so "off" doesn't get mistaken for "not sent" and fall back to the schema default.
-  const parsed = employeeSchema.safeParse({ ...raw, overtimeEligible: formData.get("overtimeEligible") === "on" });
+  const parsed = employeeSchema.safeParse({
+    ...raw,
+    overtimeEligible: formData.get("overtimeEligible") === "on",
+    isDriver: formData.get("isDriver") === "on",
+  });
   if (!parsed.success) return invalidFieldsError(t, parsed.error.issues, salaryField(raw));
   const id = await nextEmployeeId();
 
@@ -249,7 +262,11 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
     const missing = [!department && "departmentId", !shift && "shiftId"].filter(Boolean) as string[];
     if (missing.length) return invalidFieldsError(t, missing.map((f) => ({ path: [f] }) as never));
   } else {
-    const parsed = employeeSchema.safeParse({ ...raw, overtimeEligible: formData.get("overtimeEligible") === "on" });
+    const parsed = employeeSchema.safeParse({
+      ...raw,
+      overtimeEligible: formData.get("overtimeEligible") === "on",
+      isDriver: formData.get("isDriver") === "on",
+    });
     if (!parsed.success) return invalidFieldsError(t, parsed.error.issues, salaryField(raw));
     payload = { id, ...parsed.data };
   }
