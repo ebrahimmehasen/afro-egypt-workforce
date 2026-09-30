@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Search, Users, FileWarning, Fingerprint } from "lucide-react";
+import { toast } from "sonner";
+import { Search, Users, FileWarning, Fingerprint, Link2Off } from "lucide-react";
 import { Employee, Department, Shift } from "@/lib/types";
 import { deviceLink } from "@/lib/device-link";
 import { getDeviceUserNamesAction } from "@/lib/actions/device-users";
+import { unlinkDeviceUserAction } from "@/lib/actions/biometric-device";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { MultiSelectFilter } from "@/components/shared/multi-select-filter";
 import {
   Table,
@@ -17,9 +20,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ClickableRow } from "@/components/shared/clickable-row";
 import { EmptyState } from "@/components/shared/empty-state";
 import { formatEGP } from "@/lib/constants";
+import { format } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { today } from "@/lib/today";
@@ -41,18 +49,57 @@ function isNewHire(hireDate: string, todayStr: string): boolean {
 /** The fingerprint-device column: the name the device itself holds for this employee, or why it isn't shown. */
 function DeviceCell({ employee, names }: { employee: Employee; names: Record<string, string> | null }) {
   const t = useT();
+  const [pending, startTransition] = useTransition();
   const link = deviceLink(employee.biometricDeviceUserId, names);
 
   if (link.state === "not_linked") {
     return <span className="text-xs text-muted-foreground">{t.employees.deviceNotLinked}</span>;
   }
+
+  function unlink(deviceUserId: string) {
+    startTransition(async () => {
+      const res = await unlinkDeviceUserAction(deviceUserId);
+      if ("error" in res) toast.error(res.error);
+      else toast.success(t.biometricDevice.unlinkRemovalDone);
+    });
+  }
+
   return (
     <span className="flex items-center gap-1.5">
       <Fingerprint className="h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
       {link.state === "named" ? (
         <span>{link.name}</span>
       ) : link.state === "missing" ? (
-        <span className="text-xs text-warning">{t.employees.deviceMissingOnDevice}</span>
+        <>
+          <span className="text-xs text-warning">{t.employees.deviceMissingOnDevice}</span>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                disabled={pending}
+                onClick={(ev) => ev.stopPropagation()}
+                aria-label={t.biometricDevice.unlinkAction}
+                title={t.biometricDevice.unlinkAction}
+              >
+                <Link2Off className="h-3.5 w-3.5" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent onClick={(ev) => ev.stopPropagation()}>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t.biometricDevice.unlinkAction}</AlertDialogTitle>
+                <AlertDialogDescription>{format(t.biometricDevice.unlinkConfirm, { name: employee.name })}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+                <AlertDialogAction onClick={() => unlink(link.deviceUserId)}>
+                  {t.biometricDevice.unlinkAction}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
       ) : (
         <span className="text-xs text-muted-foreground">{t.employees.deviceLinked}</span>
       )}

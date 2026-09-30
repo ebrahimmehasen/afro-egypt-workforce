@@ -105,6 +105,7 @@ export async function deleteDeviceUserAction(uid: number, userId: string, displa
   await logDeviceAction(t, t.auditActions.deleteDeviceUser, detail);
   revalidatePath(PATH);
   if (employee) {
+    revalidatePath("/employees");
     revalidatePath(`/employees/${employee.employeeNumber}`);
     revalidatePath("/attendance");
     revalidatePath("/dashboard");
@@ -260,6 +261,7 @@ export async function unlinkDeviceUserAction(deviceUserId: string) {
   await prisma.employee.update({ where: { id: employee.id }, data: { biometricDeviceUserId: null, biometricLinkedAt: null } });
   await logDeviceAction(t, t.auditActions.unlinkDeviceUser, `${employee.name} (${deviceUserId}) — ${deleted} ${t.biometricDevice.recordsRemoved}`);
   revalidatePath(PATH);
+  revalidatePath("/employees");
   revalidatePath(`/employees/${employee.employeeNumber}`);
   revalidatePath("/attendance");
   revalidatePath("/dashboard");
