@@ -1,4 +1,4 @@
-import type { EmployeeDocumentType } from "@/lib/types";
+import type { EmployeeDocumentType, StandardAcknowledgmentKey } from "@/lib/types";
 
 export interface Dictionary {
   app: {
@@ -198,7 +198,13 @@ export interface Dictionary {
     paidDaysCol: string;
     formAllowances: string;
     overtimeEligible: string;
+    isDriver: string;
+    isDriverHint: string;
     sectionPersonal: string;
+    formGender: string;
+    formGenderPlaceholder: string;
+    genderMale: string;
+    genderFemale: string;
     formPhone: string;
     formAddress: string;
     formQualification: string;
@@ -907,11 +913,9 @@ export interface Dictionary {
     deleted: string;
     auditUpload: string;
     auditDelete: string;
-    slots: {
-      employment_terms: string;
-      custody_receipt: string;
-      confidentiality: string;
-    };
+    requiredSection: string;
+    optionalSection: string;
+    slots: Record<StandardAcknowledgmentKey, string>;
   };
   assistant: {
     title: string;

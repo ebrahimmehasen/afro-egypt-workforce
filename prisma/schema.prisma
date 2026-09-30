@@ -51,6 +51,11 @@ enum MilitaryStatus {
   not_applicable // لا ينطبق (إناث / خارج السن)
 }
 
+enum Gender {
+  male
+  female
+}
+
 enum PunchType {
   in
   out
@@ -134,7 +139,8 @@ enum EmployeeDocumentType {
   work_experience_certificate // كعب عمل
   cv // السيرة الذاتية
   driving_license // رخصة القيادة
-  company_policy // لائحة داخلية / سياسات الشركة
+  company_policy // لائحة داخلية / سياسات الشركة (قديم — حل محله إقرار "اللائحة الداخلية")
+  experience_certificate // شهادة خبرة
   other // أخرى
 }
 
@@ -274,10 +280,21 @@ model Employee {
   qualification         String?
   militaryStatus        MilitaryStatus?
   nationalId            String?         @unique // الرقم القومي — enforced required by the form; nullable for the migration of existing rows
+  /// null for rows saved before this existed; enforced required by the form going forward. Drives which
+  /// documents/acknowledgments are asked for by default (the military certificate is male-only) — never
+  /// used for anything else (payroll, attendance…).
+  gender                Gender?
+  /// "سواق" — drives whether the driving licence and the vehicle-receipt acknowledgment are asked for by
+  /// default. A plain HR-set flag rather than guessed from the job title, so it survives any title wording.
+  isDriver              Boolean        @default(false)
   /// This employee's own list of required document types (a JSON array of
-  /// EmployeeDocumentType). null = the company default (REQUIRED_EMPLOYEE_DOCUMENT_TYPES) —
-  /// only set once someone moves a document between "required" and "additional".
+  /// EmployeeDocumentType). null = the company default computed from their gender/isDriver (see
+  /// defaultRequiredDocumentTypes in @/lib/documents) — only set once someone moves a document between
+  /// "required" and "additional".
   requiredDocuments     Json?
+  /// Same idea as `requiredDocuments`, for the signed-acknowledgment checklist (see
+  /// defaultRequiredAcknowledgmentKeys in @/lib/acknowledgments).
+  requiredAcknowledgments Json?
   avatarColor           String?
   deletedAt             DateTime?
   createdAt             DateTime       @default(now())

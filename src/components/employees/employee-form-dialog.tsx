@@ -94,6 +94,8 @@ export function EmployeeFormDialog({
     employee?.customWorkStart ? "custom" : employee?.workScheduleId ? "schedule" : employee ? "shift" : "schedule",
   );
   const [overtimeEligible, setOvertimeEligible] = useState(employee?.overtimeEligible ?? true);
+  const [gender, setGender] = useState<"male" | "female" | undefined>(employee?.gender);
+  const [isDriver, setIsDriver] = useState(employee?.isDriver ?? false);
   // custom times start from the employee's own, else the pay type's (a daily worker's day, say)
   const customDefaults =
     employee?.customWorkStart && employee.payTypeId === payTypeId
@@ -306,6 +308,14 @@ export function EmployeeFormDialog({
             />
           </div>
 
+          <div className="flex items-center justify-between rounded-lg border border-border p-3 sm:col-span-2">
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="isDriver" className="cursor-pointer">{t.employees.isDriver}</Label>
+              <p className="text-xs text-muted-foreground">{t.employees.isDriverHint}</p>
+            </div>
+            <Switch id="isDriver" name="isDriver" checked={isDriver} onCheckedChange={setIsDriver} />
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="allowances">{t.employees.formAllowances}</Label>
             <Input id="allowances" name="allowances" type="number" min={0} defaultValue={employee?.allowances ?? 0} className={bad("allowances")} />
@@ -325,6 +335,17 @@ export function EmployeeFormDialog({
 
           <div className="mt-2 border-t border-border pt-3 sm:col-span-2">
             <p className="text-sm font-semibold text-muted-foreground">{t.employees.sectionPersonal}</p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t.employees.formGender}</Label>
+            <Select name="gender" value={gender} onValueChange={(v) => setGender(v as "male" | "female")}>
+              <SelectTrigger className={bad("gender")}><SelectValue placeholder={t.employees.formGenderPlaceholder} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="male">{t.employees.genderMale}</SelectItem>
+                <SelectItem value="female">{t.employees.genderFemale}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex flex-col gap-1.5">

@@ -7,46 +7,52 @@ import { recordChange } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
 import { canManageEmployeeFiles } from "@/lib/permissions";
 import { canViewEmployee } from "@/lib/scope";
-import { canBeRequired, defaultRequiredDocumentTypes, parseRequiredDocuments, requiredDocumentTypes, withRequirement } from "@/lib/documents";
-import { EMPLOYEE_DOCUMENT_TYPES, EmployeeDocumentType } from "@/lib/types";
+import {
+  canAcknowledgmentBeRequired,
+  defaultRequiredAcknowledgmentKeys,
+  parseRequiredAcknowledgments,
+  requiredAcknowledgmentKeys,
+  withAcknowledgmentRequirement,
+} from "@/lib/acknowledgments";
+import { StandardAcknowledgmentKey } from "@/lib/types";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
 
-/** Moves one document type between this employee's "required" and "additional" lists. */
-export async function setDocumentRequired(
+/** Moves one acknowledgment slot between this employee's "required" and "additional" lists. */
+export async function setAcknowledgmentRequired(
   employeeId: string,
-  type: EmployeeDocumentType,
+  key: string,
   required: boolean,
 ): Promise<ActionState> {
   const t = await getT();
   const user = await getSession();
   if (!user || !canManageEmployeeFiles(user)) return { error: t.validation.invalidData };
-  if (!EMPLOYEE_DOCUMENT_TYPES.includes(type) || !canBeRequired(type)) return { error: t.validation.invalidData };
+  if (!canAcknowledgmentBeRequired(key)) return { error: t.validation.invalidData };
   if (!(await canViewEmployee(user, employeeId))) return { error: t.validation.employeeNotFound };
 
   const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });
   if (!employee) return { error: t.validation.employeeNotFound };
 
-  const current = requiredDocumentTypes({
-    gender: employee.gender ?? undefined,
+  const typedKey = key as StandardAcknowledgmentKey;
+  const current = requiredAcknowledgmentKeys({
     isDriver: employee.isDriver,
-    requiredDocuments: parseRequiredDocuments(employee.requiredDocuments),
+    requiredAcknowledgments: parseRequiredAcknowledgments(employee.requiredAcknowledgments),
   });
-  if (current.includes(type) === required) return { success: true, message: t.documents.requirementSaved };
+  if (current.includes(typedKey) === required) return { success: true, message: t.documents.requirementSaved };
 
-  const next = withRequirement(current, type, required, defaultRequiredDocumentTypes({ gender: employee.gender ?? undefined, isDriver: employee.isDriver }));
+  const next = withAcknowledgmentRequirement(current, typedKey, required, defaultRequiredAcknowledgmentKeys(employee));
 
   await recordChange(
     {
       module: t.nav.employees,
       action: t.documents.auditRequirement,
-      newValue: `${t.documents.types[type]} — ${required ? t.documents.requiredLabel : t.documents.optionalLabel}`,
+      newValue: `${t.acknowledgments.slots[typedKey]} — ${required ? t.documents.requiredLabel : t.documents.optionalLabel}`,
       reason: `${employee.name} (${employee.employeeNumber})`,
     },
     (tx) =>
       tx.employee.update({
         where: { id: employeeId },
-        data: { requiredDocuments: next ?? Prisma.DbNull },
+        data: { requiredAcknowledgments: next ?? Prisma.DbNull },
       }),
   );
 

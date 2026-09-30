@@ -5,6 +5,7 @@ import { formatEGP } from "@/lib/constants";
 import { today } from "@/lib/today";
 import { payday, payPeriodOf, payPeriodRange } from "@/lib/pay-rules";
 import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
+import { missingAcknowledgmentKeys, requiredAcknowledgmentKeys } from "@/lib/acknowledgments";
 import { intlLocale } from "@/lib/i18n/format";
 import { getT, format } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
@@ -71,9 +72,11 @@ export default async function PayrollPage({
     ? []
     : db.employees
         .filter((e) => e.status !== "terminated")
-        .filter(
-          (e) => missingDocumentTypes(db.employeeDocuments.filter((d) => d.employeeId === e.id), requiredDocumentTypes(e)).length > 0,
-        )
+        .filter((e) => {
+          const missingDocs = missingDocumentTypes(db.employeeDocuments.filter((d) => d.employeeId === e.id), requiredDocumentTypes(e));
+          const missingAcks = missingAcknowledgmentKeys(db.employeeAcknowledgments.filter((a) => a.employeeId === e.id), requiredAcknowledgmentKeys(e));
+          return missingDocs.length > 0 || missingAcks.length > 0;
+        })
         .sort((a, b) => a.name.localeCompare(b.name, locale === "ar" ? "ar" : "en"));
 
   const dayFmt = new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "long", timeZone: "UTC" });

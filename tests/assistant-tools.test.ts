@@ -37,7 +37,7 @@ describe("get_employee", () => {
     const r = getEmployee(ctx, { query: "PROD-001" }) as { documents: { onFile: { files: number }[]; missing: string[] } };
     expect(r.documents.onFile).toContainEqual({ type: ar.documents.types.national_id_photo, files: 2 });
     expect(r.documents.missing).not.toContain(ar.documents.types.national_id_photo);
-    expect(r.documents.missing).toContain(ar.documents.types.work_contract);
+    expect(r.documents.missing).toContain(ar.documents.types.cv);
   });
 
   it("summarises the last 30 days of attendance, overtime and deductions", () => {
