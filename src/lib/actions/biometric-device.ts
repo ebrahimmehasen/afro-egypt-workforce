@@ -80,18 +80,36 @@ export async function updateDeviceConnection(_prev: ActionState, formData: FormD
   return { success: true, message: t.biometricDevice.connectionSaved };
 }
 
-export async function deleteDeviceUserAction(uid: number, displayName: string) {
+/** Deleting the person from the device entirely also clears any employee link to
+ * them (same cleanup as unlinkDeviceUserAction) — otherwise the employee is stuck
+ * "linked" to a device user id the device no longer has, which blocks them from
+ * ever showing up to be linked to a re-enrollment of the same person later. */
+export async function deleteDeviceUserAction(uid: number, userId: string, displayName: string) {
   const t = await getT();
   const denied = await guard(t);
   if (denied) return denied;
   try {
     await deleteDeviceUser(uid);
-    await logDeviceAction(t, t.auditActions.deleteDeviceUser, displayName);
-    revalidatePath(PATH);
-    return { success: true };
   } catch (e) {
     return { error: e instanceof Error ? e.message : t.biometricDevice.deviceUnreachable };
   }
+
+  const employee = await prisma.employee.findFirst({ where: { biometricDeviceUserId: userId, deletedAt: null } });
+  let detail = displayName;
+  if (employee) {
+    const { deleted } = await removeDeviceUserAttendance(employee.id, userId);
+    await prisma.employee.update({ where: { id: employee.id }, data: { biometricDeviceUserId: null, biometricLinkedAt: null } });
+    detail = `${displayName} (${employee.name}) — ${deleted} ${t.biometricDevice.recordsRemoved}`;
+  }
+
+  await logDeviceAction(t, t.auditActions.deleteDeviceUser, detail);
+  revalidatePath(PATH);
+  if (employee) {
+    revalidatePath(`/employees/${employee.employeeNumber}`);
+    revalidatePath("/attendance");
+    revalidatePath("/dashboard");
+  }
+  return { success: true };
 }
 
 export async function deleteDeviceFingerprintAction(uid: number, fingerIndex: number, displayName: string) {

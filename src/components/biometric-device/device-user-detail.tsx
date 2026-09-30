@@ -362,7 +362,7 @@ export function DeviceUserDetail({
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={() => run(
-                  () => deleteDeviceUserAction(user.uid, user.name),
+                  () => deleteDeviceUserAction(user.uid, user.userId, user.name),
                   t.common.delete,
                   () => router.push("/biometric-device"),
                 )}
