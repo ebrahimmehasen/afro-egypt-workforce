@@ -11,6 +11,7 @@ import { initAttendanceRealtime } from "@/lib/attendance-realtime";
 // generation worker just to render it - NEXT_PHASE distinguishes that from
 // an actual running server, so the real-time listener isn't started (and
 // immediately discarded) a dozen times during every build.
-if (process.env.NEXT_PHASE !== "phase-production-build") {
+// Vercel cannot reach the device on the factory LAN, and the listener would hold DB connections on every serverless instance.
+if (process.env.NEXT_PHASE !== "phase-production-build" && !process.env.VERCEL) {
   initAttendanceRealtime();
 }
