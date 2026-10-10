@@ -30,7 +30,6 @@ export interface EntryContext {
   day?: EntryDay;
 }
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -78,7 +77,6 @@ function useParts(ctx: EntryContext) {
           <Row label={t.entryDetails.scheduled}>
             <span dir="ltr">{timeFmt(ctx.day.scheduledStart)} → {timeFmt(ctx.day.scheduledEnd)}</span>
           </Row>
-          <Row label={t.entryDetails.workedHours}>{round2(ctx.day.workedMinutes / 60)}</Row>
           <Row label={t.entryDetails.lateMinutes}>{ctx.day.lateMinutes || "—"}</Row>
           <Row label={t.entryDetails.dayStatus}><AttendanceStatusBadge status={ctx.day.status as never} /></Row>
         </>

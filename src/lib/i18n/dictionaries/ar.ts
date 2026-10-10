@@ -716,7 +716,6 @@ export const ar: Dictionary = {
     createdAt: "اتسجّل في",
     checkIn: "الحضور",
     checkOut: "الانصراف",
-    workedHours: "ساعات العمل",
     lateMinutes: "التأخير (دقيقة)",
     scheduled: "مواعيد اليوم",
     dayStatus: "حالة اليوم",

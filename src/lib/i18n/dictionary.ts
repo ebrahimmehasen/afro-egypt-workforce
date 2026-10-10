@@ -717,7 +717,6 @@ export interface Dictionary {
     createdAt: string;
     checkIn: string;
     checkOut: string;
-    workedHours: string;
     lateMinutes: string;
     scheduled: string;
     dayStatus: string;

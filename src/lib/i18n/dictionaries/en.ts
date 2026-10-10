@@ -716,7 +716,6 @@ export const en: Dictionary = {
     createdAt: "Recorded at",
     checkIn: "In",
     checkOut: "Out",
-    workedHours: "Hours worked",
     lateMinutes: "Late (minutes)",
     scheduled: "That day's times",
     dayStatus: "Day status",
