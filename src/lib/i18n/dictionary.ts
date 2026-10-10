@@ -515,7 +515,6 @@ export interface Dictionary {
     colOut: string;
     colLate: string;
     colEarlyLeave: string;
-    colWorkedHours: string;
     colStatus: string;
     colHours: string;
     colRate: string;

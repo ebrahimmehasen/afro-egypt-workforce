@@ -89,7 +89,6 @@ export function AttendanceReport({
     fmtTime(record.actualOut),
     record.deductibleLateMinutes,
     record.earlyLeaveMinutes,
-    (record.workedMinutes / 60).toFixed(1),
     attendanceStatusLabel(record.status, t),
   ]);
 
@@ -143,7 +142,7 @@ export function AttendanceReport({
           filename="attendance-report"
           headers={[
             t.reports.colEmployee, t.reports.colDate, t.reports.colIn, t.reports.colOut,
-            t.reports.colLate, t.reports.colEarlyLeave, t.reports.colWorkedHours, t.reports.colStatus,
+            t.reports.colLate, t.reports.colEarlyLeave, t.reports.colStatus,
           ]}
           rows={exportRows}
         />
@@ -162,7 +161,6 @@ export function AttendanceReport({
                 <TableHead>{t.reports.colOut}</TableHead>
                 <TableHead>{t.reports.colLate}</TableHead>
                 <TableHead>{t.reports.colEarlyLeave}</TableHead>
-                <TableHead>{t.reports.colWorkedHours}</TableHead>
                 <TableHead>{t.reports.colStatus}</TableHead>
               </TableRow>
             </TableHeader>
@@ -175,7 +173,6 @@ export function AttendanceReport({
                   <TableCell dir="ltr">{fmtTime(record.actualOut)}</TableCell>
                   <TableCell className="tabular-nums">{record.deductibleLateMinutes || "—"}</TableCell>
                   <TableCell className="tabular-nums">{record.earlyLeaveMinutes || "—"}</TableCell>
-                  <TableCell className="tabular-nums">{(record.workedMinutes / 60).toFixed(1)}</TableCell>
                   <TableCell><AttendanceStatusBadge status={record.status} /></TableCell>
                 </TableRow>
               ))}
