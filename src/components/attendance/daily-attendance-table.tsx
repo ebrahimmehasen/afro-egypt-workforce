@@ -12,6 +12,7 @@ import {
 import { AttendanceStatusBadge } from "@/components/shared/status-badge";
 import { CorrectAttendanceDialog } from "@/components/attendance/correct-attendance-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
+import { terminatedLast } from "@/lib/employee-order";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
@@ -57,7 +58,11 @@ export function DailyAttendanceTable({
           employee!.name.toLowerCase().includes(search.toLowerCase()) ||
           employee!.id.toLowerCase().includes(search.toLowerCase()),
       )
-      .sort((a, b) => a.employee!.name.localeCompare(b.employee!.name, locale === "ar" ? "ar" : "en"));
+      .sort(
+        (a, b) =>
+          terminatedLast(a.employee, b.employee) ||
+          a.employee!.name.localeCompare(b.employee!.name, locale === "ar" ? "ar" : "en"),
+      );
   }, [records, empMap, dept, status, search, locale]);
 
   return (

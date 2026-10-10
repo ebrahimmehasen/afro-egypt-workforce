@@ -2,6 +2,7 @@ import { FALLBACK_PAY_PERIOD_START_DAY, FALLBACK_WEEKLY_OFF_DAYS } from "@/lib/p
 import { prisma } from "@/lib/prisma";
 import { Store } from "@/lib/store";
 import { withOpenShift } from "@/lib/attendance-engine";
+import { terminatedLast } from "@/lib/employee-order";
 import { AttendanceLog, AuditLogEntry } from "@/lib/types";
 import {
   toAllowance,
@@ -88,7 +89,8 @@ export async function getDb(): Promise<Store> {
   ]);
 
   return {
-    employees: employees.map(toEmployee),
+    // terminated employees sink to the end of every list built from this (sort is stable, so the id order holds within each group)
+    employees: employees.map(toEmployee).sort(terminatedLast),
     departments: departments.map(toDepartment),
     shifts: shifts.map(toShift),
     // one-punch days of a shift still running read as present, see withOpenShift

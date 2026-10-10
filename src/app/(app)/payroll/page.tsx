@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/data";
+import { terminatedLast } from "@/lib/employee-order";
 import { requireAccess } from "@/lib/auth";
 import { hasPermission, isSelfService } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
@@ -58,7 +59,11 @@ export default async function PayrollPage({
         .filter((r) => r.periodId === period!.id)
         .map((r) => ({ record: r, employee: db.employees.find((e) => e.id === r.employeeId) }))
         .filter((x) => x.employee)
-        .sort((a, b) => a.employee!.name.localeCompare(b.employee!.name, locale === "ar" ? "ar" : "en"))
+        .sort(
+          (a, b) =>
+            terminatedLast(a.employee, b.employee) ||
+            a.employee!.name.localeCompare(b.employee!.name, locale === "ar" ? "ar" : "en"),
+        )
     : [];
 
   if (isSelfService(user) && user.employeeId) {

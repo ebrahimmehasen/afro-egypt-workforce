@@ -2,6 +2,7 @@
 
 import { Employee, PayrollRecord } from "@/lib/types";
 import { formatEGP } from "@/lib/constants";
+import { terminatedLast } from "@/lib/employee-order";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -22,8 +23,10 @@ export function PayrollReport({
   const t = useT();
   const locale = useLocale();
   const empMap = new Map(employees.map((e) => [e.id, e]));
-  const rows = [...records].sort((a, b) =>
-    (empMap.get(a.employeeId)?.name ?? "").localeCompare(empMap.get(b.employeeId)?.name ?? "", locale === "ar" ? "ar" : "en"),
+  const rows = [...records].sort(
+    (a, b) =>
+      terminatedLast(empMap.get(a.employeeId), empMap.get(b.employeeId)) ||
+      (empMap.get(a.employeeId)?.name ?? "").localeCompare(empMap.get(b.employeeId)?.name ?? "", locale === "ar" ? "ar" : "en"),
   );
 
   const exportRows = rows.map((r) => [
