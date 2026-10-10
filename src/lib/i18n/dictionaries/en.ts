@@ -515,7 +515,6 @@ export const en: Dictionary = {
     colOut: "Check Out",
     colLate: "Late",
     colEarlyLeave: "Early Leave",
-    colWorkedHours: "Worked Hours",
     colStatus: "Status",
     colHours: "Hours",
     colRate: "Hourly Rate",
