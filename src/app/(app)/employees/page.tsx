@@ -4,9 +4,8 @@ import { employeesInScope, viewerScope } from "@/lib/scope";
 import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
 import { missingAcknowledgmentKeys, requiredAcknowledgmentKeys } from "@/lib/acknowledgments";
 import { canUseAssistant, hasPermission } from "@/lib/permissions";
-import { getT, format } from "@/lib/i18n";
-import { PageHeader } from "@/components/shared/page-header";
-import { EmployeesTable } from "@/components/employees/employees-table";
+import { isArchived } from "@/lib/employee-order";
+import { EmployeesView } from "@/components/employees/employees-view";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
 import { employeeFormOptions, loadPayContext } from "@/lib/pay-context";
 import { EmployeeAssistant } from "@/components/assistant/employee-assistant";
@@ -14,11 +13,15 @@ import { EmployeeAssistant } from "@/components/assistant/employee-assistant";
 export default async function EmployeesPage() {
   const db = await getDb();
   const user = await requireAccess("/employees");
-  const t = await getT();
   const canEdit = hasPermission(user, "employees");
 
   const employees = employeesInScope(viewerScope(user, db.employees), db.employees);
   const formOptions = employeeFormOptions(await loadPayContext());
+
+  // Archived = archived by hand, or terminated a month or more ago (see isArchived). Only the viewer's own
+  // scope is looked at, so a department supervisor sees just their department's archive.
+  const now = new Date();
+  const archivedIds = employees.filter((e) => isArchived(e, now)).map((e) => e.id);
 
   const incompleteDocIds = employees
     .filter((e) => {
@@ -42,17 +45,14 @@ export default async function EmployeesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={t.employees.title}
-        description={format(t.employees.totalCount, { count: employees.length })}
-        actions={canEdit ? <EmployeeFormDialog departments={db.departments} shifts={db.shifts} {...formOptions} /> : null}
-      />
-      <EmployeesTable
+      <EmployeesView
         employees={employees}
+        archivedIds={archivedIds}
         departments={db.departments}
         shifts={db.shifts}
         incompleteDocIds={incompleteDocIds}
         photoUrls={photoUrls}
+        headerActions={canEdit ? <EmployeeFormDialog departments={db.departments} shifts={db.shifts} {...formOptions} /> : null}
       />
       {canUseAssistant(user) && <EmployeeAssistant />}
     </div>

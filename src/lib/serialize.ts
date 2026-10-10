@@ -64,6 +64,8 @@ export function toEmployee(e: PEmployee): Employee {
     allowances: e.allowancesTotal,
     biometricDeviceUserId: e.biometricDeviceUserId ?? undefined,
     status: e.status,
+    terminatedAt: e.terminatedAt ? iso(e.terminatedAt) : undefined,
+    archivedAt: e.archivedAt ? iso(e.archivedAt) : undefined,
     phone: e.phone ?? undefined,
     address: e.address ?? undefined,
     qualification: e.qualification ?? undefined,

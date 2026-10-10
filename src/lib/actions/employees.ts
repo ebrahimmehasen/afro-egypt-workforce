@@ -11,6 +11,8 @@ import { getT } from "@/lib/i18n";
 import { generateEmployeeNumber } from "@/lib/employee-number";
 import { invalidFieldsError } from "@/lib/validation";
 import { refreshPayCalculations } from "@/lib/pay-refresh";
+import { hasPermission } from "@/lib/permissions";
+import { isArchived } from "@/lib/employee-order";
 
 const employeeSchema = z
   .object({
@@ -233,6 +235,7 @@ export async function applyCreateEmployee(payload: EmployeePayload, actorName: s
           dailyRate: salaryType === "daily" ? dailyRate ?? null : null,
           hireDate: new Date(`${hireDate}T00:00:00.000Z`),
           allowancesTotal: allowances,
+          terminatedAt: rest.status === "terminated" ? new Date() : null,
         },
       });
     },
@@ -323,6 +326,11 @@ export async function applyUpdateEmployee(payload: EmployeePayload, actorName: s
           dailyRate: salaryType === "daily" ? dailyRate ?? null : null,
           hireDate: new Date(`${hireDate}T00:00:00.000Z`),
           allowancesTotal: allowances,
+          // The end-of-service date follows the status: stamped when it becomes terminated (an employee who
+          // already was keeps their original date), cleared the moment it is anything else.
+          terminatedAt: rest.status === "terminated" ? (before.status === "terminated" ? before.terminatedAt ?? new Date() : new Date()) : null,
+          // Changing the status to a working one also cancels an archive done by hand.
+          ...(before.status !== rest.status && rest.status !== "terminated" ? { archivedAt: null } : {}),
         },
       });
       await freezeLinkedAccountIfInactive(tx, id, updated.status);
@@ -351,41 +359,101 @@ async function freezeLinkedAccountIfInactive(
   await tx.user.updateMany({ where: { employeeId, active: true }, data: { active: false } });
 }
 
-/** Soft delete — the employee is archived (deletedAt set), not physically removed. */
-export async function deleteEmployee(id: string): Promise<ActionState> {
-  const t = await getT();
-  const removed = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
-  if (!removed) return { error: t.validation.employeeNotFound };
+/**
+ * Archive / unarchive an employee by hand. Both are ordinary edits, not deletes: they go through gate() (an
+ * "اداري" account's request waits for the admin unless it has directEdit), are audited old → new, and never
+ * touch the employee's attendance, pay or files. They need the same grant as editing an employee.
+ */
+async function archiveAllowed() {
   const actor = await getSession();
+  return actor && hasPermission(actor, "employees") ? actor : null;
+}
+
+export async function archiveEmployee(id: string): Promise<ActionState> {
+  const t = await getT();
+  const actor = await archiveAllowed();
+  if (!actor) return { error: t.validation.notAllowed };
+  const employee = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
+  if (!employee) return { error: t.validation.employeeNotFound };
+  if (isArchived(employee)) return { error: t.employees.alreadyArchived };
 
   return gate(
     {
-      actionKey: "employees.delete",
+      actionKey: "employees.archive",
       module: t.nav.employees,
-      actionLabel: t.auditActions.deleteEmployee,
-      summary: `${removed.name} (${removed.employeeNumber})`,
+      actionLabel: t.auditActions.archiveEmployee,
+      summary: `${employee.name} (${employee.employeeNumber})`,
       targetId: id,
     },
     { id },
-    () => applyDeleteEmployee({ id }, actor?.name ?? t.auditActions.system),
+    () => applyArchiveEmployee({ id }, actor.name),
   );
 }
 
-export async function applyDeleteEmployee(payload: { id: string }, actorName: string): Promise<ActionState> {
+export async function applyArchiveEmployee(payload: { id: string }, actorName: string): Promise<ActionState> {
   const t = await getT();
-  const removed = await prisma.employee.findFirst({ where: { id: payload.id, deletedAt: null } });
-  if (!removed) return { error: t.validation.employeeNotFound };
+  const employee = await prisma.employee.findFirst({ where: { id: payload.id, deletedAt: null } });
+  if (!employee) return { error: t.validation.employeeNotFound };
+  if (isArchived(employee)) return { error: t.employees.alreadyArchived };
 
   await recordChangeAs(
     actorName,
-    { module: t.nav.employees, action: t.auditActions.deleteEmployee, oldValue: `${removed.name} (${removed.employeeNumber})` },
-    async (tx) => {
-      const updated = await tx.employee.update({ where: { id: payload.id }, data: { deletedAt: new Date(), status: "terminated" } });
-      await freezeLinkedAccountIfInactive(tx, payload.id, updated.status);
-      return updated;
+    {
+      module: t.nav.employees,
+      action: t.auditActions.archiveEmployee,
+      oldValue: t.employees.notArchived,
+      newValue: t.employees.archivedBadge,
+      reason: `${employee.name} (${employee.employeeNumber})`,
     },
+    (tx) => tx.employee.update({ where: { id: employee.id }, data: { archivedAt: new Date() } }),
   );
 
   revalidatePath("/employees");
-  return { success: true };
+  revalidatePath(`/employees/${employee.employeeNumber}`);
+  return { success: true, message: t.employees.archivedEmployee };
+}
+
+export async function unarchiveEmployee(id: string): Promise<ActionState> {
+  const t = await getT();
+  const actor = await archiveAllowed();
+  if (!actor) return { error: t.validation.notAllowed };
+  const employee = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
+  if (!employee) return { error: t.validation.employeeNotFound };
+  // an archive done by the one-month rule has no switch to turn off: the employee comes back when the status changes
+  if (!employee.archivedAt) return { error: t.employees.unarchiveByStatus };
+
+  return gate(
+    {
+      actionKey: "employees.unarchive",
+      module: t.nav.employees,
+      actionLabel: t.auditActions.unarchiveEmployee,
+      summary: `${employee.name} (${employee.employeeNumber})`,
+      targetId: id,
+    },
+    { id },
+    () => applyUnarchiveEmployee({ id }, actor.name),
+  );
+}
+
+export async function applyUnarchiveEmployee(payload: { id: string }, actorName: string): Promise<ActionState> {
+  const t = await getT();
+  const employee = await prisma.employee.findFirst({ where: { id: payload.id, deletedAt: null } });
+  if (!employee) return { error: t.validation.employeeNotFound };
+  if (!employee.archivedAt) return { error: t.employees.unarchiveByStatus };
+
+  await recordChangeAs(
+    actorName,
+    {
+      module: t.nav.employees,
+      action: t.auditActions.unarchiveEmployee,
+      oldValue: t.employees.archivedBadge,
+      newValue: t.employees.notArchived,
+      reason: `${employee.name} (${employee.employeeNumber})`,
+    },
+    (tx) => tx.employee.update({ where: { id: employee.id }, data: { archivedAt: null } }),
+  );
+
+  revalidatePath("/employees");
+  revalidatePath(`/employees/${employee.employeeNumber}`);
+  return { success: true, message: t.employees.unarchivedEmployee };
 }

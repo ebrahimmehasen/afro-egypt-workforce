@@ -40,6 +40,8 @@ export interface Employee {
   allowances: number; // fixed monthly allowances total (for quick display; itemized in Allowance[])
   biometricDeviceUserId?: string; // linked from /biometric-device, not the employee form
   status: EmployeeStatus;
+  terminatedAt?: string; // ISO datetime — when the status last became "terminated"
+  archivedAt?: string; // ISO datetime — set when the employee was archived by hand
   phone?: string;
   address?: string;
   qualification?: string;

@@ -9,7 +9,7 @@ import { getT } from "@/lib/i18n";
 import { ActionState } from "@/hooks/use-action-feedback";
 
 import { applyCreateDepartment, applyUpdateDepartment, applyDeleteDepartment } from "@/lib/actions/departments";
-import { applyCreateEmployee, applyUpdateEmployee, applyDeleteEmployee } from "@/lib/actions/employees";
+import { applyCreateEmployee, applyUpdateEmployee, applyArchiveEmployee, applyUnarchiveEmployee } from "@/lib/actions/employees";
 import { applyCreateShift, applyUpdateShift } from "@/lib/actions/shifts";
 import { applyCreateDeduction, applyDeleteDeduction, applyUpdateDeduction } from "@/lib/actions/deductions";
 import { applyCreateAllowance, applyDeleteAllowance } from "@/lib/actions/allowances";
@@ -36,7 +36,8 @@ const APPLIERS: Record<string, (payload: unknown, actorName: string) => Promise<
   "departments.delete": (p, a) => applyDeleteDepartment(p as never, a),
   "employees.create": (p, a) => applyCreateEmployee(p as never, a),
   "employees.update": (p, a) => applyUpdateEmployee(p as never, a),
-  "employees.delete": (p, a) => applyDeleteEmployee(p as never, a),
+  "employees.archive": (p, a) => applyArchiveEmployee(p as never, a),
+  "employees.unarchive": (p, a) => applyUnarchiveEmployee(p as never, a),
   "shifts.create": (p, a) => applyCreateShift(p as never, a),
   "shifts.update": (p, a) => applyUpdateShift(p as never, a),
   "deductions.create": (p, a) => applyCreateDeduction(p as never, a),

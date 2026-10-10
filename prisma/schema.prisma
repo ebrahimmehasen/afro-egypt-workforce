@@ -275,6 +275,12 @@ model Employee {
   /// had no way to punch. Null for links made before this was tracked.
   biometricLinkedAt     DateTime?
   status                EmployeeStatus @default(active)
+  /// When the status last became "terminated" (null in any other status). Starts the month after which a
+  /// terminated employee counts as archived — see isArchived in src/lib/employee-order.ts.
+  terminatedAt          DateTime?
+  /// Set when someone archived this employee by hand. Independent of `deletedAt`, which no screen uses for
+  /// employees any more. Cleared by "unarchive", or when the status moves away from terminated.
+  archivedAt            DateTime?
   phone                 String?
   address               String?         @db.Text
   qualification         String?

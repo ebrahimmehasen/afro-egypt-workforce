@@ -220,11 +220,20 @@ export interface Dictionary {
     statusActive: string;
     statusOnLeave: string;
     statusTerminated: string;
-    deleteTitle: string;
-    deleteConfirm: string;
+    archiveTitle: string;
+    archiveConfirm: string;
+    archivedEmployee: string;
+    unarchiveTitle: string;
+    unarchivedEmployee: string;
+    unarchiveByStatus: string;
+    alreadyArchived: string;
+    archivedBadge: string;
+    notArchived: string;
+    archivedFilter: string;
+    archivedViewTitle: string;
+    backToActiveList: string;
     savedEmployee: string;
     savedEdits: string;
-    deletedEmployee: string;
     backToList: string;
     tabBasic: string;
     tabAttendance: string;
@@ -1029,7 +1038,8 @@ export interface Dictionary {
   auditActions: {
     addEmployee: string;
     editEmployee: string;
-    deleteEmployee: string;
+    archiveEmployee: string;
+    unarchiveEmployee: string;
     addDepartment: string;
     editDepartment: string;
     deleteDepartment: string;

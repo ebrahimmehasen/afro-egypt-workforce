@@ -14,7 +14,8 @@ import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
 import { missingAcknowledgmentKeys, requiredAcknowledgmentKeys } from "@/lib/acknowledgments";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
 import { EmployeeAssistant } from "@/components/assistant/employee-assistant";
-import { DeleteEmployeeButton } from "@/components/employees/delete-employee-button";
+import { ArchiveEmployeeButton } from "@/components/employees/archive-employee-button";
+import { isArchived, isManuallyArchived } from "@/lib/employee-order";
 import { DocumentsPanel } from "@/components/employees/documents-panel";
 import { AcknowledgmentsPanel } from "@/components/employees/acknowledgments-panel";
 import { FileWarning } from "lucide-react";
@@ -70,6 +71,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   const missingFilesCount = missingDocs.length + missingAcks.length;
   const canManageDocs = canManageEmployeeFiles(user);
   const canEdit = hasPermission(user, "employees");
+  const archived = isArchived(employee);
 
   // The daily pay breakdown, by this employee's pay type and times (all from settings), with any hand edit
   // of a posted entry shown next to what the system calculated.
@@ -124,7 +126,10 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
               <AvatarFallback className="text-lg">{employee.name.slice(0, 1)}</AvatarFallback>
             </Avatar>
             <div>
-              <h1 className="text-lg font-bold text-foreground">{employee.name}</h1>
+              <h1 className="flex flex-wrap items-center gap-2 text-lg font-bold text-foreground">
+                {employee.name}
+                {archived && <Badge variant="secondary">{t.employees.archivedBadge}</Badge>}
+              </h1>
               <p className="text-sm text-muted-foreground">
                 {translateLabel(employee.jobTitle, locale)} · {translateLabel(department?.name ?? "", locale)}
               </p>
@@ -345,7 +350,12 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
           <TabsContent value="actions">
             <Card>
               <CardContent className="flex flex-wrap items-center gap-3 p-5">
-                <DeleteEmployeeButton id={employee.id} name={employee.name} labeledTrigger redirectTo="/employees" />
+                <ArchiveEmployeeButton
+                  id={employee.id}
+                  name={employee.name}
+                  archived={archived}
+                  manuallyArchived={isManuallyArchived(employee)}
+                />
               </CardContent>
             </Card>
           </TabsContent>
