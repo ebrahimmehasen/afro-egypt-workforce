@@ -9,6 +9,7 @@ import { recordChangeAs } from "@/lib/audit";
 import { getT } from "@/lib/i18n";
 import { ACCEPTED_DOCUMENT_MIME, MAX_DOCUMENT_BYTES } from "@/lib/documents";
 import { DOCUMENT_STORAGE_ROOT } from "@/lib/document-storage";
+import { getDocumentThumbnail, removeDocumentThumbnail, THUMBNAIL_CONTENT_TYPE } from "@/lib/document-thumbnail";
 import { EMPLOYEE_DOCUMENT_TYPES, EmployeeDocumentType } from "@/lib/types";
 
 const EXT_BY_MIME: Record<string, string> = {
@@ -39,6 +40,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // Scoped to this employee so a valid id from another employee's file can't be read.
   const doc = await prisma.employeeDocument.findFirst({ where: { id: docId, employeeId: id } });
   if (!doc) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  // ?thumb=1 — a small cached preview instead of the original (list avatars). Images only.
+  if (req.nextUrl.searchParams.get("thumb") === "1") {
+    if (!doc.mimeType?.startsWith("image/")) return NextResponse.json({ error: "no thumbnail" }, { status: 404 });
+    try {
+      const thumb = await getDocumentThumbnail(doc.fileUrl);
+      return new NextResponse(new Uint8Array(thumb), {
+        headers: {
+          "Content-Type": THUMBNAIL_CONTENT_TYPE,
+          // the file behind a docId never changes, so the browser may reuse it for a while
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
+    } catch {
+      return NextResponse.json({ error: "file missing or unreadable" }, { status: 404 });
+    }
+  }
 
   try {
     const bytes = await readFile(path.join(DOCUMENT_STORAGE_ROOT, doc.fileUrl));
@@ -140,6 +158,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     (tx) => tx.employeeDocument.delete({ where: { id: doc.id } }),
   );
   await unlink(path.join(DOCUMENT_STORAGE_ROOT, doc.fileUrl)).catch(() => {});
+  await removeDocumentThumbnail(doc.fileUrl);
 
   return NextResponse.json({ ok: true });
 }

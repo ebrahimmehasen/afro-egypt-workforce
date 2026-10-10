@@ -29,9 +29,15 @@ export default async function EmployeesPage() {
     .map((e) => e.id);
 
   // The personal photo each employee uploaded under Documents (images only — a PDF can't be a thumbnail).
+  // `thumb=1` asks the documents route for the small cached copy rather than the full-size upload.
+  // Uploads aren't replaced in place, so an employee can have several — take the newest.
   const photoUrls: Record<string, string> = {};
+  const newest: Record<string, string> = {};
   for (const d of db.employeeDocuments) {
-    if (d.type === "personal_photo" && d.mimeType?.startsWith("image/")) photoUrls[d.employeeId] = d.fileUrl;
+    if (d.type !== "personal_photo" || !d.mimeType?.startsWith("image/")) continue;
+    if (newest[d.employeeId] && newest[d.employeeId] >= d.uploadedAt) continue;
+    newest[d.employeeId] = d.uploadedAt;
+    photoUrls[d.employeeId] = `${d.fileUrl}&thumb=1`;
   }
 
   return (
