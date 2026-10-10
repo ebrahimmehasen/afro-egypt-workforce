@@ -162,6 +162,7 @@ export interface Dictionary {
     noMatchDesc: string;
     colId: string;
     colName: string;
+    colPhoto: string;
     colDepartment: string;
     colJobTitle: string;
     colDevice: string;

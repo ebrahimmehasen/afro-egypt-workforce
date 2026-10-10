@@ -28,6 +28,12 @@ export default async function EmployeesPage() {
     })
     .map((e) => e.id);
 
+  // The personal photo each employee uploaded under Documents (images only — a PDF can't be a thumbnail).
+  const photoUrls: Record<string, string> = {};
+  for (const d of db.employeeDocuments) {
+    if (d.type === "personal_photo" && d.mimeType?.startsWith("image/")) photoUrls[d.employeeId] = d.fileUrl;
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -40,6 +46,7 @@ export default async function EmployeesPage() {
         departments={db.departments}
         shifts={db.shifts}
         incompleteDocIds={incompleteDocIds}
+        photoUrls={photoUrls}
       />
       {canUseAssistant(user) && <EmployeeAssistant />}
     </div>

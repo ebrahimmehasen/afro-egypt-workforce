@@ -9,6 +9,7 @@ import { deviceLink } from "@/lib/device-link";
 import { getDeviceUserNamesAction } from "@/lib/actions/device-users";
 import { unlinkDeviceUserAction } from "@/lib/actions/biometric-device";
 import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MultiSelectFilter } from "@/components/shared/multi-select-filter";
@@ -112,11 +113,14 @@ export function EmployeesTable({
   departments,
   shifts,
   incompleteDocIds = [],
+  photoUrls = {},
 }: {
   employees: Employee[];
   departments: Department[];
   shifts: Shift[];
   incompleteDocIds?: string[];
+  /** employee id → the personal photo uploaded under Documents */
+  photoUrls?: Record<string, string>;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -221,6 +225,7 @@ export function EmployeesTable({
             <TableHeader>
               <TableRow>
                 <TableHead>{t.employees.colId}</TableHead>
+                <TableHead className="w-12"><span className="sr-only">{t.employees.colPhoto}</span></TableHead>
                 <TableHead>{t.employees.colName}</TableHead>
                 <TableHead>{t.employees.colDepartment}</TableHead>
                 <TableHead>{t.employees.colJobTitle}</TableHead>
@@ -238,6 +243,12 @@ export function EmployeesTable({
                   className={isNewHire(e.hireDate, todayStr) ? "bg-gold-400/15 hover:bg-gold-400/25" : undefined}
                 >
                   <TableCell dir="ltr" className="font-mono text-xs tabular-nums">{e.employeeNumber}</TableCell>
+                  <TableCell className="w-12 pe-0">
+                    <Avatar className="h-8 w-8">
+                      {photoUrls[e.id] && <AvatarImage src={photoUrls[e.id]} alt="" loading="lazy" className="object-cover" />}
+                      <AvatarFallback className="text-xs">{e.name.slice(0, 1)}</AvatarFallback>
+                    </Avatar>
+                  </TableCell>
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-1.5">
                       {/* a real link keeps keyboard and middle-click working; the row click covers the rest */}

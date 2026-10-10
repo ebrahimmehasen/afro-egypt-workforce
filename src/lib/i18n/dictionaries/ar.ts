@@ -162,6 +162,7 @@ export const ar: Dictionary = {
     noMatchDesc: "جرّب تغيير كلمات البحث أو الفلاتر",
     colId: "الرقم الوظيفي",
     colName: "اسم الموظف",
+    colPhoto: "الصورة الشخصية",
     colDepartment: "القسم",
     colJobTitle: "الوظيفة",
     colDevice: "جهاز البصمة",

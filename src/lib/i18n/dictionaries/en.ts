@@ -162,6 +162,7 @@ export const en: Dictionary = {
     noMatchDesc: "Try changing your search or filters",
     colId: "Employee ID",
     colName: "Employee Name",
+    colPhoto: "Photo",
     colDepartment: "Department",
     colJobTitle: "Job Title",
     colDevice: "Fingerprint Device",
