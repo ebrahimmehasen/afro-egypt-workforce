@@ -289,7 +289,6 @@ export interface Dictionary {
     colOut: string;
     colLate: string;
     colEarlyLeave: string;
-    colWorkedHours: string;
     correctionAction: string;
     noRecordsToday: string;
     noRecordsTodayDesc: string;

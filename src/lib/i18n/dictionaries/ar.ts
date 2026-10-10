@@ -289,7 +289,6 @@ export const ar: Dictionary = {
     colOut: "الخروج",
     colLate: "التأخير",
     colEarlyLeave: "الانصراف المبكر",
-    colWorkedHours: "ساعات العمل",
     correctionAction: "تصحيح",
     noRecordsToday: "لا يوجد سجلات حضور لهذا اليوم",
     noRecordsTodayDesc: "جرّب اختيار تاريخ آخر",

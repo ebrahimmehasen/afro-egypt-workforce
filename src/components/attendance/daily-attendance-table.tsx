@@ -102,7 +102,6 @@ export function DailyAttendanceTable({
                 <TableHead>{t.attendance.colOut}</TableHead>
                 <TableHead>{t.attendance.colLate}</TableHead>
                 <TableHead>{t.attendance.colEarlyLeave}</TableHead>
-                <TableHead>{t.attendance.colWorkedHours}</TableHead>
                 <TableHead>{t.common.status}</TableHead>
                 {canCorrect && <TableHead className="text-end">{t.attendance.correctionAction}</TableHead>}
               </TableRow>
@@ -118,7 +117,6 @@ export function DailyAttendanceTable({
                   <TableCell className="tabular-nums" dir="ltr">{fmtTime(record.actualOut)}</TableCell>
                   <TableCell className="tabular-nums">{record.deductibleLateMinutes ? `${record.deductibleLateMinutes} ${t.common.minutes}` : "—"}</TableCell>
                   <TableCell className="tabular-nums">{record.earlyLeaveMinutes ? `${record.earlyLeaveMinutes} ${t.common.minutes}` : "—"}</TableCell>
-                  <TableCell className="tabular-nums">{record.workedMinutes ? `${(record.workedMinutes / 60).toFixed(1)} ${t.common.hours}` : "—"}</TableCell>
                   <TableCell><AttendanceStatusBadge status={record.status} /></TableCell>
                   {canCorrect && (
                     <TableCell className="text-end">
