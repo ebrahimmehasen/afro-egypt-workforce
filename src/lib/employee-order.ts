@@ -28,22 +28,44 @@ export const ARCHIVE_AFTER_DAYS = 30;
 /**
  * Is this employee archived? The one place that rule lives — every screen asks here.
  *
- * Archived means either someone archived them by hand (`archivedAt`), or they are terminated and
- * at least a month (30 days) has passed since their service ended (`terminatedAt`). The second
- * half is worked out from the clock on every read, so nothing has to run to archive anyone, and
- * moving the status back off "terminated" (which clears `terminatedAt`) un-archives them.
+ * Only a terminated employee can be archived, so an employee who is not terminated never is, whatever
+ * `archivedAt` still says. A terminated employee is archived when someone archived them by hand (`archivedAt`)
+ * or at least a month (30 days) has passed since their service ended (`terminatedAt`). The one-month half is
+ * worked out from the clock on every read, so nothing has to run to archive anyone, and moving the status
+ * back off "terminated" (which clears both dates) un-archives them.
  *
- * A terminated employee with no `terminatedAt` can't be dated, so they are not archived.
+ * A terminated employee with no `terminatedAt` and no `archivedAt` can't be dated, so is not archived.
  */
 export function isArchived(employee: ArchiveFields, now: Date = new Date()): boolean {
+  if (employee.status !== "terminated") return false;
   if (employee.archivedAt) return true;
-  if (employee.status !== "terminated" || !employee.terminatedAt) return false;
+  if (!employee.terminatedAt) return false;
   const ended = new Date(employee.terminatedAt).getTime();
   if (Number.isNaN(ended)) return false;
   return now.getTime() - ended >= ARCHIVE_AFTER_DAYS * 24 * 60 * 60 * 1000;
 }
 
-/** True when the employee is archived only because someone did it by hand (not by the one-month rule). */
-export function isManuallyArchived(employee: Pick<ArchiveFields, "archivedAt">): boolean {
-  return Boolean(employee.archivedAt);
+/** True when the employee is archived because someone did it by hand (not by the one-month rule). */
+export function isManuallyArchived(employee: ArchiveFields): boolean {
+  return employee.status === "terminated" && Boolean(employee.archivedAt);
+}
+
+/** May this employee be archived by hand right now? Only a terminated employee who isn't archived already. */
+export function canArchive(employee: ArchiveFields, now: Date = new Date()): boolean {
+  return employee.status === "terminated" && !isArchived(employee, now);
+}
+
+/**
+ * When an employee's status becomes "terminated" their fingerprint-device link is cleared — and ONLY the link
+ * (the two columns below). Their attendance, punches, pay and files are never touched, so the archived
+ * profile keeps its whole history. Returns the columns to write, or nothing when no change is due: the
+ * employee wasn't linked, or this edit isn't the moment they became terminated.
+ */
+export function deviceLinkClearOnTermination(
+  before: { status: EmployeeStatus; biometricDeviceUserId?: string | null },
+  nextStatus: EmployeeStatus,
+): { biometricDeviceUserId: null; biometricLinkedAt: null } | null {
+  if (nextStatus !== "terminated" || before.status === "terminated") return null;
+  if (!before.biometricDeviceUserId) return null;
+  return { biometricDeviceUserId: null, biometricLinkedAt: null };
 }

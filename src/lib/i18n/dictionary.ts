@@ -227,6 +227,7 @@ export interface Dictionary {
     unarchivedEmployee: string;
     unarchiveByStatus: string;
     alreadyArchived: string;
+    archiveOnlyTerminated: string;
     archivedBadge: string;
     notArchived: string;
     archivedFilter: string;
@@ -851,7 +852,9 @@ export interface Dictionary {
       workforce_cost: string;
       audit_log: string;
       settings: string;
+      biometric_device: string;
     };
+    biometricDeviceHint: string;
   };
   changeRequests: {
     title: string;
@@ -1088,6 +1091,7 @@ export interface Dictionary {
     clearDeviceLog: string;
     linkDeviceUser: string;
     unlinkDeviceUser: string;
+    unlinkDeviceOnTermination: string;
     renameDeviceUser: string;
     syncAttendance: string;
     pauseRealtimeSync: string;

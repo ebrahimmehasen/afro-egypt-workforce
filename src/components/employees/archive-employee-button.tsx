@@ -22,6 +22,7 @@ import {
 /**
  * The profile's "أرشفة الموظف" button (with a confirmation), or — for an employee someone archived by hand —
  * "إلغاء الأرشفة". An employee archived by the one-month rule gets neither switch: they come back through their status.
+ * Only a terminated employee can be archived, so the page only renders this for one (the server enforces it too).
  */
 export function ArchiveEmployeeButton({
   id,

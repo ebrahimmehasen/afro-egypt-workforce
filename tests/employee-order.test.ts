@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ARCHIVE_AFTER_DAYS, isArchived, isManuallyArchived, terminatedLast } from "@/lib/employee-order";
+import {
+  ARCHIVE_AFTER_DAYS, canArchive, deviceLinkClearOnTermination, isArchived, isManuallyArchived, terminatedLast,
+} from "@/lib/employee-order";
 import { employeesInScope, viewerScope } from "@/lib/scope";
 import type { Employee, EmployeeStatus, User } from "@/lib/types";
 
@@ -38,7 +40,21 @@ describe("isArchived", () => {
     expect(isArchived({ status: "active" }, NOW)).toBe(false);
   });
 
-  it("terminated less than a month ago is not archived — they stay at the end of the main list", () => {
+  it("an employee who is NOT terminated is never archived, even if archivedAt is still set", () => {
+    const archivedAt = daysAgo(1);
+    expect(isArchived({ status: "active", archivedAt }, NOW)).toBe(false);
+    expect(isArchived({ status: "on_leave", archivedAt }, NOW)).toBe(false);
+    expect(isManuallyArchived({ status: "active", archivedAt })).toBe(false);
+  });
+
+  it("terminated and archived by hand is archived", () => {
+    const archivedAt = daysAgo(1);
+    expect(isArchived({ status: "terminated", terminatedAt: daysAgo(2), archivedAt }, NOW)).toBe(true);
+    expect(isManuallyArchived({ status: "terminated", archivedAt })).toBe(true);
+    expect(isManuallyArchived({ status: "terminated" })).toBe(false);
+  });
+
+  it("terminated less than a month ago, with no archivedAt, is not archived — they stay at the end of the main list", () => {
     expect(isArchived({ status: "terminated", terminatedAt: daysAgo(5) }, NOW)).toBe(false);
     expect(isArchived({ status: "terminated", terminatedAt: daysAgo(ARCHIVE_AFTER_DAYS - 1) }, NOW)).toBe(false);
   });
@@ -48,18 +64,9 @@ describe("isArchived", () => {
     expect(isArchived({ status: "terminated", terminatedAt: daysAgo(400) }, NOW)).toBe(true);
   });
 
-  it("archived by hand is archived, whatever the status", () => {
-    const archivedAt = daysAgo(1);
-    expect(isArchived({ status: "active", archivedAt }, NOW)).toBe(true);
-    expect(isArchived({ status: "on_leave", archivedAt }, NOW)).toBe(true);
-    expect(isArchived({ status: "terminated", terminatedAt: daysAgo(2), archivedAt }, NOW)).toBe(true);
-    expect(isManuallyArchived({ archivedAt })).toBe(true);
-    expect(isManuallyArchived({})).toBe(false);
-  });
-
-  it("going back to active takes an archived employee out of the archive", () => {
-    // what the update action stores once the status leaves "terminated": terminatedAt and archivedAt cleared
-    const before = { status: "terminated" as const, terminatedAt: daysAgo(90) };
+  it("going back to a working status takes an archived employee out of the archive", () => {
+    // what the update action stores once the status leaves "terminated": both dates cleared
+    const before = { status: "terminated" as const, terminatedAt: daysAgo(90), archivedAt: daysAgo(10) };
     expect(isArchived(before, NOW)).toBe(true);
     const after = { status: "active" as const, terminatedAt: undefined, archivedAt: undefined };
     expect(isArchived(after, NOW)).toBe(false);
@@ -74,6 +81,48 @@ describe("isArchived", () => {
     const emp = { status: "terminated" as const, terminatedAt: daysAgo(10) };
     expect(isArchived(emp, NOW)).toBe(false);
     expect(isArchived(emp, new Date(NOW.getTime() + 21 * 24 * 60 * 60 * 1000))).toBe(true);
+  });
+});
+
+describe("canArchive — only a terminated employee can be archived by hand", () => {
+  const NOW = new Date("2026-10-11T12:00:00.000Z");
+  const recent = new Date(NOW.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString();
+
+  it("rejects an employee who is not terminated", () => {
+    expect(canArchive({ status: "active" }, NOW)).toBe(false);
+    expect(canArchive({ status: "on_leave" }, NOW)).toBe(false);
+  });
+
+  it("allows a terminated employee who isn't archived yet", () => {
+    expect(canArchive({ status: "terminated", terminatedAt: recent }, NOW)).toBe(true);
+  });
+
+  it("rejects one who is archived already", () => {
+    expect(canArchive({ status: "terminated", terminatedAt: recent, archivedAt: recent }, NOW)).toBe(false);
+  });
+});
+
+describe("deviceLinkClearOnTermination — ending service frees the fingerprint link and nothing else", () => {
+  it("clears exactly the two link columns when a linked employee becomes terminated", () => {
+    const patch = deviceLinkClearOnTermination({ status: "active", biometricDeviceUserId: "1001" }, "terminated");
+    expect(patch).toEqual({ biometricDeviceUserId: null, biometricLinkedAt: null });
+    // by construction the patch carries no attendance, pay or document field, so none of those can be touched
+    expect(Object.keys(patch!).sort()).toEqual(["biometricDeviceUserId", "biometricLinkedAt"]);
+  });
+
+  it("does nothing when the employee wasn't linked", () => {
+    expect(deviceLinkClearOnTermination({ status: "active", biometricDeviceUserId: null }, "terminated")).toBeNull();
+    expect(deviceLinkClearOnTermination({ status: "on_leave" }, "terminated")).toBeNull();
+  });
+
+  it("does nothing unless this edit is the moment they become terminated", () => {
+    expect(deviceLinkClearOnTermination({ status: "active", biometricDeviceUserId: "1001" }, "on_leave")).toBeNull();
+    // already terminated and somehow linked again: a plain edit must not silently unlink them
+    expect(deviceLinkClearOnTermination({ status: "terminated", biometricDeviceUserId: "1001" }, "terminated")).toBeNull();
+  });
+
+  it("does not link them back when they return to a working status", () => {
+    expect(deviceLinkClearOnTermination({ status: "terminated", biometricDeviceUserId: null }, "active")).toBeNull();
   });
 });
 
@@ -98,7 +147,7 @@ describe("the archive respects the viewer's scope", () => {
   const roster = [
     emp("A1", "D1"),
     emp("A2", "D1", { status: "terminated", terminatedAt: longAgo }),
-    emp("A3", "D1", { archivedAt: longAgo }),
+    emp("A3", "D1", { status: "terminated", terminatedAt: "2026-10-05T00:00:00.000Z", archivedAt: longAgo }),
     emp("B1", "D2", { status: "terminated", terminatedAt: longAgo }),
     emp("B2", "D2"),
   ];

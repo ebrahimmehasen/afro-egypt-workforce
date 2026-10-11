@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma, TransactionClient } from "@/lib/prisma";
-import { recordChangeAs } from "@/lib/audit";
+import { recordChangeAs, writeAudit } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
 import { gate } from "@/lib/change-requests";
 import { ActionState } from "@/hooks/use-action-feedback";
@@ -12,7 +12,7 @@ import { generateEmployeeNumber } from "@/lib/employee-number";
 import { invalidFieldsError } from "@/lib/validation";
 import { refreshPayCalculations } from "@/lib/pay-refresh";
 import { hasPermission } from "@/lib/permissions";
-import { isArchived } from "@/lib/employee-order";
+import { canArchive, deviceLinkClearOnTermination, isArchived } from "@/lib/employee-order";
 
 const employeeSchema = z
   .object({
@@ -329,10 +329,27 @@ export async function applyUpdateEmployee(payload: EmployeePayload, actorName: s
           // The end-of-service date follows the status: stamped when it becomes terminated (an employee who
           // already was keeps their original date), cleared the moment it is anything else.
           terminatedAt: rest.status === "terminated" ? (before.status === "terminated" ? before.terminatedAt ?? new Date() : new Date()) : null,
-          // Changing the status to a working one also cancels an archive done by hand.
-          ...(before.status !== rest.status && rest.status !== "terminated" ? { archivedAt: null } : {}),
+          // Only a terminated employee can be archived: any other status clears an archive done by hand, and
+          // becoming terminated starts without one (an employee who stays terminated keeps theirs).
+          ...(before.status === "terminated" && rest.status === "terminated" ? {} : { archivedAt: null }),
+          // Ending someone's service frees their fingerprint-device link in the same write. Only the link:
+          // their attendance, pay and files stay exactly as they were. (The device itself is not contacted.)
+          ...(deviceLinkClearOnTermination(before, rest.status) ?? {}),
         },
       });
+      if (deviceLinkClearOnTermination(before, rest.status)) {
+        await writeAudit(
+          tx,
+          {
+            module: t.nav.biometricDevice,
+            action: t.auditActions.unlinkDeviceOnTermination,
+            oldValue: `${before.name} (${before.employeeNumber}) — ${before.biometricDeviceUserId}`,
+            newValue: "-",
+            reason: t.employees.statusTerminated,
+          },
+          actorName,
+        );
+      }
       await freezeLinkedAccountIfInactive(tx, id, updated.status);
       return updated;
     },
@@ -376,6 +393,7 @@ export async function archiveEmployee(id: string): Promise<ActionState> {
   const employee = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
   if (!employee) return { error: t.validation.employeeNotFound };
   if (isArchived(employee)) return { error: t.employees.alreadyArchived };
+  if (!canArchive(employee)) return { error: t.employees.archiveOnlyTerminated };
 
   return gate(
     {
@@ -395,6 +413,8 @@ export async function applyArchiveEmployee(payload: { id: string }, actorName: s
   const employee = await prisma.employee.findFirst({ where: { id: payload.id, deletedAt: null } });
   if (!employee) return { error: t.validation.employeeNotFound };
   if (isArchived(employee)) return { error: t.employees.alreadyArchived };
+  // checked again here: a queued request may be approved after the employee's status changed
+  if (!canArchive(employee)) return { error: t.employees.archiveOnlyTerminated };
 
   await recordChangeAs(
     actorName,
@@ -420,7 +440,7 @@ export async function unarchiveEmployee(id: string): Promise<ActionState> {
   const employee = await prisma.employee.findFirst({ where: { id, deletedAt: null } });
   if (!employee) return { error: t.validation.employeeNotFound };
   // an archive done by the one-month rule has no switch to turn off: the employee comes back when the status changes
-  if (!employee.archivedAt) return { error: t.employees.unarchiveByStatus };
+  if (!employee.archivedAt || employee.status !== "terminated") return { error: t.employees.unarchiveByStatus };
 
   return gate(
     {
@@ -439,7 +459,7 @@ export async function applyUnarchiveEmployee(payload: { id: string }, actorName:
   const t = await getT();
   const employee = await prisma.employee.findFirst({ where: { id: payload.id, deletedAt: null } });
   if (!employee) return { error: t.validation.employeeNotFound };
-  if (!employee.archivedAt) return { error: t.employees.unarchiveByStatus };
+  if (!employee.archivedAt || employee.status !== "terminated") return { error: t.employees.unarchiveByStatus };
 
   await recordChangeAs(
     actorName,

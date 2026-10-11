@@ -18,15 +18,17 @@ export const PERMISSION_DEFS = [
   { key: "workforce_cost", path: "/workforce-cost" },
   { key: "audit_log", path: "/audit-log" },
   { key: "settings", path: "/settings" },
+  { key: "biometric_device", path: "/biometric-device" },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_DEFS)[number]["key"];
 export const PERMISSION_KEYS: PermissionKey[] = PERMISSION_DEFS.map((p) => p.key);
 
-// /biometric-device is never grantable — same tier as /users and /permissions.
+// /users, /permissions and /change-requests are never grantable — admin only. (/biometric-device is a
+// grantable page like the rest: it comes in through PERMISSION_DEFS.)
 const ADMIN_NAV = [
   "/dashboard", ...PERMISSION_DEFS.map((p) => p.path),
-  "/users", "/permissions", "/change-requests", "/biometric-device",
+  "/users", "/permissions", "/change-requests",
 ];
 const EMPLOYEE_NAV = ["/dashboard", "/attendance", "/leaves", "/payroll"];
 
@@ -72,8 +74,9 @@ export function canManagePermissions(role: Role): boolean {
   return role === "admin";
 }
 
-export function canManageBiometricDevice(role: Role): boolean {
-  return role === "admin";
+/** The fingerprint-device page and its actions: admin, or an account granted "جهاز البصمة". */
+export function canUseBiometricDevice(user: SessionLike): boolean {
+  return hasPermission(user, "biometric_device");
 }
 
 /** Roles whose access is governed by the per-user permissions checklist. */

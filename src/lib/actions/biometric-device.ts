@@ -3,9 +3,11 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { auditActor } from "@/lib/audit";
+import { auditActor, recordChangeAs } from "@/lib/audit";
+import { gate } from "@/lib/change-requests";
+import { canLinkDeviceEmployee } from "@/lib/scope";
 import { getSession } from "@/lib/auth";
-import { canManageBiometricDevice } from "@/lib/permissions";
+import { canUseBiometricDevice } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { syncDeviceAttendance, backfillDeviceUser } from "@/lib/attendance-sync";
 import { removeDeviceUserAttendance } from "@/lib/attendance-ingest";
@@ -31,11 +33,12 @@ const PATH = "/biometric-device";
  * Server Actions are directly callable HTTP endpoints regardless of what the
  * UI shows — the page's requireAccess() check alone doesn't stop a request
  * crafted straight at one of these, so every exported action here re-checks
- * the role itself before touching the device or the DB.
+ * the "جهاز البصمة" permission itself (admin, or an account granted it)
+ * before touching the device or the DB.
  */
 async function guard(t: Awaited<ReturnType<typeof getT>>) {
   const user = await getSession();
-  if (!user || !canManageBiometricDevice(user.role)) return { error: t.validation.invalidData };
+  if (!user || !canUseBiometricDevice(user)) return { error: t.validation.invalidData };
   return null;
 }
 
@@ -88,13 +91,17 @@ export async function deleteDeviceUserAction(uid: number, userId: string, displa
   const t = await getT();
   const denied = await guard(t);
   if (denied) return denied;
+  // The device user may be linked to an employee, and deleting it removes that link and the attendance behind it,
+  // so a scoped account can only do it for an employee inside its scope (checked before the device is touched).
+  const employee = await prisma.employee.findFirst({ where: { biometricDeviceUserId: userId, deletedAt: null } });
+  const actor = await getSession();
+  if (employee && !(actor && (await canLinkDeviceEmployee(actor, employee.id)))) return { error: t.validation.notAllowed };
   try {
     await deleteDeviceUser(uid);
   } catch (e) {
     return { error: e instanceof Error ? e.message : t.biometricDevice.deviceUnreachable };
   }
 
-  const employee = await prisma.employee.findFirst({ where: { biometricDeviceUserId: userId, deletedAt: null } });
   let detail = displayName;
   if (employee) {
     const { deleted } = await removeDeviceUserAttendance(employee.id, userId);
@@ -199,28 +206,73 @@ export async function updateDeviceUserNameAction(uid: number, newName: string, o
 
 /** Links a device user to an employee. If the device user was already linked to a
  * different employee, that link is cleared first (in the same transaction) so the
- * unique constraint on biometricDeviceUserId is never violated mid-swap. */
-export async function linkDeviceUserAction(deviceUserId: string, employeeId: string) {
+ * unique constraint on biometricDeviceUserId is never violated mid-swap.
+ *
+ * Changing an employee's link is an ordinary edit of their record: it goes through gate() (an admin or a
+ * directEdit account applies it now, anyone else's request waits for the admin), and a scoped account may
+ * only touch employees inside its scope - checked here on the server, for the employee being linked and for
+ * the one it would be taken from. */
+export async function linkDeviceUserAction(deviceUserId: string, employeeId: string): Promise<ActionState & { imported?: number }> {
   const t = await getT();
   const denied = await guard(t);
   if (denied) return denied;
+  const actor = await getSession();
+  const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });
+  if (!employee) return { error: t.validation.employeeNotFound };
+  const current = await prisma.employee.findFirst({
+    where: { biometricDeviceUserId: deviceUserId, id: { not: employeeId }, deletedAt: null },
+    select: { id: true },
+  });
+  if (!actor || !(await canLinkDeviceEmployee(actor, employeeId)) || (current && !(await canLinkDeviceEmployee(actor, current.id)))) {
+    return { error: t.validation.notAllowed };
+  }
+
+  return gate(
+    {
+      actionKey: "biometric.link",
+      module: t.nav.biometricDevice,
+      actionLabel: t.auditActions.linkDeviceUser,
+      summary: `${employee.name} (${employee.employeeNumber}) <- ${deviceUserId}`,
+      targetId: employeeId,
+    },
+    { deviceUserId, employeeId },
+    () => applyLinkDeviceUser({ deviceUserId, employeeId }, actor.name),
+  );
+}
+
+export async function applyLinkDeviceUser(
+  payload: { deviceUserId: string; employeeId: string },
+  actorName: string,
+): Promise<ActionState & { imported?: number }> {
+  const t = await getT();
+  const { deviceUserId, employeeId } = payload;
   const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });
   if (!employee) return { error: t.validation.employeeNotFound };
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const conflict = await tx.employee.findFirst({
-        where: { biometricDeviceUserId: deviceUserId, id: { not: employeeId }, deletedAt: null },
-      });
-      if (conflict) {
-        await tx.employee.update({ where: { id: conflict.id }, data: { biometricDeviceUserId: null, biometricLinkedAt: null } });
-      }
-      await tx.employee.update({
-        where: { id: employeeId },
-        // a re-link to the same device user keeps its original date
-        data: { biometricDeviceUserId: deviceUserId, ...(employee.biometricDeviceUserId === deviceUserId ? {} : { biometricLinkedAt: new Date() }) },
-      });
-    });
+    await recordChangeAs(
+      actorName,
+      {
+        module: t.nav.biometricDevice,
+        action: t.auditActions.linkDeviceUser,
+        oldValue: employee.biometricDeviceUserId ?? "-",
+        newValue: deviceUserId,
+        reason: `${employee.name} (${employee.employeeNumber})`,
+      },
+      async (tx) => {
+        const conflict = await tx.employee.findFirst({
+          where: { biometricDeviceUserId: deviceUserId, id: { not: employeeId }, deletedAt: null },
+        });
+        if (conflict) {
+          await tx.employee.update({ where: { id: conflict.id }, data: { biometricDeviceUserId: null, biometricLinkedAt: null } });
+        }
+        await tx.employee.update({
+          where: { id: employeeId },
+          // a re-link to the same device user keeps its original date
+          data: { biometricDeviceUserId: deviceUserId, ...(employee.biometricDeviceUserId === deviceUserId ? {} : { biometricLinkedAt: new Date() }) },
+        });
+      },
+    );
   } catch (e) {
     return { error: e instanceof Error ? e.message : t.biometricDevice.deviceUnreachable };
   }
@@ -237,7 +289,6 @@ export async function linkDeviceUserAction(deviceUserId: string, employeeId: str
     console.error("[biometric-device] backfill after link failed:", e instanceof Error ? e.message : e);
   }
 
-  await logDeviceAction(t, t.auditActions.linkDeviceUser, `${employee.name} <- ${deviceUserId} (${imported} ${t.biometricDevice.syncImported.toLowerCase()})`);
   revalidatePath(PATH);
   revalidatePath(`/employees/${employee.employeeNumber}`);
   revalidatePath("/attendance");
@@ -249,17 +300,52 @@ export async function linkDeviceUserAction(deviceUserId: string, employeeId: str
  * of it (source: "biometric" rows tied to this deviceUserId) - an unlink
  * means "this wasn't actually them", so their record shouldn't keep saying
  * otherwise. Manual HR corrections are untouched (they're not stored as
- * AttendanceLog rows at all). */
-export async function unlinkDeviceUserAction(deviceUserId: string) {
+ * AttendanceLog rows at all). Same gate() and scope rules as linking.
+ * (Ending an employee's service clears the link differently - see
+ * deviceLinkClearOnTermination - and keeps their attendance.) */
+export async function unlinkDeviceUserAction(deviceUserId: string): Promise<ActionState & { deleted?: number }> {
   const t = await getT();
   const denied = await guard(t);
   if (denied) return denied;
+  const actor = await getSession();
+  const employee = await prisma.employee.findFirst({ where: { biometricDeviceUserId: deviceUserId, deletedAt: null } });
+  if (!employee) return { error: t.validation.employeeNotFound };
+  if (!actor || !(await canLinkDeviceEmployee(actor, employee.id))) return { error: t.validation.notAllowed };
+
+  return gate(
+    {
+      actionKey: "biometric.unlink",
+      module: t.nav.biometricDevice,
+      actionLabel: t.auditActions.unlinkDeviceUser,
+      summary: `${employee.name} (${employee.employeeNumber}) - ${deviceUserId}`,
+      targetId: employee.id,
+    },
+    { deviceUserId },
+    () => applyUnlinkDeviceUser({ deviceUserId }, actor.name),
+  );
+}
+
+export async function applyUnlinkDeviceUser(
+  payload: { deviceUserId: string },
+  actorName: string,
+): Promise<ActionState & { deleted?: number }> {
+  const t = await getT();
+  const { deviceUserId } = payload;
   const employee = await prisma.employee.findFirst({ where: { biometricDeviceUserId: deviceUserId, deletedAt: null } });
   if (!employee) return { error: t.validation.employeeNotFound };
 
   const { deleted } = await removeDeviceUserAttendance(employee.id, deviceUserId);
-  await prisma.employee.update({ where: { id: employee.id }, data: { biometricDeviceUserId: null, biometricLinkedAt: null } });
-  await logDeviceAction(t, t.auditActions.unlinkDeviceUser, `${employee.name} (${deviceUserId}) — ${deleted} ${t.biometricDevice.recordsRemoved}`);
+  await recordChangeAs(
+    actorName,
+    {
+      module: t.nav.biometricDevice,
+      action: t.auditActions.unlinkDeviceUser,
+      oldValue: deviceUserId,
+      newValue: "-",
+      reason: `${employee.name} (${employee.employeeNumber}) - ${deleted} ${t.biometricDevice.recordsRemoved}`,
+    },
+    (tx) => tx.employee.update({ where: { id: employee.id }, data: { biometricDeviceUserId: null, biometricLinkedAt: null } }),
+  );
   revalidatePath(PATH);
   revalidatePath("/employees");
   revalidatePath(`/employees/${employee.employeeNumber}`);

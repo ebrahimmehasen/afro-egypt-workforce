@@ -72,6 +72,8 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   const canManageDocs = canManageEmployeeFiles(user);
   const canEdit = hasPermission(user, "employees");
   const archived = isArchived(employee);
+  // The Actions tab holds only the archive / unarchive switch, and only a terminated employee has one.
+  const showActions = canEdit && employee.status === "terminated";
 
   // The daily pay breakdown, by this employee's pay type and times (all from settings), with any hand edit
   // of a posted entry shown next to what the system calculated.
@@ -158,7 +160,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
           <TabsTrigger value="overtime">{t.employees.tabOvertime}</TabsTrigger>
           <TabsTrigger value="deductions">{t.employees.tabDeductions}</TabsTrigger>
           <TabsTrigger value="payroll">{t.employees.tabPayroll}</TabsTrigger>
-          {canEdit && <TabsTrigger value="actions">{t.common.actions}</TabsTrigger>}
+          {showActions && <TabsTrigger value="actions">{t.common.actions}</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="documents" className="flex flex-col gap-4">
@@ -346,7 +348,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
           </Card>
         </TabsContent>
 
-        {canEdit && (
+        {showActions && (
           <TabsContent value="actions">
             <Card>
               <CardContent className="flex flex-wrap items-center gap-3 p-5">

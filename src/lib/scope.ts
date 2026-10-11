@@ -1,5 +1,5 @@
 import { Employee, User } from "@/lib/types";
-import { isSelfService } from "@/lib/permissions";
+import { hasPermission, isSelfService } from "@/lib/permissions";
 import { Store } from "@/lib/store";
 import { prisma } from "@/lib/prisma";
 
@@ -53,6 +53,14 @@ export async function canViewEmployee(user: User, employeeId: string): Promise<b
 }
 
 /** Narrow an employee list to the scope. */
+/**
+ * May this user link (or unlink) this employee to a fingerprint-device user? They need the device permission
+ * AND the employee must be inside their scope — a department supervisor links only their own department.
+ */
+export async function canLinkDeviceEmployee(user: User, employeeId: string): Promise<boolean> {
+  return hasPermission(user, "biometric_device") && (await canViewEmployee(user, employeeId));
+}
+
 export function employeesInScope(scope: Scope, employees: Employee[]): Employee[] {
   return scope.all ? employees : employees.filter((e) => scope.ids.has(e.id));
 }

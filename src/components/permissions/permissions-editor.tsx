@@ -99,6 +99,9 @@ export function PermissionsEditor({
                 </label>
               ))}
             </div>
+            {keys.includes("biometric_device") && (
+              <p className="text-xs text-muted-foreground">{t.permissions.biometricDeviceHint}</p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 border-t border-border pt-3">
