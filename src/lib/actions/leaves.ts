@@ -14,7 +14,7 @@ import { ActionState } from "@/hooks/use-action-feedback";
 import { getT, format } from "@/lib/i18n";
 import { dayStr } from "@/lib/serialize";
 import { checkAnnualLeaveRequest } from "@/lib/leave-balance";
-import { loadOffDayRule } from "@/lib/leave-days";
+import { loadBalanceInputs, loadDayKindRule } from "@/lib/leave-days";
 import { leaveTypeLabel } from "@/lib/i18n/labels";
 
 const leaveSchema = z.object({
@@ -42,37 +42,39 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
     if (!own) return { error: t.validation.notAllowed };
   }
 
-  // Annual leave is bounded by the employee's balance. Enforced here for every way a request arrives — the
-  // employee filing for themselves or someone else filing for them — not just by what the form shows.
+  // Annual leave is checked against the employee's balance, for every way a request arrives — the employee filing
+  // for themselves or someone else filing for them — not just by what the form shows. Days the balance can't
+  // cover are still accepted: they are charged to pay by the absence table when they come.
+  let submittedMessage = t.leaves.submitted;
   if (parsed.data.type === "annual") {
     const employee = await prisma.employee.findFirst({ where: { id: parsed.data.employeeId, deletedAt: null } });
     if (!employee) return { error: t.validation.employeeNotFound };
-    const onFile = await prisma.leave.findMany({
-      where: { employeeId: employee.id, type: "annual", status: { not: "rejected" } },
-      select: { type: true, status: true, from: true, to: true },
-    });
-    // the weekly day off and public holidays inside the leave are not charged to the balance
-    const isOffDay = await loadOffDayRule();
+    const year = Number(parsed.data.from.slice(0, 4));
+    const [{ leaves, absentDays }, kindOf] = await Promise.all([loadBalanceInputs(employee.id, year), loadDayKindRule()]);
     const check = checkAnnualLeaveRequest({
       hireDate: dayStr(employee.hireDate),
-      leaves: onFile.map((l) => ({ type: l.type, status: l.status, from: dayStr(l.from), to: dayStr(l.to) })),
+      leaves,
+      absentDays,
       from: parsed.data.from,
       to: parsed.data.to,
       now: new Date(),
-      isOffDay,
+      kindOf,
     });
+    const b = t.leaves.balance;
     if (!check.ok) {
-      const b = t.leaves.balance;
       const message = {
         invalid_days: b.errInvalidDays,
         no_working_days: b.errNoWorkingDays,
         not_eligible: format(b.errNotEligible, { date: check.balance.eligibleOn }),
         other_year: b.errOtherYear,
         notice: b.errNotice,
-        exceeds_balance: format(b.errExceeds, { available: check.balance.availableDays, requested: check.days }),
       }[check.reason];
       return { error: message };
     }
+    submittedMessage =
+      check.fromPay > 0
+        ? format(b.submittedPartlyFromPay, { days: check.days, fromBalance: check.fromBalance, fromPay: check.fromPay })
+        : format(b.submittedFromBalance, { days: check.days });
   }
 
   await prisma.leave.create({
@@ -87,7 +89,7 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
     },
   });
   revalidatePath("/leaves");
-  return { success: true, message: t.leaves.submitted };
+  return { success: true, message: submittedMessage };
 }
 
 type LeaveDecisionPayload = { id: string; decision: "approved" | "rejected" };

@@ -372,7 +372,9 @@ export interface Dictionary {
       errNotEligible: string;
       errOtherYear: string;
       errNotice: string;
-      errExceeds: string;
+      chargedToPay: string;
+      submittedFromBalance: string;
+      submittedPartlyFromPay: string;
     };
   };
   overtime: {

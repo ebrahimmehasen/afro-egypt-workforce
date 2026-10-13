@@ -30,10 +30,10 @@ import {
 import { DayPayCard } from "@/components/employees/day-pay-card";
 import { prisma } from "@/lib/prisma";
 import { dayStr } from "@/lib/serialize";
-import { annualLeaveBalance } from "@/lib/leave-balance";
+import { annualLeaveBalance, leaveCharges, type DayCharge } from "@/lib/leave-balance";
 import { LeaveBalanceCard } from "@/components/leaves/leave-balance-card";
 import { today } from "@/lib/today";
-import { loadOffDayRule } from "@/lib/leave-days";
+import { loadDayKindRule, trackedAbsentDays } from "@/lib/leave-days";
 import { dayPayRows } from "@/lib/day-pay-view";
 import { employeeFormOptions, kindOf, loadPayContext, rulesFor, scheduleFor } from "@/lib/pay-context";
 
@@ -76,13 +76,30 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   const canManageDocs = canManageEmployeeFiles(user);
   const canEdit = hasPermission(user, "employees");
   const archived = isArchived(employee);
-  // Annual-leave balance, worked out now from the hire date and this employee's annual leaves (db is already scoped).
-  const leaveBalance = annualLeaveBalance(
-    employee.hireDate,
-    db.leaves.filter((l) => l.employeeId === employee.id),
-    today(),
-    await loadOffDayRule(),
-  );
+  // Annual-leave balance, worked out now from the hire date, this employee's leaves and the days they were absent
+  // (db is already scoped). The same inputs settle, day by day, which absences the balance paid for.
+  const dayKindOf = await loadDayKindRule();
+  const balanceLeaves = db.leaves.filter((l) => l.employeeId === employee.id);
+  const absentDays = trackedAbsentDays(db.dailyAttendance.filter((a) => a.employeeId === employee.id));
+  const todayStr = today();
+  const leaveBalance = annualLeaveBalance({
+    hireDate: employee.hireDate,
+    leaves: balanceLeaves,
+    absentDays,
+    asOf: todayStr,
+    kindOf: dayKindOf,
+  });
+  const chargesByYear = new Map<number, Map<string, DayCharge>>();
+  const chargeFor = (date: string) => {
+    const year = Number(date.slice(0, 4));
+    if (!chargesByYear.has(year)) {
+      chargesByYear.set(
+        year,
+        leaveCharges({ hireDate: employee.hireDate, leaves: balanceLeaves, absentDays, year, upTo: todayStr, kindOf: dayKindOf }),
+      );
+    }
+    return chargesByYear.get(year)!.get(date);
+  };
   // The Actions tab holds only the archive / unarchive switch, and only a terminated employee has one.
   const showActions = canEdit && employee.status === "terminated";
 
@@ -115,6 +132,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
       kind: kindOf(ctx, a.date),
     })),
     leaveFor: (date) => leaves.find((l) => dayStr(l.from) <= date && dayStr(l.to) >= date) ?? null,
+    chargeFor,
     posted: [...posted[0], ...posted[1]].map((p) => ({
       systemKey: p.systemKey!,
       amount: p.amount,

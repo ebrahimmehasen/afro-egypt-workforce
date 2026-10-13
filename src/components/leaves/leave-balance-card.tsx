@@ -29,6 +29,9 @@ export function LeaveBalanceCard({ balance, className }: { balance: LeaveBalance
             <Stat label={b.accrued} value={balance.accruedDays} unit={b.daysUnit} />
             <Stat label={b.used} value={balance.usedDays} unit={b.daysUnit} />
           </dl>
+          {balance.chargedToPayDays > 0 && (
+            <p className="text-xs text-warning">{format(b.chargedToPay, { days: balance.chargedToPayDays })}</p>
+          )}
           <p className="text-[11px] text-muted-foreground">{b.offDaysHint} {b.fractionHint}</p>
         </>
       ) : (

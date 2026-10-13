@@ -1,6 +1,7 @@
 import { AttendanceDay, systemEntriesFor, systemKey } from "@/lib/attendance-deductions";
 import { DayKind, LeaveForAbsence, PayTypeRules, ScheduleTimes, computeDayPay } from "@/lib/pay-engine";
 import { PayEmployee } from "@/lib/pay-context";
+import type { DayCharge } from "@/lib/leave-balance";
 
 /** A posted system entry as stored, including one that was edited or removed by hand. */
 export interface PostedEntry {
@@ -54,11 +55,13 @@ export function dayPayRows(opts: {
   days: (AttendanceDay & { kind: DayKind })[];
   leaveFor: (date: string) => (LeaveForAbsence & { type: string }) | null;
   posted: PostedEntry[];
+  /** what the annual-leave balance made of a day of absence (see leaveCharges) — the same answer the posting job uses */
+  chargeFor?: (date: string) => DayCharge | undefined;
 }): DayPayRow[] {
   const byKey = new Map(opts.posted.map((p) => [p.systemKey, p]));
   return opts.days.map((day) => {
     const leave = opts.leaveFor(day.date);
-    const entries = systemEntriesFor(day, opts.employee, opts.rules, opts.schedule, day.kind, leave);
+    const entries = systemEntriesFor(day, opts.employee, opts.rules, opts.schedule, day.kind, leave, opts.chargeFor?.(day.date));
     const pay = computeDayPay({
       date: day.date,
       kind: day.kind,
