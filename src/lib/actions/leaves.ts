@@ -14,6 +14,7 @@ import { ActionState } from "@/hooks/use-action-feedback";
 import { getT, format } from "@/lib/i18n";
 import { dayStr } from "@/lib/serialize";
 import { checkAnnualLeaveRequest } from "@/lib/leave-balance";
+import { loadOffDayRule } from "@/lib/leave-days";
 import { leaveTypeLabel } from "@/lib/i18n/labels";
 
 const leaveSchema = z.object({
@@ -50,17 +51,21 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
       where: { employeeId: employee.id, type: "annual", status: { not: "rejected" } },
       select: { type: true, status: true, from: true, to: true },
     });
+    // the weekly day off and public holidays inside the leave are not charged to the balance
+    const isOffDay = await loadOffDayRule();
     const check = checkAnnualLeaveRequest({
       hireDate: dayStr(employee.hireDate),
       leaves: onFile.map((l) => ({ type: l.type, status: l.status, from: dayStr(l.from), to: dayStr(l.to) })),
       from: parsed.data.from,
       to: parsed.data.to,
       now: new Date(),
+      isOffDay,
     });
     if (!check.ok) {
       const b = t.leaves.balance;
       const message = {
         invalid_days: b.errInvalidDays,
+        no_working_days: b.errNoWorkingDays,
         not_eligible: format(b.errNotEligible, { date: check.balance.eligibleOn }),
         other_year: b.errOtherYear,
         notice: b.errNotice,

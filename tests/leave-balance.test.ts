@@ -213,3 +213,52 @@ describe("filing an annual leave", () => {
     expect(UNITS_PER_DAY).toBe(4);
   });
 });
+
+describe("Fridays and public holidays are not charged to the balance", () => {
+  const FRIDAY = 5;
+  const holidays = [{ from: "2026-10-21", to: "2026-10-21" }]; // a Wednesday
+  const isOffDay = (day: string) =>
+    new Date(`${day}T00:00:00Z`).getUTCDay() === FRIDAY || holidays.some((h) => day >= h.from && day <= h.to);
+
+  it("a request spanning a Friday is shorter by that Friday", () => {
+    // Sun 18 Oct .. Sat 24 Oct is 7 calendar days, one of them Friday 23 Oct
+    expect(requestDays("2026-10-18", "2026-10-24")).toBe(7);
+    expect(requestDays("2026-10-18", "2026-10-24", isOffDay)).toBe(5); // minus Friday 23 and the holiday on Wed 21
+  });
+
+  it("a public holiday inside the range is not charged either", () => {
+    expect(requestDays("2026-10-20", "2026-10-22", isOffDay)).toBe(2); // Tue, (Wed holiday), Thu
+  });
+
+  it("the days already on file are counted the same way, so a Friday in an old leave isn't deducted", () => {
+    const leaves = [annual("2026-10-18", "2026-10-24", "pending")];
+    const withRule = annualLeaveBalance("2024-01-01", leaves, "2026-10-13", isOffDay);
+    const withoutRule = annualLeaveBalance("2024-01-01", leaves, "2026-10-13");
+    expect(withoutRule.usedDays).toBe(7);
+    expect(withRule.usedDays).toBe(5);
+    expect(withRule.balanceDays).toBe(withRule.accruedDays - 5);
+  });
+
+  it("asking for exactly the available working days works even when Fridays sit inside the range", () => {
+    const now = new Date(2026, 9, 13, 12, 0, 0);
+    // hired 2024-01-01 -> 10 months accrued = 17.5 days, 17 available. 18 Oct..14 Nov is 28 calendar days;
+    // minus 4 Fridays (23, 30 Oct, 6, 13 Nov) and 1 holiday (21 Oct) = 23 working days -> too many.
+    expect(
+      checkAnnualLeaveRequest({ hireDate: "2024-01-01", leaves: [], from: "2026-10-18", to: "2026-11-14", now, isOffDay }),
+    ).toMatchObject({ ok: false, reason: "exceeds_balance", days: 23 });
+    // 18 Oct..7 Nov is 21 calendar days, minus 3 Fridays (23, 30 Oct, 6 Nov) and the holiday = 17 -> exactly the balance
+    const ok = checkAnnualLeaveRequest({ hireDate: "2024-01-01", leaves: [], from: "2026-10-18", to: "2026-11-07", now, isOffDay });
+    expect(ok.ok).toBe(true);
+    expect(ok.days).toBe(17);
+  });
+
+  it("a period that is nothing but a Friday or a holiday has no day to charge and is refused with its own reason", () => {
+    const now = new Date(2026, 9, 13, 12, 0, 0);
+    expect(
+      checkAnnualLeaveRequest({ hireDate: "2024-01-01", leaves: [], from: "2026-10-23", to: "2026-10-23", now, isOffDay }),
+    ).toMatchObject({ ok: false, reason: "no_working_days" });
+    expect(
+      checkAnnualLeaveRequest({ hireDate: "2024-01-01", leaves: [], from: "2026-10-21", to: "2026-10-21", now, isOffDay }),
+    ).toMatchObject({ ok: false, reason: "no_working_days" });
+  });
+});

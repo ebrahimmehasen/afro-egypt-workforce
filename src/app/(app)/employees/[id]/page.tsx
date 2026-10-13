@@ -33,6 +33,7 @@ import { dayStr } from "@/lib/serialize";
 import { annualLeaveBalance } from "@/lib/leave-balance";
 import { LeaveBalanceCard } from "@/components/leaves/leave-balance-card";
 import { today } from "@/lib/today";
+import { loadOffDayRule } from "@/lib/leave-days";
 import { dayPayRows } from "@/lib/day-pay-view";
 import { employeeFormOptions, kindOf, loadPayContext, rulesFor, scheduleFor } from "@/lib/pay-context";
 
@@ -80,6 +81,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
     employee.hireDate,
     db.leaves.filter((l) => l.employeeId === employee.id),
     today(),
+    await loadOffDayRule(),
   );
   // The Actions tab holds only the archive / unarchive switch, and only a terminated employee has one.
   const showActions = canEdit && employee.status === "terminated";

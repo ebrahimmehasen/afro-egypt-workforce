@@ -367,6 +367,8 @@ export interface Dictionary {
       fractionHint: string;
       notEligible: string;
       errInvalidDays: string;
+      errNoWorkingDays: string;
+      offDaysHint: string;
       errNotEligible: string;
       errOtherYear: string;
       errNotice: string;

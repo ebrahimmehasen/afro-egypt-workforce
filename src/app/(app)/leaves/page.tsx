@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { annualLeaveBalance, type LeaveBalance } from "@/lib/leave-balance";
 import { today } from "@/lib/today";
+import { loadOffDayRule } from "@/lib/leave-days";
 import { PageHeader } from "@/components/shared/page-header";
 import { LeaveFormDialog } from "@/components/leaves/leave-form-dialog";
 import { LeavesTable } from "@/components/leaves/leaves-table";
@@ -20,12 +21,14 @@ export default async function LeavesPage() {
 
   // Each visible employee's annual-leave balance, worked out now from the hire date and their annual leaves.
   const day = today();
+  const isOffDay = await loadOffDayRule();
   const balances: Record<string, LeaveBalance> = {};
   for (const e of employees) {
     balances[e.id] = annualLeaveBalance(
       e.hireDate,
       leaves.filter((l) => l.employeeId === e.id),
       day,
+      isOffDay,
     );
   }
 

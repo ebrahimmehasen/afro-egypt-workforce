@@ -367,6 +367,8 @@ export const en: Dictionary = {
       fractionHint: "The fraction stays in the balance and joins next month's accrual. The balance resets on 1 January.",
       notEligible: "Hasn't completed 6 months yet — entitlement starts after {date}.",
       errInvalidDays: "Annual leave must be whole days (from one day to another, no half days).",
+      errNoWorkingDays: "This whole period is a weekly day off or public holiday — no days would be charged to the balance.",
+      offDaysHint: "Fridays and public holidays inside the period are not charged to the balance.",
       errNotEligible: "The employee hasn't completed 6 months from the hire date — entitlement starts after {date}.",
       errOtherYear: "Annual leave has to fall entirely within the current year — request each year separately.",
       errNotice: "Annual leave must be requested at least 48 hours before it starts.",

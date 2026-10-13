@@ -5,6 +5,10 @@
 // All arithmetic is in QUARTER-DAYS (whole numbers), because the monthly accrual is 1.75 days = 7 quarter-days
 // and adding fractions of a day in floating point drifts (twelve months must come to exactly 21 days = 84
 // units). Days appear only at the edge, in `unitsToDays`.
+//
+// A leave is counted in WORKING days: the weekly day off (Friday) and public holidays that fall inside it are not
+// charged to the balance. Which days those are comes in as `isOffDay`, read by the caller from the settings, so
+// this file stays free of any I/O.
 
 /** One day, in the integer unit the balance is kept in. */
 export const UNITS_PER_DAY = 4;
@@ -14,6 +18,10 @@ export const MONTHLY_ACCRUAL_UNITS = 7;
 export const ELIGIBILITY_MONTHS = 6;
 /** An annual leave must be requested at least this long before its first day. */
 export const NOTICE_HOURS = 48;
+
+/** True for a day that never counts toward a leave: the weekly day off or a public holiday. */
+export type IsOffDay = (day: string) => boolean;
+const noOffDays: IsOffDay = () => false;
 
 export type LeaveRequestStatus = "pending" | "approved" | "rejected";
 
@@ -67,30 +75,35 @@ export function accruedUnits(hireDate: string, asOf: string): number {
   return (month - startMonth + 1) * MONTHLY_ACCRUAL_UNITS;
 }
 
-/** Calendar days of [from, to] (inclusive) that fall inside `year`. */
-export function daysInYear(from: string, to: string, year: number): number {
-  const start = Date.parse(`${from}T00:00:00Z`);
-  const end = Date.parse(`${to}T00:00:00Z`);
-  const yStart = Date.UTC(year, 0, 1);
-  const yEnd = Date.UTC(year, 11, 31);
-  const lo = Math.max(start, yStart);
-  const hi = Math.min(end, yEnd);
-  return hi < lo ? 0 : Math.round((hi - lo) / 86_400_000) + 1;
-}
+const DAY_MS = 86_400_000;
 
-/** Calendar days of a request, inclusive of both ends; 0 when the range is invalid (end before start). */
-export function requestDays(from: string, to: string): number {
+/** The days of [from, to] (inclusive), as yyyy-MM-dd strings, keeping only those `keep` accepts. */
+function eachDay(from: string, to: string, keep: (day: string) => boolean): number {
   const start = Date.parse(`${from}T00:00:00Z`);
   const end = Date.parse(`${to}T00:00:00Z`);
   if (Number.isNaN(start) || Number.isNaN(end) || end < start) return 0;
-  return Math.round((end - start) / 86_400_000) + 1;
+  let n = 0;
+  for (let t = start; t <= end; t += DAY_MS) {
+    if (keep(new Date(t).toISOString().slice(0, 10))) n++;
+  }
+  return n;
+}
+
+/** Days of [from, to] (inclusive) that fall inside `year` and count toward a leave (not a day off or holiday). */
+export function daysInYear(from: string, to: string, year: number, isOffDay: IsOffDay = noOffDays): number {
+  return eachDay(from, to, (day) => day.startsWith(`${year}-`) && !isOffDay(day));
+}
+
+/** Days a request would charge, inclusive of both ends, skipping the weekly day off and public holidays; 0 when the range is invalid. */
+export function requestDays(from: string, to: string, isOffDay: IsOffDay = noOffDays): number {
+  return eachDay(from, to, (day) => !isOffDay(day));
 }
 
 /** Quarter-days already spoken for in `year`: annual leaves that are pending or approved (rejected ones are free). */
-export function reservedUnits(leaves: BalanceLeave[], year: number): number {
+export function reservedUnits(leaves: BalanceLeave[], year: number, isOffDay: IsOffDay = noOffDays): number {
   return leaves
     .filter((l) => l.type === "annual" && l.status !== "rejected")
-    .reduce((sum, l) => sum + daysInYear(l.from, l.to, year) * UNITS_PER_DAY, 0);
+    .reduce((sum, l) => sum + daysInYear(l.from, l.to, year, isOffDay) * UNITS_PER_DAY, 0);
 }
 
 export interface LeaveBalance {
@@ -113,10 +126,15 @@ export interface LeaveBalance {
 }
 
 /** The balance of the year containing `asOf` (yyyy-MM-dd), from the hire date and the employee's leaves. */
-export function annualLeaveBalance(hireDate: string, leaves: BalanceLeave[], asOf: string): LeaveBalance {
+export function annualLeaveBalance(
+  hireDate: string,
+  leaves: BalanceLeave[],
+  asOf: string,
+  isOffDay: IsOffDay = noOffDays,
+): LeaveBalance {
   const year = parts(asOf).y;
   const accrued = accruedUnits(hireDate, asOf);
-  const used = reservedUnits(leaves, year);
+  const used = reservedUnits(leaves, year, isOffDay);
   const balance = accrued - used;
   return {
     year,
@@ -134,7 +152,7 @@ export function annualLeaveBalance(hireDate: string, leaves: BalanceLeave[], asO
 }
 
 /** Why an annual-leave request is refused. Each maps to its own message. */
-export type AnnualLeaveRefusal = "invalid_days" | "not_eligible" | "other_year" | "notice" | "exceeds_balance";
+export type AnnualLeaveRefusal = "invalid_days" | "no_working_days" | "not_eligible" | "other_year" | "notice" | "exceeds_balance";
 
 export type AnnualLeaveCheck =
   | { ok: true; days: number; balance: LeaveBalance }
@@ -160,13 +178,18 @@ export function checkAnnualLeaveRequest(input: {
   to: string;
   now: Date;
   days?: number;
+  /** The weekly day off and public holidays — they are not charged to the balance. */
+  isOffDay?: IsOffDay;
 }): AnnualLeaveCheck {
   const { hireDate, leaves, from, to, now } = input;
+  const isOffDay = input.isOffDay ?? noOffDays;
   const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const balance = annualLeaveBalance(hireDate, leaves, today);
-  const days = input.days ?? requestDays(from, to);
+  const balance = annualLeaveBalance(hireDate, leaves, today, isOffDay);
+  const days = input.days ?? requestDays(from, to, isOffDay);
   const refuse = (reason: AnnualLeaveRefusal): AnnualLeaveCheck => ({ ok: false, reason, balance, days });
 
+  // a range that is nothing but days off / holidays has no day to charge
+  if (input.days === undefined && requestDays(from, to) > 0 && days === 0) return refuse("no_working_days");
   if (!Number.isInteger(days) || days < 1) return refuse("invalid_days");
   if (!balance.eligible) return refuse("not_eligible");
   // The balance is one calendar year's and resets on 1 January, so a leave has to sit inside the current year.
