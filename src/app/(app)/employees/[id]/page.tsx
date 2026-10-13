@@ -30,6 +30,9 @@ import {
 import { DayPayCard } from "@/components/employees/day-pay-card";
 import { prisma } from "@/lib/prisma";
 import { dayStr } from "@/lib/serialize";
+import { annualLeaveBalance } from "@/lib/leave-balance";
+import { LeaveBalanceCard } from "@/components/leaves/leave-balance-card";
+import { today } from "@/lib/today";
 import { dayPayRows } from "@/lib/day-pay-view";
 import { employeeFormOptions, kindOf, loadPayContext, rulesFor, scheduleFor } from "@/lib/pay-context";
 
@@ -72,6 +75,12 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   const canManageDocs = canManageEmployeeFiles(user);
   const canEdit = hasPermission(user, "employees");
   const archived = isArchived(employee);
+  // Annual-leave balance, worked out now from the hire date and this employee's annual leaves (db is already scoped).
+  const leaveBalance = annualLeaveBalance(
+    employee.hireDate,
+    db.leaves.filter((l) => l.employeeId === employee.id),
+    today(),
+  );
   // The Actions tab holds only the archive / unarchive switch, and only a terminated employee has one.
   const showActions = canEdit && employee.status === "terminated";
 
@@ -241,6 +250,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
         </TabsContent>
 
         <TabsContent value="attendance" className="flex flex-col gap-4">
+          <LeaveBalanceCard balance={leaveBalance} />
           <DayPayCard
             rows={dayRows}
             t={t}

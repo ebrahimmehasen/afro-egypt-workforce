@@ -11,7 +11,9 @@ import { gate } from "@/lib/change-requests";
 import { nextId } from "@/lib/id";
 import { recalculateRange } from "@/lib/attendance-service";
 import { ActionState } from "@/hooks/use-action-feedback";
-import { getT } from "@/lib/i18n";
+import { getT, format } from "@/lib/i18n";
+import { dayStr } from "@/lib/serialize";
+import { checkAnnualLeaveRequest } from "@/lib/leave-balance";
 import { leaveTypeLabel } from "@/lib/i18n/labels";
 
 const leaveSchema = z.object({
@@ -37,6 +39,35 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
   if (actor.role !== "admin") {
     const own = isSelfService(actor) ? actor.employeeId === parsed.data.employeeId : await canViewEmployee(actor, parsed.data.employeeId);
     if (!own) return { error: t.validation.notAllowed };
+  }
+
+  // Annual leave is bounded by the employee's balance. Enforced here for every way a request arrives — the
+  // employee filing for themselves or someone else filing for them — not just by what the form shows.
+  if (parsed.data.type === "annual") {
+    const employee = await prisma.employee.findFirst({ where: { id: parsed.data.employeeId, deletedAt: null } });
+    if (!employee) return { error: t.validation.employeeNotFound };
+    const onFile = await prisma.leave.findMany({
+      where: { employeeId: employee.id, type: "annual", status: { not: "rejected" } },
+      select: { type: true, status: true, from: true, to: true },
+    });
+    const check = checkAnnualLeaveRequest({
+      hireDate: dayStr(employee.hireDate),
+      leaves: onFile.map((l) => ({ type: l.type, status: l.status, from: dayStr(l.from), to: dayStr(l.to) })),
+      from: parsed.data.from,
+      to: parsed.data.to,
+      now: new Date(),
+    });
+    if (!check.ok) {
+      const b = t.leaves.balance;
+      const message = {
+        invalid_days: b.errInvalidDays,
+        not_eligible: format(b.errNotEligible, { date: check.balance.eligibleOn }),
+        other_year: b.errOtherYear,
+        notice: b.errNotice,
+        exceeds_balance: format(b.errExceeds, { available: check.balance.availableDays, requested: check.days }),
+      }[check.reason];
+      return { error: message };
+    }
   }
 
   await prisma.leave.create({

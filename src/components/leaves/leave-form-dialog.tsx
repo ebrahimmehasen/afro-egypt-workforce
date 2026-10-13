@@ -17,6 +17,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Employee, LeaveType } from "@/lib/types";
+import type { LeaveBalance } from "@/lib/leave-balance";
+import { LeaveBalanceCard } from "@/components/leaves/leave-balance-card";
 import { today } from "@/lib/today";
 
 function SubmitButton() {
@@ -27,9 +29,18 @@ function SubmitButton() {
 
 const LEAVE_TYPES: LeaveType[] = ["annual", "casual", "sick", "unpaid", "mission", "permission", "excused_absence"];
 
-export function LeaveFormDialog({ employees }: { employees: Employee[] }) {
+export function LeaveFormDialog({
+  employees,
+  balances = {},
+}: {
+  employees: Employee[];
+  /** employee id → annual-leave balance, for the employees this viewer can see */
+  balances?: Record<string, LeaveBalance>;
+}) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const [employeeId, setEmployeeId] = useState(employees[0]?.id ?? "");
+  const [type, setType] = useState<LeaveType>("annual");
   const [state, formAction] = useActionState(createLeave, {});
   useActionFeedback(state, () => setOpen(false));
 
@@ -54,7 +65,7 @@ export function LeaveFormDialog({ employees }: { employees: Employee[] }) {
         <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label>{t.common.employee}</Label>
-            <Select name="employeeId" defaultValue={employees[0]?.id}>
+            <Select name="employeeId" value={employeeId} onValueChange={setEmployeeId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.name} — {e.employeeNumber}</SelectItem>)}
@@ -63,7 +74,7 @@ export function LeaveFormDialog({ employees }: { employees: Employee[] }) {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>{t.leaves.formType}</Label>
-            <Select name="type" defaultValue="annual">
+            <Select name="type" value={type} onValueChange={(v) => setType(v as LeaveType)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {LEAVE_TYPES.map((value) => (
@@ -72,6 +83,7 @@ export function LeaveFormDialog({ employees }: { employees: Employee[] }) {
               </SelectContent>
             </Select>
           </div>
+          {type === "annual" && balances[employeeId] && <LeaveBalanceCard balance={balances[employeeId]} />}
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="from">{t.leaves.formFrom}</Label>

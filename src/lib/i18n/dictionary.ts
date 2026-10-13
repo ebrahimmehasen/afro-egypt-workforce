@@ -358,6 +358,20 @@ export interface Dictionary {
     deleteTitle: string;
     deleteConfirm: string;
     deleted: string;
+    balance: {
+      title: string;
+      available: string;
+      accrued: string;
+      used: string;
+      daysUnit: string;
+      fractionHint: string;
+      notEligible: string;
+      errInvalidDays: string;
+      errNotEligible: string;
+      errOtherYear: string;
+      errNotice: string;
+      errExceeds: string;
+    };
   };
   overtime: {
     title: string;
