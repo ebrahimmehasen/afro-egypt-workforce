@@ -457,6 +457,15 @@ export const en: Dictionary = {
     updatedDeduction: "Deduction updated",
   },
   payroll: {
+    export: {
+      button: "Payroll details",
+      noRecords: "This period hasn't been calculated yet — calculate payroll first, then download the details.",
+      sheetName: "Payroll details",
+      payType: "Pay type",
+      paidDays: "Paid days",
+      dayRate: "Day rate",
+      totalDeductions: "Total deductions",
+    },
     title: "Payroll",
     description: "Calculate and approve employee payroll",
     employeesCount: "{count} employees",
@@ -522,7 +531,6 @@ export const en: Dictionary = {
     advances: "Advances",
     otherDeductions: "Other Deductions",
     netSalary: "Net Salary",
-    disclaimer: "Trial calculation per factory rules —",
   },
   reports: {
     title: "Reports",

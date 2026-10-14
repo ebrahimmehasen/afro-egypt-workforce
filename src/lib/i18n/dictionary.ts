@@ -457,6 +457,15 @@ export interface Dictionary {
     updatedDeduction: string;
   };
   payroll: {
+    export: {
+      button: string;
+      noRecords: string;
+      sheetName: string;
+      payType: string;
+      paidDays: string;
+      dayRate: string;
+      totalDeductions: string;
+    };
     title: string;
     description: string;
     employeesCount: string;
@@ -522,7 +531,6 @@ export interface Dictionary {
     advances: string;
     otherDeductions: string;
     netSalary: string;
-    disclaimer: string;
   };
   reports: {
     title: string;

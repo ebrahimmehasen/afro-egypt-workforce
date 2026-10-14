@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PeriodActions } from "@/components/payroll/period-actions";
+import { PayrollExportButton } from "@/components/payroll/payroll-export-button";
 import { PayrollPeriodBar } from "@/components/payroll/payroll-period-bar";
 import { BreakdownDialog } from "@/components/payroll/breakdown-dialog";
 import {
@@ -121,7 +122,16 @@ export default async function PayrollPage({
               </div>
               <Badge variant={STATUS_VARIANT[period.status]}>{payrollPeriodStatusLabel(period.status, t)}</Badge>
             </div>
-            <PeriodActions period={period} canEdit={canEdit} />
+            <div className="flex flex-wrap items-center gap-2">
+              {/* only admin / the "payroll" permission — the export route enforces the same itself */}
+              {canEdit && (
+                <PayrollExportButton
+                  periodId={period.id}
+                  hasRecords={db.payrollRecords.some((r) => r.periodId === period!.id)}
+                />
+              )}
+              <PeriodActions period={period} canEdit={canEdit} />
+            </div>
           </CardContent>
         </Card>
       ) : (

@@ -457,6 +457,15 @@ export const ar: Dictionary = {
     updatedDeduction: "تم تعديل الخصم",
   },
   payroll: {
+    export: {
+      button: "تفاصيل المرتبات",
+      noRecords: "الفترة دي لسه ما اتحسبتش — احسب الرواتب الأول وبعدين نزّل التفاصيل.",
+      sheetName: "تفاصيل المرتبات",
+      payType: "نوع الأجر",
+      paidDays: "الأيام المدفوعة",
+      dayRate: "أجر اليوم",
+      totalDeductions: "إجمالي الخصومات",
+    },
     title: "الرواتب",
     description: "حساب واعتماد رواتب الموظفين",
     employeesCount: "{count} موظف",
@@ -522,7 +531,6 @@ export const ar: Dictionary = {
     advances: "السلف",
     otherDeductions: "خصومات أخرى",
     netSalary: "صافي المرتب",
-    disclaimer: "حساب تجريبي وفق قواعد المصنع —",
   },
   reports: {
     title: "التقارير",
