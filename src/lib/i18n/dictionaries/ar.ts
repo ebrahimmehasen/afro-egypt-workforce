@@ -1127,6 +1127,7 @@ export const ar: Dictionary = {
     addAllowance: "إضافة بدل/حافز",
     deleteAllowance: "حذف بدل/حافز",
     calculatePayroll: "حساب الرواتب",
+    autoRecalculatePayroll: "إعادة حساب الرواتب تلقائيًا (اتغيّرت الخصومات)",
     approvePayroll: "اعتماد الرواتب",
     closePayrollPeriod: "إغلاق فترة الرواتب",
     openPayrollPeriod: "فتح فترة رواتب",

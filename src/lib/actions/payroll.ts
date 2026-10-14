@@ -3,16 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { recordChangeAs, writeAudit } from "@/lib/audit";
+import { recordChangeAs } from "@/lib/audit";
+import { calculatePeriodRecords } from "@/lib/payroll-recalc";
 import { getSession } from "@/lib/auth";
 import { gate } from "@/lib/change-requests";
-import { calculatePayrollRecord } from "@/lib/payroll-engine";
-import { dailyPaidDays, payPeriodRange } from "@/lib/pay-rules";
-import { dayRate } from "@/lib/pay-engine";
-import { kindOf, loadPayContext, rulesFor } from "@/lib/pay-context";
-import { ABSENCE_TRACKING_FROM } from "@/lib/attendance-engine";
-import { dayStr } from "@/lib/serialize";
-import { addDays } from "@/lib/today";
 import { getT } from "@/lib/i18n";
 import { ActionState } from "@/hooks/use-action-feedback";
 
@@ -20,13 +14,6 @@ const MONTHS_AR = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
 ];
-
-/** The pay month as a half-open date range for queries: from its start day in the month before, up to (not
- * including) that day in this one. The start day comes from the payroll settings. */
-function payMonthRange(year: number, month: number, startDay: number) {
-  const { from, to } = payPeriodRange(year, month, startDay);
-  return { from: new Date(`${from}T00:00:00.000Z`), to: new Date(`${addDays(to, 1)}T00:00:00.000Z`) };
-}
 
 const openPeriodSchema = z.object({
   year: z.coerce.number().int().min(2020).max(2100),
@@ -100,108 +87,9 @@ export async function calculatePayroll(periodId: string): Promise<ActionState> {
 
 export async function applyCalculatePayroll(payload: CalculatePayrollPayload, actorName: string): Promise<ActionState> {
   const t = await getT();
-  const { periodId } = payload;
-  const period = await prisma.payrollPeriod.findUnique({ where: { id: periodId } });
-  if (!period) return { error: t.validation.periodNotFound };
-  if (period.status === "closed") return { error: t.validation.periodClosed };
-
-  // every rule comes from settings: the pay month's start day, each employee's pay type, the days off
-  const ctx = await loadPayContext();
-  const { from, to } = payMonthRange(period.year, period.month, ctx.payPeriodStartDay);
-
-  const activeEmployees = await prisma.employee.findMany({ where: { deletedAt: null, status: { in: ["active", "on_leave"] } } });
-
-  await prisma.$transaction(async (tx) => {
-    await tx.payrollRecord.deleteMany({ where: { periodId } });
-
-    for (const employee of activeEmployees) {
-      const [monthAttendance, empAllowances, approvedOvertime, periodDeductions] = await Promise.all([
-        tx.dailyAttendance.findMany({ where: { employeeId: employee.id, date: { gte: from, lt: to } } }),
-        tx.allowance.findMany({
-          where: {
-            employeeId: employee.id,
-            // recurring allowances always apply; a one-off bonus only in its own month
-            OR: [
-              { monthly: true },
-              { monthly: false, effectiveYear: period.year, effectiveMonth: period.month },
-            ],
-          },
-        }),
-        // approved additions: overtime and weekly-day-off / holiday / Thursday work; a removed system one no longer counts
-        tx.overtime.findMany({ where: { employeeId: employee.id, status: "approved", voidedAt: null, date: { gte: from, lt: to } } }),
-        // every deduction of the month, the system's (absence, lateness, early leave) and the manual ones;
-        // a system deduction someone removed no longer counts
-        tx.deduction.findMany({ where: { employeeId: employee.id, date: { gte: from, lt: to }, voidedAt: null } }),
-      ]);
-
-      const rules = rulesFor(ctx, employee);
-      const paidDays = dailyPaidDays(
-        monthAttendance.map((a) => ({ date: dayStr(a.date), status: a.status })),
-        ABSENCE_TRACKING_FROM,
-        (date) => kindOf(ctx, date) !== "workday",
-      );
-
-      const allowancesTotal = empAllowances
-        .filter((a) => a.type === "transport" || a.type === "meal" || a.type === "fixed")
-        .reduce((s, a) => s + a.amount, 0);
-      const incentives = empAllowances.filter((a) => a.type === "incentive").reduce((s, a) => s + a.amount, 0);
-      const bonuses = empAllowances.filter((a) => a.type === "bonus").reduce((s, a) => s + a.amount, 0);
-      const approvedOvertimeAmount = approvedOvertime.reduce((s, o) => s + o.amount, 0);
-
-      const result = calculatePayrollRecord(periodId, {
-        employee: {
-          id: employee.id,
-          employeeNumber: employee.employeeNumber,
-          name: employee.name,
-          departmentId: employee.departmentId,
-          jobTitle: employee.jobTitle,
-          hireDate: employee.hireDate.toISOString().slice(0, 10),
-          shiftId: employee.shiftId,
-          salaryType: rules.basis,
-          basicSalary: employee.basicSalary,
-          dailyRate: employee.dailyRate ?? undefined,
-          dailyWorkingHours: employee.dailyWorkingHours,
-          allowances: employee.allowancesTotal,
-          biometricDeviceUserId: employee.biometricDeviceUserId ?? undefined,
-          status: employee.status,
-        },
-        allowancesTotal,
-        approvedOvertimeAmount,
-        incentives,
-        bonuses,
-        dayRate: dayRate(rules, employee),
-        paidDays,
-        deductions: periodDeductions.map((d) => ({
-          id: d.id,
-          employeeId: d.employeeId,
-          type: d.type,
-          amount: d.amount,
-          date: d.date.toISOString().slice(0, 10),
-          reason: d.reason,
-          createdAt: d.createdAt.toISOString(),
-        })),
-      });
-
-      await tx.payrollRecord.create({ data: { ...result, periodId, employeeId: employee.id } });
-    }
-
-    await tx.payrollPeriod.update({
-      where: { id: periodId },
-      data: { status: "calculated", calculatedAt: new Date() },
-    });
-
-    await writeAudit(
-      tx,
-      {
-        module: t.nav.payroll,
-        action: t.auditActions.calculatePayroll,
-        oldValue: t.payrollPeriodStatus.draft,
-        newValue: `${t.payrollPeriodStatus.calculated} — ${activeEmployees.length} ${t.common.employee}`,
-        reason: period.label,
-      },
-      actorName,
-    );
-  });
+  const result = await calculatePeriodRecords(payload.periodId, actorName, t);
+  if (result === "not_found") return { error: t.validation.periodNotFound };
+  if (result === "closed") return { error: t.validation.periodClosed };
 
   revalidatePath("/payroll");
   revalidatePath("/dashboard");

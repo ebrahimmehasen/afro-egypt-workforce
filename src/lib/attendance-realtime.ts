@@ -2,7 +2,7 @@ import { startRealtimeListener, stopRealtimeListener, isRealtimeListenerActive, 
 import { ingestOneRecord } from "@/lib/attendance-ingest";
 import { syncDeviceAttendance } from "@/lib/attendance-sync";
 import { recordAbsences } from "@/lib/attendance-service";
-import { postAttendanceDeductions } from "@/lib/attendance-deductions";
+import { runAttendanceEffects, scheduleAttendanceEffects } from "@/lib/attendance-effects";
 
 // Shared through globalThis for the same reason as the listener state in zk-device.ts: this module can be
 // compiled into more than one bundle, and "start once" / "don't overlap" must hold for the whole process.
@@ -33,10 +33,11 @@ async function catchUp(reason: string) {
     // no record on a working day really didn't punch. While the device is unreachable nothing is marked.
     const absent = await recordAbsences();
     if (absent > 0) console.log(`[attendance-realtime] recorded ${absent} day(s) with no punch (absent or on leave)`);
-    // then charge the finished days per the bylaws (absence, lateness, early leave)
-    const d = await postAttendanceDeductions();
+    // then charge the finished days per the bylaws (absence, lateness, early leave), and bring any calculated
+    // payroll in line with them
+    const d = await runAttendanceEffects();
     if (d.created + d.updated + d.removed > 0) {
-      console.log(`[attendance-realtime] system deductions: +${d.created} ~${d.updated} -${d.removed}`);
+      console.log(`[attendance-realtime] system deductions: +${d.created} ~${d.updated} -${d.removed}; payroll periods recalculated: ${d.periods}`);
     }
   } catch (e) {
     console.error(`[attendance-realtime] catch-up (${reason}) failed:`, e instanceof Error ? e.message : e);
@@ -58,9 +59,16 @@ export function initAttendanceRealtime() {
     .catch((e) => console.error("[attendance-realtime] initial connect failed (will keep retrying):", e instanceof Error ? e.message : e));
 
   setInterval(() => {
-    // Nothing to back up while the device is unreachable or paused: the reconnect catch-up covers that.
+    // While the device is connected the catch-up does it all (sync, absences, deductions, payroll). While it is
+    // unreachable or paused nothing is synced or marked absent, but the days already on file — punches, approved
+    // leaves, corrections — still get their deductions posted and reach the payroll.
     if (isRealtimeListenerActive()) void catchUp("safety net");
+    else scheduleAttendanceEffects();
   }, SAFETY_NET_INTERVAL_MS);
+  // and once shortly after start, so a restart with the device unreachable doesn't wait the full interval
+  setTimeout(() => {
+    if (!isRealtimeListenerActive()) scheduleAttendanceEffects();
+  }, 30_000);
 
   console.log(`[attendance-realtime] safety-net catch-up every ${SAFETY_NET_INTERVAL_MS / 60000} min`);
 }

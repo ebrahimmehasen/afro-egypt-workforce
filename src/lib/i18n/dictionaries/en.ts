@@ -1127,6 +1127,7 @@ export const en: Dictionary = {
     addAllowance: "Add Allowance/Bonus",
     deleteAllowance: "Delete Allowance/Bonus",
     calculatePayroll: "Calculate Payroll",
+    autoRecalculatePayroll: "Payroll recalculated automatically (deductions changed)",
     approvePayroll: "Approve Payroll",
     closePayrollPeriod: "Close Payroll Period",
     openPayrollPeriod: "Open Payroll Period",

@@ -1079,6 +1079,7 @@ export interface Dictionary {
     addAllowance: string;
     deleteAllowance: string;
     calculatePayroll: string;
+    autoRecalculatePayroll: string;
     approvePayroll: string;
     closePayrollPeriod: string;
     openPayrollPeriod: string;

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { recalculateOpenDays } from "@/lib/attendance-service";
-import { lockedDayCheck, postAttendanceDeductions } from "@/lib/attendance-deductions";
+import { lockedDayCheck } from "@/lib/attendance-deductions";
+import { runAttendanceEffects } from "@/lib/attendance-effects";
 import { loadPayContext } from "@/lib/pay-context";
 
 // Shared through globalThis: this module is compiled into several server bundles, and "one run at a time,
@@ -32,8 +33,8 @@ export function refreshPayCalculations(): void {
           loadPayContext(),
         ]);
         const days = await recalculateOpenDays(lockedDayCheck(periods, ctx));
-        const posted = await postAttendanceDeductions();
-        console.log(`[pay-refresh] ${days} day(s) recalculated; entries +${posted.created} ~${posted.updated} -${posted.removed}`);
+        const posted = await runAttendanceEffects();
+        console.log(`[pay-refresh] ${days} day(s) recalculated; entries +${posted.created} ~${posted.updated} -${posted.removed}; payroll periods recalculated: ${posted.periods}`);
       } while (state.again);
     } catch (e) {
       console.error("[pay-refresh] failed:", e instanceof Error ? e.message : e);

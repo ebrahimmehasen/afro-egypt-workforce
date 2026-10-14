@@ -16,6 +16,7 @@ import { dayStr } from "@/lib/serialize";
 import { checkAnnualLeaveRequest } from "@/lib/leave-balance";
 import { loadBalanceInputs, loadDayKindRule } from "@/lib/leave-days";
 import { leaveTypeLabel } from "@/lib/i18n/labels";
+import { scheduleAttendanceEffects } from "@/lib/attendance-effects";
 
 const leaveSchema = z.object({
   employeeId: z.string().min(1),
@@ -143,6 +144,8 @@ export async function applyDecideLeave(payload: LeaveDecisionPayload, actorName:
   revalidatePath("/attendance");
   revalidatePath("/dashboard");
   revalidatePath("/audit-log");
+  // the leave changes what those days cost: re-post them now and refresh any calculated payroll
+  scheduleAttendanceEffects();
   return { success: true };
 }
 
@@ -182,5 +185,7 @@ export async function deleteLeave(id: string): Promise<ActionState> {
   revalidatePath("/attendance");
   revalidatePath("/dashboard");
   revalidatePath("/audit-log");
+  // the leave changes what those days cost: re-post them now and refresh any calculated payroll
+  scheduleAttendanceEffects();
   return { success: true, message: t.leaves.deleted };
 }

@@ -12,6 +12,7 @@ import { getT } from "@/lib/i18n";
 import { deductionTypeLabel } from "@/lib/i18n/labels";
 import { hasPermission } from "@/lib/permissions";
 import { dayStr } from "@/lib/serialize";
+import { scheduleAttendanceEffects } from "@/lib/attendance-effects";
 
 const deductionSchema = z.object({
   employeeId: z.string().min(1),
@@ -76,6 +77,8 @@ export async function applyCreateDeduction(payload: DeductionPayload, actorName:
 
   revalidatePath("/deductions");
   revalidatePath("/dashboard");
+  // a deduction changed: bring any calculated (not yet approved) payroll in line with it
+  scheduleAttendanceEffects({ payrollChanged: true });
   return { success: true, message: t.deductions.submittedDeduction };
 }
 
@@ -122,6 +125,8 @@ export async function applyDeleteDeduction(payload: { id: string }, actorName: s
   }
   revalidatePath("/deductions");
   revalidatePath("/dashboard");
+  // a deduction changed: bring any calculated (not yet approved) payroll in line with it
+  scheduleAttendanceEffects({ payrollChanged: true });
   return { success: true };
 }
 
@@ -185,5 +190,7 @@ export async function applyUpdateDeduction(payload: UpdateDeductionPayload, acto
   }
   revalidatePath("/deductions");
   revalidatePath("/dashboard");
+  // a deduction changed: bring any calculated (not yet approved) payroll in line with it
+  scheduleAttendanceEffects({ payrollChanged: true });
   return { success: true, message: t.deductions.updatedDeduction };
 }

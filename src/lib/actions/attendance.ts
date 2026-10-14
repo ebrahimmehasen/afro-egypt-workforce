@@ -12,6 +12,7 @@ import { toShift } from "@/lib/serialize";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT, intlLocale } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
+import { scheduleAttendanceEffects } from "@/lib/attendance-effects";
 
 const correctionSchema = z.object({
   employeeId: z.string().min(1),
@@ -113,6 +114,8 @@ export async function applyCorrectAttendance(payload: CorrectionPayload, actorNa
   revalidatePath(`/employees/${employee.employeeNumber}`);
   revalidatePath("/audit-log");
 
+  // post the day's deductions now (not at the next 10-minute run) and refresh any calculated payroll
+  scheduleAttendanceEffects();
   return { success: true, message: t.attendance.correctionSaved };
 }
 
@@ -193,5 +196,7 @@ export async function applyAddManualAttendance(payload: ManualAttendancePayload,
   revalidatePath(`/employees/${employee.employeeNumber}`);
   revalidatePath("/audit-log");
 
+  // post the day's deductions now (not at the next 10-minute run) and refresh any calculated payroll
+  scheduleAttendanceEffects();
   return { success: true, message: t.attendance.manualAttendanceSaved };
 }
