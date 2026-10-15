@@ -22,7 +22,8 @@ export type ExportCell = string | number | null;
 /**
  * The "تفاصيل المرتبات" sheet: one header row, then one row per employee of the period, with their pay as it was
  * calculated. Pure — reads only what it is given and computes nothing new: every amount is a stored PayrollRecord
- * field, except the split of the two record fields that hold several deduction types together (early leave /
+ * field, except the total (the stored gross less the stored overtime, as the payslip shows it) and the split of
+ * the two record fields that hold several deduction types together (early leave /
  * permission / leaving without permission, and admin / other deductions), which is read from that period's posted
  * deductions — the same rows the payroll calculation summed — and never moves money out of the stored field, so the
  * deduction columns always add up to the stored total. Nothing about the company goes in: no name, logo,
@@ -53,8 +54,9 @@ export function payrollExportSheet(input: {
     t.payslip.allowances,
     t.allowanceTypes.incentive,
     t.allowanceTypes.bonus,
-    t.payslip.overtime,
+    // as on the payslip: the total without overtime, then overtime on its own, then the deductions, then the net
     t.payslip.total,
+    t.payslip.overtime,
     ...EXPORT_DEDUCTION_TYPES.map((type) => deductionTypeLabel(type, t)),
     t.payroll.export.totalDeductions,
     t.payslip.netSalary,
@@ -103,8 +105,8 @@ export function payrollExportSheet(input: {
         record.allowances,
         record.incentives,
         record.bonuses,
+        record.grossSalary - record.overtimeAmount,
         record.overtimeAmount,
-        record.grossSalary,
         ...EXPORT_DEDUCTION_TYPES.map((type) => deductionCells[type]),
         record.totalDeductions,
         record.netSalary,

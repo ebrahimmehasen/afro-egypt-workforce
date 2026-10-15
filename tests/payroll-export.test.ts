@@ -81,6 +81,18 @@ describe("the payroll details sheet", () => {
     }
   });
 
+  it("columns in payslip order: the total without overtime, then overtime, then the deductions, then the net", () => {
+    const { headers, rows } = build([rec("a")], [emp("a", "أحمد")]);
+    const col = (h: string) => headers.indexOf(h);
+    expect(col(t.payslip.overtime)).toBe(col(t.payslip.total) + 1);
+    expect(col(deductionTypeLabel("late", t))).toBe(col(t.payslip.overtime) + 1);
+    expect(headers[headers.length - 1]).toBe(t.payslip.netSalary);
+    // stored gross 6850 includes 200 of overtime
+    expect(rows[0][col(t.payslip.total)]).toBe(6650);
+    expect(rows[0][col(t.payslip.overtime)]).toBe(200);
+    expect((rows[0][col(t.payslip.total)] as number) + 200 - 780).toBe(rows[0][col(t.payslip.netSalary)]);
+  });
+
   it("splits the record's combined fields by type from the period's deductions", () => {
     const { headers, rows } = build([rec("a")], [emp("a", "أحمد")], [
       { employeeId: "a", type: "early_leave", amount: 5 },

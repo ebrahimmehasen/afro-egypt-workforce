@@ -73,7 +73,8 @@ export default async function PayslipPage({ params }: { params: Promise<{ record
               <Row key={item.label} label={item.label} amount={item.amount} locale={locale} />
             ))}
             <Separator className="my-2" />
-            <Row label={t.payslip.total} amount={record.grossSalary} bold locale={locale} />
+            <Row label={t.payslip.total} amount={breakdown.total} bold locale={locale} />
+            <Row label={breakdown.overtime.label} amount={breakdown.overtime.amount} locale={locale} />
 
             <p className="mb-1 mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t.payslip.deductionsTitle}</p>
             {breakdown.deductions.map((item) => (

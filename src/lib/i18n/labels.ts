@@ -131,8 +131,16 @@ export interface BreakdownRow {
   amount: number;
 }
 
-/** Builds payslip/breakdown line items from a PayrollRecord's numeric fields — never from pre-baked labels, so it stays correct in either language. */
-export function payrollBreakdownRows(record: PayrollRecord, t: Dictionary): { earnings: BreakdownRow[]; deductions: BreakdownRow[] } {
+/**
+ * Builds payslip/breakdown line items from a PayrollRecord's numeric fields — never from pre-baked labels, so it
+ * stays correct in either language. Shown in this order: the earnings, their `total`, then `overtime` on its own
+ * line, then the deductions, then the net. The total leaves overtime out: it is the stored gross less the stored
+ * overtime — display only, nothing recalculated — so total + overtime − deductions is still the stored net.
+ */
+export function payrollBreakdownRows(
+  record: PayrollRecord,
+  t: Dictionary,
+): { earnings: BreakdownRow[]; total: number; overtime: BreakdownRow; deductions: BreakdownRow[] } {
   const isDaily = record.paidDaysCount != null;
   return {
     earnings: [
@@ -143,10 +151,11 @@ export function payrollBreakdownRows(record: PayrollRecord, t: Dictionary): { ea
           }
         : { label: t.payslip.basicSalary, amount: record.basicSalary },
       { label: t.payslip.allowances, amount: record.allowances },
-      { label: t.payslip.overtime, amount: record.overtimeAmount },
       ...(record.incentives ? [{ label: t.allowanceTypes.incentive, amount: record.incentives }] : []),
       ...(record.bonuses ? [{ label: t.allowanceTypes.bonus, amount: record.bonuses }] : []),
     ],
+    total: record.grossSalary - record.overtimeAmount,
+    overtime: { label: t.payslip.overtime, amount: record.overtimeAmount },
     deductions: [
       { label: t.payslip.lateDeduction, amount: record.lateDeduction },
       // a daily worker has no absence deduction — absent days simply aren't paid

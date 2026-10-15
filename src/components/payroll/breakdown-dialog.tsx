@@ -38,7 +38,8 @@ export function BreakdownDialog({ record, employeeName }: { record: PayrollRecor
             <Row key={item.label} label={item.label} amount={item.amount} locale={locale} />
           ))}
           <Separator className="my-1" />
-          <Row label={t.payroll.totalLabel} amount={record.grossSalary} bold locale={locale} />
+          <Row label={t.payroll.totalLabel} amount={breakdown.total} bold locale={locale} />
+          <Row label={breakdown.overtime.label} amount={breakdown.overtime.amount} locale={locale} />
           <Separator className="my-1" />
           {breakdown.deductions.map((item) => (
             <Row key={item.label} label={item.label} amount={-item.amount} locale={locale} />
