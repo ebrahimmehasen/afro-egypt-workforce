@@ -270,7 +270,7 @@ export const en: Dictionary = {
   },
   shifts: {
     title: "Shifts",
-    description: "Configure work hours and grace periods for each shift",
+    description: "Working hours — the same list as in Settings. An employee on one is timed by it for lateness and overtime, under their pay type's rules.",
     addShift: "Add Shift",
     editShift: "Edit Shift",
     formName: "Shift Name",
@@ -704,7 +704,8 @@ export const en: Dictionary = {
     deletePayTypeTitle: "Delete pay type",
     deletePayTypeConfirm: "Delete \"{name}\"? If employees are on it, it is only retired.",
     deleteScheduleTitle: "Delete schedule",
-    deleteScheduleConfirm: "Delete the schedule \"{name}\"? If employees are on it, it is only retired.",
+    deleteScheduleConfirm: "Delete the schedule \"{name}\"? If employees are on it, it can't be deleted.",
+    scheduleInUse: "Employees are on this schedule, so it can't be deleted: {names}. Move them to another schedule first.",
     recalcNote: "Changes here apply automatically to calculations not yet approved. Approved or closed ones never change.",
   },
   dayPay: {

@@ -264,7 +264,7 @@ export function PayTypesSection({ payTypes, canManage }: { payTypes: PayTypeRow[
 // ---------------------------------------------------------------------------------------------------------
 // Work schedules
 
-function ScheduleDialog({ schedule }: { schedule?: ScheduleRow }) {
+function ScheduleDialog({ schedule, from }: { schedule?: ScheduleRow; from: "settings" | "shifts" }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(saveWorkSchedule, {});
@@ -286,6 +286,7 @@ function ScheduleDialog({ schedule }: { schedule?: ScheduleRow }) {
         </DialogHeader>
         <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           {schedule && <input type="hidden" name="id" value={schedule.id} />}
+          <input type="hidden" name="from" value={from} />
           <Field label={t.paySettings.scheduleName} hint={t.paySettings.scheduleNameHint}>
             <Input name="name" defaultValue={schedule?.name ?? ""} className={bad("name")} />
           </Field>
@@ -307,7 +308,19 @@ function ScheduleDialog({ schedule }: { schedule?: ScheduleRow }) {
   );
 }
 
-export function WorkSchedulesSection({ schedules, canManage }: { schedules: ScheduleRow[]; canManage: boolean }) {
+/**
+ * The one list of working hours ("مواعيد العمل"), shown on the settings page and on /shifts alike. `from` says
+ * which page it sits on, so the server applies that page's permission.
+ */
+export function WorkSchedulesSection({
+  schedules,
+  canManage,
+  from = "settings",
+}: {
+  schedules: ScheduleRow[];
+  canManage: boolean;
+  from?: "settings" | "shifts";
+}) {
   const t = useT();
   const shown = schedules.filter((s) => !s.deletedAt);
   return (
@@ -317,7 +330,7 @@ export function WorkSchedulesSection({ schedules, canManage }: { schedules: Sche
           <CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5 text-primary" />{t.paySettings.schedulesTitle}</CardTitle>
           <CardDescription>{t.paySettings.schedulesDesc}</CardDescription>
         </div>
-        {canManage && <ScheduleDialog />}
+        {canManage && <ScheduleDialog from={from} />}
       </CardHeader>
       <CardContent>
         {shown.length === 0 ? (
@@ -327,11 +340,12 @@ export function WorkSchedulesSection({ schedules, canManage }: { schedules: Sche
             {shown.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
+                  {/* a div, not a p: Badge renders a div, which can't sit inside a p */}
+                  <div className="flex flex-wrap items-center gap-2 font-medium text-foreground">
                     <span dir="ltr">{s.name}</span>
                     {!s.active && <Badge variant="outline">{t.paySettings.inactive}</Badge>}
                     <Badge variant="outline">{format(t.paySettings.employeesOn, { count: s.employees })}</Badge>
-                  </p>
+                  </div>
                   <p className="text-sm text-muted-foreground" dir="ltr">
                     {s.startTime} → {s.endTime}
                     {s.overtimeStart && s.overtimeStart !== s.endTime && ` · OT ${s.overtimeStart}`}
@@ -339,11 +353,11 @@ export function WorkSchedulesSection({ schedules, canManage }: { schedules: Sche
                 </div>
                 {canManage && (
                   <div className="flex shrink-0 items-center gap-1">
-                    <ScheduleDialog schedule={s} />
+                    <ScheduleDialog schedule={s} from={from} />
                     <DeleteButton
                       title={t.paySettings.deleteScheduleTitle}
                       confirm={format(t.paySettings.deleteScheduleConfirm, { name: s.name })}
-                      run={() => deleteWorkSchedule(s.id)}
+                      run={() => deleteWorkSchedule(s.id, from)}
                     />
                   </div>
                 )}

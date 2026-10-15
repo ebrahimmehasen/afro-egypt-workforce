@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { HolidaysCard } from "@/components/settings/holidays-card";
 import { GeneralPaySection, PayRulesSection, PayTypesSection, WorkSchedulesSection } from "@/components/settings/pay-settings";
 import { prisma } from "@/lib/prisma";
+import { loadScheduleRows } from "@/lib/work-schedules";
 import { dayStr } from "@/lib/serialize";
 import { today } from "@/lib/today";
 import { toPayTypeRules } from "@/lib/pay-context";
@@ -24,10 +25,7 @@ export default async function SettingsPage() {
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       include: { _count: { select: { employees: { where: { deletedAt: null } } } } },
     }),
-    prisma.workSchedule.findMany({
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      include: { _count: { select: { employees: { where: { deletedAt: null } } } } },
-    }),
+    loadScheduleRows(),
   ]);
   // Pay types, schedules and rules decide how everyone is paid: only the main admin changes them.
   const canManagePay = user.role === "admin";
@@ -61,16 +59,7 @@ export default async function SettingsPage() {
       />
       <WorkSchedulesSection
         canManage={canManagePay}
-        schedules={schedules.map((s) => ({
-          id: s.id,
-          name: s.name,
-          startTime: s.startTime,
-          endTime: s.endTime,
-          overtimeStart: s.overtimeStart,
-          active: s.active,
-          deletedAt: s.deletedAt ? s.deletedAt.toISOString() : null,
-          employees: s._count.employees,
-        }))}
+        schedules={schedules}
       />
       <PayRulesSection
         canManage={canManagePay}

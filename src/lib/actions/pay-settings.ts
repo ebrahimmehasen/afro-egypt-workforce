@@ -8,8 +8,12 @@ import { getSession } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { refreshPayCalculations } from "@/lib/pay-refresh";
+import { gate } from "@/lib/change-requests";
+import { hasPermission } from "@/lib/permissions";
+import { format } from "@/lib/i18n/format";
 
-// Pay types, work schedules and the general pay settings. Only the main admin manages them: they decide how
+// Pay types, work schedules and the general pay settings. Only the main admin manages them (work schedules are
+// also edited from /shifts — see saveWorkSchedule): they decide how
 // everyone is paid. Every change is audited and brings the days not yet approved in line with the new rules
 // (see refreshPayCalculations); approved and closed pay months never change.
 
@@ -34,7 +38,7 @@ async function adminOnly() {
 }
 
 function afterChange() {
-  for (const path of ["/settings", "/employees", "/attendance", "/overtime", "/deductions", "/payroll", "/dashboard"]) revalidatePath(path);
+  for (const path of ["/settings", "/shifts", "/employees", "/attendance", "/overtime", "/deductions", "/payroll", "/dashboard"]) revalidatePath(path);
   refreshPayCalculations();
 }
 
@@ -185,22 +189,58 @@ const scheduleSchema = z.object({
   active: bool,
 });
 
+/**
+ * Work schedules ("مواعيد العمل") are the one list of working hours: the settings page and /shifts both show and
+ * edit it. Who may write depends on the page it is written from — the settings keep their rule (the main admin),
+ * /shifts its own ("shifts" permission) — and every write goes through gate() and the audit trail.
+ */
+type ScheduleFrom = "settings" | "shifts";
+const scheduleFrom = (v: unknown): ScheduleFrom => (v === "shifts" ? "shifts" : "settings");
+
+async function scheduleEditor(from: ScheduleFrom) {
+  const t = await getT();
+  const user = await getSession();
+  const allowed = user && (from === "shifts" ? hasPermission(user, "shifts") : user.role === "admin");
+  return allowed ? { t, user, error: null } : { t, user: null, error: t.validation.notAllowed };
+}
+
+type SchedulePayload = { id?: string; name: string; startTime: string; endTime: string; overtimeStart: string | null; active: boolean; from: ScheduleFrom };
+
 export async function saveWorkSchedule(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const { t, user, error } = await adminOnly();
+  const from = scheduleFrom(formData.get("from"));
+  const { t, user, error } = await scheduleEditor(from);
   if (error || !user) return { error };
   const parsed = scheduleSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData, fields: parsed.error.issues.map((i) => String(i.path[0])) };
   const { id, ...rest } = parsed.data;
-  const data = { ...rest, name: rest.name || `${rest.startTime} → ${rest.endTime}` };
+  const payload: SchedulePayload = { id, ...rest, name: rest.name || `${rest.startTime} → ${rest.endTime}`, from };
 
-  const before = id ? await prisma.workSchedule.findUnique({ where: { id } }) : null;
+  if (id && !(await prisma.workSchedule.findFirst({ where: { id, deletedAt: null } }))) return { error: t.validation.notFound };
+
+  return gate(
+    {
+      actionKey: "workSchedules.save",
+      module: from === "shifts" ? t.nav.shifts : t.nav.settings,
+      actionLabel: id ? t.auditActions.editWorkSchedule : t.auditActions.addWorkSchedule,
+      summary: `${payload.name} (${payload.startTime} → ${payload.endTime})`,
+      targetId: id,
+    },
+    payload,
+    () => applySaveWorkSchedule(payload, user.name),
+  );
+}
+
+export async function applySaveWorkSchedule(payload: SchedulePayload, actorName: string): Promise<ActionState> {
+  const t = await getT();
+  const { id, from, ...data } = payload;
+  const before = id ? await prisma.workSchedule.findFirst({ where: { id, deletedAt: null } }) : null;
   if (id && !before) return { error: t.validation.notFound };
   const sortOrder = id ? undefined : ((await prisma.workSchedule.aggregate({ _max: { sortOrder: true } }))._max.sortOrder ?? 0) + 1;
 
   await recordChangeAs(
-    user.name,
+    actorName,
     {
-      module: t.nav.settings,
+      module: from === "shifts" ? t.nav.shifts : t.nav.settings,
       action: id ? t.auditActions.editWorkSchedule : t.auditActions.addWorkSchedule,
       oldValue: before ? `${before.name} (${before.startTime} → ${before.endTime})` : undefined,
       newValue: `${data.name} (${data.startTime} → ${data.endTime})`,
@@ -211,23 +251,49 @@ export async function saveWorkSchedule(_prev: ActionState, formData: FormData): 
   return { success: true, message: t.paySettings.saved };
 }
 
-/** Removes a schedule: retired (hidden, kept) if any employee is on it, deleted otherwise. */
-export async function deleteWorkSchedule(id: string): Promise<ActionState> {
-  const { t, user, error } = await adminOnly();
+/** The employees still on a schedule, by name — a schedule anyone is on can't be removed. */
+async function scheduleUsers(id: string): Promise<string[]> {
+  const rows = await prisma.employee.findMany({ where: { workScheduleId: id, deletedAt: null }, select: { name: true }, orderBy: { name: "asc" } });
+  return rows.map((r) => r.name);
+}
+
+/** Removes a schedule nobody is on (soft: kept with deletedAt, so history still resolves it); refused, naming them, if anyone is. */
+export async function deleteWorkSchedule(id: string, fromValue: string = "settings"): Promise<ActionState> {
+  const from = scheduleFrom(fromValue);
+  const { t, user, error } = await scheduleEditor(from);
   if (error || !user) return { error };
-  const schedule = await prisma.workSchedule.findUnique({ where: { id }, include: { _count: { select: { employees: true } } } });
+  const schedule = await prisma.workSchedule.findFirst({ where: { id, deletedAt: null } });
   if (!schedule) return { error: t.validation.notFound };
-  const inUse = schedule._count.employees > 0;
+  const users = await scheduleUsers(id);
+  if (users.length) return { error: format(t.paySettings.scheduleInUse, { names: users.join("، ") }) };
+
+  return gate(
+    {
+      actionKey: "workSchedules.delete",
+      module: from === "shifts" ? t.nav.shifts : t.nav.settings,
+      actionLabel: t.auditActions.deleteWorkSchedule,
+      summary: `${schedule.name} (${schedule.startTime} → ${schedule.endTime})`,
+      targetId: id,
+    },
+    { id, from },
+    () => applyDeleteWorkSchedule({ id, from }, user.name),
+  );
+}
+
+export async function applyDeleteWorkSchedule(payload: { id: string; from: ScheduleFrom }, actorName: string): Promise<ActionState> {
+  const t = await getT();
+  const schedule = await prisma.workSchedule.findFirst({ where: { id: payload.id, deletedAt: null } });
+  if (!schedule) return { error: t.validation.notFound };
+  // checked again at approval: someone may have been put on it while the request waited
+  const users = await scheduleUsers(payload.id);
+  if (users.length) return { error: format(t.paySettings.scheduleInUse, { names: users.join("، ") }) };
   await recordChangeAs(
-    user.name,
-    { module: t.nav.settings, action: t.auditActions.deleteWorkSchedule, oldValue: schedule.name, newValue: inUse ? t.paySettings.retired : "-" },
-    (tx) =>
-      inUse
-        ? tx.workSchedule.update({ where: { id }, data: { deletedAt: new Date(), active: false } })
-        : tx.workSchedule.delete({ where: { id } }),
+    actorName,
+    { module: payload.from === "shifts" ? t.nav.shifts : t.nav.settings, action: t.auditActions.deleteWorkSchedule, oldValue: schedule.name, newValue: "-" },
+    (tx) => tx.workSchedule.update({ where: { id: payload.id }, data: { deletedAt: new Date(), active: false } }),
   );
   afterChange();
-  return { success: true, message: inUse ? t.paySettings.retiredInUse : t.paySettings.deleted };
+  return { success: true, message: t.paySettings.deleted };
 }
 
 // ---------------------------------------------------------------------------------------------------------

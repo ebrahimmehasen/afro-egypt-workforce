@@ -708,6 +708,8 @@ export interface Dictionary {
     deletePayTypeConfirm: string;
     deleteScheduleTitle: string;
     deleteScheduleConfirm: string;
+    /** a schedule employees are on can't be removed — {names} lists them */
+    scheduleInUse: string;
     recalcNote: string;
   };
   dayPay: {

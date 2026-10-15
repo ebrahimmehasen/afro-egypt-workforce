@@ -11,6 +11,7 @@ import { ActionState } from "@/hooks/use-action-feedback";
 import { applyCreateDepartment, applyUpdateDepartment, applyDeleteDepartment } from "@/lib/actions/departments";
 import { applyCreateEmployee, applyUpdateEmployee, applyArchiveEmployee, applyUnarchiveEmployee } from "@/lib/actions/employees";
 import { applyCreateShift, applyUpdateShift } from "@/lib/actions/shifts";
+import { applyDeleteWorkSchedule, applySaveWorkSchedule } from "@/lib/actions/pay-settings";
 import { applyLinkDeviceUser, applyUnlinkDeviceUser } from "@/lib/actions/biometric-device";
 import { applyCreateDeduction, applyDeleteDeduction, applyUpdateDeduction } from "@/lib/actions/deductions";
 import { applyCreateAllowance, applyDeleteAllowance } from "@/lib/actions/allowances";
@@ -63,6 +64,8 @@ const APPLIERS: Record<string, (payload: unknown, actorName: string) => Promise<
   "settings.payroll": (p, a) => applyUpdatePayrollSettings(p as never, a),
   "settings.holiday.add": (p, a) => applyAddHoliday(p as never, a),
   "settings.holiday.delete": (p, a) => applyDeleteHoliday(p as never, a),
+  "workSchedules.save": (p, a) => applySaveWorkSchedule(p as never, a),
+  "workSchedules.delete": (p, a) => applyDeleteWorkSchedule(p as never, a),
 };
 
 async function guard() {
