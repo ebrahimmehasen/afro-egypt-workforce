@@ -114,7 +114,9 @@ describe("daily worker: the holiday is unpaid", () => {
     expect(postedFor(dailyEmp, dailyRules, "absent")).toEqual([]);
   });
 
-  it("a holiday on a Friday is counted once: it was never a paid day, and it doesn't remove another", () => {
+  // A daily worker is paid for the working days only (the pay type's 26 days): Fridays are never paid. So a
+  // holiday that falls on a Friday changes nothing — that day was unpaid anyway, and no other day is taken.
+  it("a holiday on a Friday changes nothing: the Friday was already unpaid, and no extra day is taken off", () => {
     const withFridayHoliday = { weeklyOffDays: [5], holidays: [{ from: FRIDAY_HOLIDAY, to: FRIDAY_HOLIDAY }] };
     const k = (d: string) => kindOfCtx(withFridayHoliday, d);
     const paid = dailyPaidDays(month(k), "2000-01-01", (d) => k(d) !== "workday");
