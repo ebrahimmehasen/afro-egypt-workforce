@@ -1,4 +1,8 @@
+import Link from "next/link";
+import { Clock3 } from "lucide-react";
 import { getDb } from "@/lib/data";
+import { getT } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
 import { requireAccess } from "@/lib/auth";
 import { employeesInScope, viewerScope } from "@/lib/scope";
 import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
@@ -14,6 +18,9 @@ export default async function EmployeesPage() {
   const db = await getDb();
   const user = await requireAccess("/employees");
   const canEdit = hasPermission(user, "employees");
+  // "كشف الإضافي" is the overtime page's statement: shown only to who may open it
+  const canSeeOvertime = hasPermission(user, "overtime");
+  const t = await getT();
 
   const employees = employeesInScope(viewerScope(user, db.employees), db.employees);
   const formOptions = employeeFormOptions(await loadPayContext());
@@ -52,7 +59,21 @@ export default async function EmployeesPage() {
         shifts={db.shifts}
         incompleteDocIds={incompleteDocIds}
         photoUrls={photoUrls}
-        headerActions={canEdit ? <EmployeeFormDialog departments={db.departments} shifts={db.shifts} {...formOptions} /> : null}
+        headerActions={
+          canEdit || canSeeOvertime ? (
+            <>
+              {canSeeOvertime && (
+                <Button asChild variant="outline" className="gap-2">
+                  <Link href="/overtime/statement">
+                    <Clock3 className="h-4 w-4" />
+                    {t.overtime.statement.button}
+                  </Link>
+                </Button>
+              )}
+              {canEdit && <EmployeeFormDialog departments={db.departments} shifts={db.shifts} {...formOptions} />}
+            </>
+          ) : null
+        }
       />
       {canUseAssistant(user) && <EmployeeAssistant />}
     </div>

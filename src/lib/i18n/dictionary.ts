@@ -416,6 +416,26 @@ export interface Dictionary {
     deleteTitle: string;
     deleteConfirm: string;
     deleteSystemConfirm: string;
+    /** كشف الإضافي — /overtime/statement */
+    statement: {
+      title: string;
+      description: string;
+      button: string;
+      month: string;
+      from: string;
+      to: string;
+      apply: string;
+      export: string;
+      pendingNotice: string;
+      empty: string;
+      noData: string;
+      invalidRange: string;
+      colHours: string;
+      colAmount: string;
+      total: string;
+      kindManual: string;
+      sheetName: string;
+    };
   };
   deductions: {
     title: string;
