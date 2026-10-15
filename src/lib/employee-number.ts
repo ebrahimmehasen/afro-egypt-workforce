@@ -27,3 +27,25 @@ export async function generateEmployeeNumber(tx: TransactionClient, departmentNa
 
   return `${code}-${String(seq).padStart(3, "0")}`;
 }
+
+/**
+ * The number an employee gets on moving to another department: the department's next number, as on creation.
+ * The sequence never goes back, so a number given up by a move is never handed out again. Numbers set before the
+ * sequence existed (or by hand) can sit ahead of it, so a value some employee already holds is skipped — still
+ * inside the caller's transaction; the unique index on employeeNumber stays the last word against a duplicate.
+ */
+export async function nextFreeEmployeeNumber(tx: TransactionClient, departmentName: string): Promise<string> {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const number = await generateEmployeeNumber(tx, departmentName);
+    const holder = await tx.employee.findUnique({ where: { employeeNumber: number }, select: { id: true } });
+    if (!holder) return number;
+  }
+  throw new EmployeeNumberTakenError();
+}
+
+export class EmployeeNumberTakenError extends Error {
+  constructor() {
+    super("employee number taken");
+    this.name = "EmployeeNumberTakenError";
+  }
+}

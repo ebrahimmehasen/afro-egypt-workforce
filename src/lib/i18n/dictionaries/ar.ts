@@ -235,6 +235,7 @@ export const ar: Dictionary = {
     backToActiveList: "القائمة العادية",
     savedEmployee: "تم حفظ الموظف",
     savedEdits: "تم حفظ التعديلات",
+    numberTaken: "ما قدرناش ندّي الموظف رقم جديد في القسم ده لأن الرقم متاخد — ما اتحفظش حاجة، جرّب تاني.",
     backToList: "الرجوع لقائمة الموظفين",
     tabBasic: "البيانات الأساسية",
     tabAttendance: "الحضور",

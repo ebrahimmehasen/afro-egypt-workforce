@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma, TransactionClient } from "@/lib/prisma";
 import { recordChangeAs, writeAudit } from "@/lib/audit";
@@ -8,7 +9,8 @@ import { getSession } from "@/lib/auth";
 import { gate } from "@/lib/change-requests";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
-import { generateEmployeeNumber } from "@/lib/employee-number";
+import { Prisma } from "@prisma/client";
+import { EmployeeNumberTakenError, generateEmployeeNumber, nextFreeEmployeeNumber } from "@/lib/employee-number";
 import { invalidFieldsError } from "@/lib/validation";
 import { refreshPayCalculations } from "@/lib/pay-refresh";
 import { hasPermission } from "@/lib/permissions";
@@ -283,7 +285,7 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
     if (nidOwner && nidOwner.id !== id) return { error: t.validation.nationalIdTaken, fields: ["nationalId"] };
   }
 
-  return gate(
+  const result = await gate(
     {
       actionKey: "employees.update",
       module: t.nav.employees,
@@ -294,6 +296,10 @@ export async function updateEmployee(_prev: ActionState, formData: FormData): Pr
     payload,
     () => applyUpdateEmployee(payload, actor?.name ?? t.auditActions.system),
   );
+  // Saved from the employee's profile and the move gave a new number: the old address no longer exists, so
+  // the profile reopens at the new one (a request still waiting for approval changes nothing and stays put).
+  if (result.employeeNumber && formData.get("onProfile") === "1") redirect(`/employees/${result.employeeNumber}`);
+  return result;
 }
 
 export async function applyUpdateEmployee(payload: EmployeePayload, actorName: string): Promise<ActionState> {
@@ -307,19 +313,36 @@ export async function applyUpdateEmployee(payload: EmployeePayload, actorName: s
     if (nidOwner && nidOwner.id !== id) return { error: t.validation.nationalIdTaken, fields: ["nationalId"] };
   }
 
-  await recordChangeAs(
-    actorName,
-    {
-      module: t.nav.employees,
-      action: t.auditActions.editEmployee,
-      oldValue: `${before.name} — ${before.basicSalary} EGP`,
-      newValue: `${payload.name} — ${payload.basicSalary} EGP`,
-    },
-    async (tx) => {
+  const audit = {
+    module: t.nav.employees,
+    action: t.auditActions.editEmployee,
+    oldValue: `${before.name} — ${before.basicSalary} EGP`,
+    newValue: `${payload.name} — ${payload.basicSalary} EGP`,
+  };
+  let renumbered: { from: string; to: string } | null = null;
+  try {
+    await recordChangeAs(actorName, audit, async (tx) => {
+      // A real move to another department gives the employee that department's next number, claimed in this
+      // same transaction (and only now: a request waiting for approval reserves nothing). Read here, not from
+      // `before`, so the comparison is against what is saved at this moment.
+      const current = await tx.employee.findUniqueOrThrow({ where: { id }, select: { departmentId: true, employeeNumber: true } });
+      let employeeNumber: string | undefined;
+      if (rest.departmentId !== current.departmentId) {
+        const [from, to] = await Promise.all([
+          tx.department.findUnique({ where: { id: current.departmentId }, select: { name: true } }),
+          tx.department.findUniqueOrThrow({ where: { id: rest.departmentId }, select: { name: true } }),
+        ]);
+        employeeNumber = await nextFreeEmployeeNumber(tx, to.name);
+        renumbered = { from: current.employeeNumber, to: employeeNumber };
+        // department and number, old → new, on the same audit row (recordChangeAs writes it after this returns)
+        audit.oldValue += ` — ${from?.name ?? current.departmentId} (${current.employeeNumber})`;
+        audit.newValue += ` — ${to.name} (${employeeNumber})`;
+      }
       const updated = await tx.employee.update({
         where: { id },
         data: {
           ...rest,
+          ...(employeeNumber ? { employeeNumber } : {}),
           nationalId,
           salaryType,
           ...(pay ?? {}),
@@ -352,14 +375,24 @@ export async function applyUpdateEmployee(payload: EmployeePayload, actorName: s
       }
       await freezeLinkedAccountIfInactive(tx, id, updated.status);
       return updated;
-    },
-  );
+    });
+  } catch (e) {
+    // the unique index (or the skip-taken loop) refused the number: nothing was saved, say so plainly
+    const duplicate =
+      e instanceof EmployeeNumberTakenError ||
+      (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002" && String(e.meta?.target ?? "").includes("employeeNumber"));
+    if (duplicate) return { error: t.employees.numberTaken, fields: ["departmentId"] };
+    throw e;
+  }
 
   revalidatePath("/employees");
   revalidatePath(`/employees/${before.employeeNumber}`);
+  const moved = renumbered as { from: string; to: string } | null;
+  if (moved) revalidatePath(`/employees/${moved.to}`);
   // salary, pay type or schedule may have changed: days not yet approved follow the new setup
   refreshPayCalculations();
-  return { success: true, message: t.employees.savedEdits };
+  // the new number lets an open profile page move to its new address
+  return { success: true, message: t.employees.savedEdits, ...(moved ? { employeeNumber: moved.to } : {}) };
 }
 
 /**

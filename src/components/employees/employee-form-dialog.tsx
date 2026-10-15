@@ -2,6 +2,7 @@
 
 import { useFormStatus } from "react-dom";
 import { useActionState, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Plus, Pencil } from "lucide-react";
 import { createEmployee, updateEmployee } from "@/lib/actions/employees";
 import { useActionFeedback, keepFilledFields } from "@/hooks/use-action-feedback";
@@ -130,6 +131,7 @@ export function EmployeeFormDialog({
 
   const action = employee ? updateEmployee : createEmployee;
   const [state, formAction] = useActionState(action, {});
+  const pathname = usePathname();
   useActionFeedback(state, () => setOpen(false));
   const bad = (field: string) => (state.fields?.includes(field) ? "border-destructive ring-1 ring-destructive" : "");
 
@@ -159,6 +161,8 @@ export function EmployeeFormDialog({
         </DialogHeader>
         <form action={formAction} ref={keepFilledFields} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {employee && <input type="hidden" name="id" value={employee.id} />}
+          {/* on the employee's own profile: a move to another department (new number) reopens it at its new address */}
+          {employee && pathname === `/employees/${employee.employeeNumber}` && <input type="hidden" name="onProfile" value="1" />}
 
           <div className="flex flex-col gap-1.5 sm:col-span-2">
             <Label htmlFor="name">{t.employees.formName}</Label>

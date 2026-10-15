@@ -235,6 +235,8 @@ export interface Dictionary {
     backToActiveList: string;
     savedEmployee: string;
     savedEdits: string;
+    /** a department move found the new department's next number already taken — nothing was saved */
+    numberTaken: string;
     backToList: string;
     tabBasic: string;
     tabAttendance: string;

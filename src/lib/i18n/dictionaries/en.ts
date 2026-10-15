@@ -235,6 +235,7 @@ export const en: Dictionary = {
     backToActiveList: "Regular list",
     savedEmployee: "Employee saved",
     savedEdits: "Changes saved",
+    numberTaken: "Couldn't give the employee a new number in this department because it is already taken. Nothing was saved; please try again.",
     backToList: "Back to employee list",
     tabBasic: "Basic Info",
     tabAttendance: "Attendance",

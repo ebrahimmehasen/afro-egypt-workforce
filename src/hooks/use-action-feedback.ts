@@ -9,6 +9,8 @@ export interface ActionState {
   message?: string;
   /** Names of the form fields that failed validation, so the form can highlight them. */
   fields?: string[];
+  /** Set when an edit moved the employee to another department and so gave them a new number. */
+  employeeNumber?: string;
 }
 
 /**
