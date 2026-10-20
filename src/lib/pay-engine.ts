@@ -234,7 +234,9 @@ export function computeDayPay(input: DayPayInput): DayPay {
   // "له إضافي" = لا: the time worked past the overtime start is still tracked (for the day's own
   // display), but the system posts nothing for it. A manual overtime entry is a separate flow
   // entirely (src/lib/actions/overtime.ts) and is never touched by this flag.
-  if (input.pay.overtimeEligible !== false) item("overtime", "addition", overtimeCountedMinutes, rules.overtimeMultiplier);
+  // Overtime is for salaried employees only: a daily worker gets none for staying past the overtime start
+  // (their weekly-day-off / holiday work and Thursday time above are paid as before).
+  if (rules.basis === "monthly" && input.pay.overtimeEligible !== false) item("overtime", "addition", overtimeCountedMinutes, rules.overtimeMultiplier);
 
   return { times, hourlyRate: hourly, workedMinutes, lateMinutes, earlyMinutes, overtimeRawMinutes, overtimeCountedMinutes, items };
 }
