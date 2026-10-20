@@ -100,8 +100,10 @@ describe.skipIf(!sampleDb)("employee number follows the department", () => {
   beforeAll(async () => {
     await cleanUp();
     shiftId = (await prisma.shift.findFirstOrThrow()).id;
-    deptA = (await prisma.department.create({ data: { name: DEPT_A } })).id;
-    deptB = (await prisma.department.create({ data: { name: DEPT_B } })).id;
+    // created already soft-deleted: the number logic reads them by id all the same, and the sample-seed test
+    // (which counts the live departments, in parallel with this file) never sees them
+    deptA = (await prisma.department.create({ data: { name: DEPT_A, deletedAt: new Date() } })).id;
+    deptB = (await prisma.department.create({ data: { name: DEPT_B, deletedAt: new Date() } })).id;
   });
   beforeEach(() => {
     session = { id: "U-admin", name: ACTOR, email: "a@x", role: "admin", permissions: [] };
