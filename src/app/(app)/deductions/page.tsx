@@ -2,6 +2,7 @@ import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { currentYearMonth } from "@/lib/today";
 import { hasPermission } from "@/lib/permissions";
+import { employeesInScope, rowsInScope, viewerScope } from "@/lib/scope";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
 import { translateLabel } from "@/lib/i18n/data-labels";
@@ -31,10 +32,13 @@ export default async function DeductionsPage({
     : undefined;
   const monthLabel = monthPeriod ? translateLabel(monthPeriod.label, locale) : initialMonth;
 
-  const deductions = [...db.deductions].sort((a, b) => (a.date < b.date ? 1 : -1));
+  // only the viewer's own employees: a department supervisor sees — and files for — their department only
+  const scope = viewerScope(user, db.employees);
+  const employees = employeesInScope(scope, db.employees);
+  const deductions = rowsInScope(scope, db.deductions).sort((a, b) => (a.date < b.date ? 1 : -1));
   // what the details popup shows for each row: department, pay type and that day's attendance
   const entryContext = buildEntryContext(deductions, db, await loadPayContext());
-  const allowances = [...db.allowances];
+  const allowances = rowsInScope(scope, db.allowances);
 
   // default the bonus month to the open (draft) period, else the real month
   const openPeriod = db.payrollPeriods.find((p) => p.status === "draft" || p.status === "calculated");
@@ -55,11 +59,11 @@ export default async function DeductionsPage({
         </div>
 
         <TabsContent value="deductions" className="flex flex-col gap-4">
-          {canManage && <div className="flex justify-end"><DeductionFormDialog employees={db.employees} /></div>}
+          {canManage && <div className="flex justify-end"><DeductionFormDialog employees={employees} /></div>}
           <DeductionsTable
             key={initialMonth ?? "all"}
             deductions={deductions}
-            employees={db.employees}
+            employees={employees}
             canManage={canManage}
             initialMonth={initialMonth}
             monthLabel={monthLabel}
@@ -70,10 +74,10 @@ export default async function DeductionsPage({
         <TabsContent value="allowances" className="flex flex-col gap-4">
           {canManage && (
             <div className="flex justify-end">
-              <AllowanceFormDialog employees={db.employees} currentPeriod={bonusPeriod} />
+              <AllowanceFormDialog employees={employees} currentPeriod={bonusPeriod} />
             </div>
           )}
-          <AllowancesTable allowances={allowances} employees={db.employees} canManage={canManage} />
+          <AllowancesTable allowances={allowances} employees={employees} canManage={canManage} />
         </TabsContent>
       </Tabs>
     </div>

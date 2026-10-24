@@ -91,6 +91,8 @@ export async function deleteDeduction(id: string): Promise<ActionState> {
   const existing = await prisma.deduction.findUnique({ where: { id } });
   if (!existing) return { error: t.validation.notFound };
   const actor = await getSession();
+  // only for an employee the account can see (a department supervisor: their department)
+  if (!actor || !(await canViewEmployee(actor, existing.employeeId))) return { error: t.validation.notAllowed };
 
   return gate(
     {
@@ -147,6 +149,7 @@ export async function updateDeduction(_prev: ActionState, formData: FormData): P
   if (!parsed.success) return { error: t.validation.invalidData };
   const existing = await prisma.deduction.findUnique({ where: { id: parsed.data.id } });
   if (!existing) return { error: t.validation.notFound };
+  if (!(await canViewEmployee(user, existing.employeeId))) return { error: t.validation.notAllowed };
 
   return gate(
     {

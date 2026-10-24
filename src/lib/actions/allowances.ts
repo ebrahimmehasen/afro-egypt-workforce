@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recordChangeAs } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
+import { canViewEmployee } from "@/lib/scope";
 import { gate } from "@/lib/change-requests";
 import { nextId } from "@/lib/id";
 import { ActionState } from "@/hooks/use-action-feedback";
@@ -33,6 +34,8 @@ export async function createAllowance(_prev: ActionState, formData: FormData): P
   const parsed = allowanceSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const actor = await getSession();
+  // only for an employee the account can see (a department supervisor: their department)
+  if (!actor || !(await canViewEmployee(actor, parsed.data.employeeId))) return { error: t.validation.notAllowed };
   const payload: AllowancePayload = { id: nextId("ALW"), ...parsed.data };
 
   return gate(
@@ -83,6 +86,7 @@ export async function deleteAllowance(id: string): Promise<ActionState> {
   const existing = await prisma.allowance.findUnique({ where: { id } });
   if (!existing) return { error: t.validation.notFound };
   const actor = await getSession();
+  if (!actor || !(await canViewEmployee(actor, existing.employeeId))) return { error: t.validation.notAllowed };
 
   return gate(
     {
