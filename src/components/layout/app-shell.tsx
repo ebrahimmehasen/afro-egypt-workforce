@@ -47,9 +47,10 @@ export function AppShell({
         </div>
       )}
 
-      <div className="flex min-h-screen flex-1 flex-col">
+      {/* min-w-0: a wide table scrolls inside its own box instead of widening the page (and the phone screen) */}
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <Topbar user={user} onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6">{children}</main>
+        <main className="min-w-0 flex-1 p-4 sm:p-6">{children}</main>
       </div>
     </div>
   );
