@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { isSelfService } from "@/lib/permissions";
+import { HR_APPROVALS, actionPermission, canApprove, hasPermission, isSelfService } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { ActionState } from "@/hooks/use-action-feedback";
 
@@ -45,10 +45,19 @@ export async function gate(
   // they can't even queue a change for approval.
   if (isSelfService(actor)) return { error: t.validation.notAllowed };
 
+  // Only on a page they were granted: an account can't change — nor ask to change — anything else.
+  const permission = actionPermission(meta.actionKey);
+  if (permission && !hasPermission(actor, permission)) return { error: t.validation.notAllowed };
+
+  // Requests the admin or HR must approve (a leave decision, a deduction / penalty / advance): HR's own goes
+  // through now, anyone else's waits for them — "direct edit" doesn't skip it.
+  const approval = HR_APPROVALS[meta.actionKey];
+  if (approval && canApprove(actor, approval)) return apply();
+
   // "All permissions" accounts skip the queue for everything except deletes:
   // the action runs now and is only logged on /change-requests for the admin.
   const isDelete = meta.actionKey.endsWith(".delete");
-  if (!isDelete) {
+  if (!isDelete && !approval) {
     const account = await prisma.user.findUnique({ where: { id: actor.id }, select: { directEdit: true, active: true } });
     if (account?.active && account.directEdit) {
       const result = await apply();

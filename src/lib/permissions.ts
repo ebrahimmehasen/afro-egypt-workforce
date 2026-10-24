@@ -24,7 +24,8 @@ export const PERMISSION_DEFS = [
 export type PermissionKey = (typeof PERMISSION_DEFS)[number]["key"];
 export const PERMISSION_KEYS: PermissionKey[] = PERMISSION_DEFS.map((p) => p.key);
 
-// /users, /permissions and /change-requests are never grantable — admin only. (/biometric-device is a
+// /users, /permissions and /change-requests are never grantable — admin only (HR approving leaves or deductions
+// also opens /change-requests, for those requests only — see allowedNavPaths). (/biometric-device is a
 // grantable page like the rest: it comes in through PERMISSION_DEFS.)
 const ADMIN_NAV = [
   "/dashboard", ...PERMISSION_DEFS.map((p) => p.path),
@@ -58,11 +59,61 @@ export function allowedNavPaths(user: SessionLike): string[] {
   if (user.role === "admin") return ADMIN_NAV;
   if (isSelfService(user)) return EMPLOYEE_NAV;
   const granted = PERMISSION_DEFS.filter((p) => hasPermission(user, p.key)).map((p) => p.path);
-  return ["/dashboard", ...granted];
+  // HR approving leaves or deductions reviews those requests on /change-requests (only those — see the page)
+  return ["/dashboard", ...granted, ...(reviewsRequests(user) ? ["/change-requests"] : [])];
 }
 
 export function canAccess(user: SessionLike, path: string): boolean {
   return allowedNavPaths(user).some((p) => path === p || path.startsWith(`${p}/`));
+}
+
+/**
+ * The page permission every gated write needs, by its action key's prefix: an account can only change — or even
+ * ask to change — what sits on a page it was granted. Work schedules check their own (settings vs /shifts).
+ */
+const ACTION_PERMISSIONS: Record<string, PermissionKey> = {
+  employees: "employees",
+  departments: "departments",
+  shifts: "shifts",
+  attendance: "attendance",
+  leaves: "leaves",
+  overtime: "overtime",
+  deductions: "deductions",
+  allowances: "deductions",
+  payroll: "payroll",
+  settings: "settings",
+  biometric: "biometric_device",
+};
+
+export function actionPermission(actionKey: string): PermissionKey | null {
+  return ACTION_PERMISSIONS[actionKey.split(".")[0]] ?? null;
+}
+
+/**
+ * Requests only the system admin or HR may approve — a leave or excuse decision, and a deduction (penalty,
+ * advance…) — with the permission each needs. Nobody else's request skips that approval, "direct edit" included.
+ */
+export const HR_APPROVALS: Record<string, PermissionKey> = {
+  "leaves.decide": "leaves",
+  "deductions.create": "deductions",
+};
+
+/** The system admin, or an HR ("الموارد البشرية") account holding that page's permission. */
+export function canApprove(user: SessionLike, permission: PermissionKey): boolean {
+  if (user.role === "admin") return true;
+  return user.role === "hr" && hasPermission(user, permission);
+}
+
+/** Whether `user` may approve / reject a pending change request with this action key: the admin any; HR the HR_APPROVALS ones. */
+export function canReviewRequest(user: SessionLike, actionKey: string): boolean {
+  if (user.role === "admin") return true;
+  const permission = HR_APPROVALS[actionKey];
+  return Boolean(permission && canApprove(user, permission));
+}
+
+/** Whether `user` reviews any requests at all (the admin, or HR approving leaves or deductions). */
+export function reviewsRequests(user: SessionLike): boolean {
+  return Object.values(HR_APPROVALS).some((p) => canApprove(user, p));
 }
 
 /** Only a true admin manages logins and permission grants — never delegable. */

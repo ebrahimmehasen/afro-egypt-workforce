@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { employeesInScope, rowsInScope, viewerScope } from "@/lib/scope";
-import { hasPermission } from "@/lib/permissions";
+import { canApprove, hasPermission } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { annualLeaveBalance, type LeaveBalance } from "@/lib/leave-balance";
 import { today } from "@/lib/today";
@@ -42,7 +42,7 @@ export default async function LeavesPage() {
         description={t.leaves.description}
         actions={<LeaveFormDialog employees={employees} balances={balances} />}
       />
-      <LeavesTable leaves={sorted} employees={db.employees} canApprove={hasPermission(user, "leaves")} canDelete={user.role === "admin"} />
+      <LeavesTable leaves={sorted} employees={db.employees} canApprove={canApprove(user, "leaves")} canDelete={user.role === "admin"} />
     </div>
   );
 }

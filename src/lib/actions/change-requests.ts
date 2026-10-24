@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { canManagePermissions } from "@/lib/permissions";
+import { canReviewRequest, reviewsRequests } from "@/lib/permissions";
+import { canViewEmployee } from "@/lib/scope";
 import { recordChangeAs } from "@/lib/audit";
 import { getT } from "@/lib/i18n";
 import { ActionState } from "@/hooks/use-action-feedback";
@@ -70,8 +71,24 @@ const APPLIERS: Record<string, (payload: unknown, actorName: string) => Promise<
 
 async function guard() {
   const user = await getSession();
-  if (!user || !canManagePermissions(user.role)) return null;
+  if (!user || !reviewsRequests(user)) return null;
   return user;
+}
+
+/**
+ * Whether `actor` may decide this request: the admin any; HR only the ones it approves (a leave decision, a
+ * deduction / penalty / advance), and only for an employee it can see.
+ */
+async function mayReview(actor: NonNullable<Awaited<ReturnType<typeof guard>>>, cr: { actionKey: string; payload: unknown }): Promise<boolean> {
+  if (actor.role === "admin") return true;
+  if (!canReviewRequest(actor, cr.actionKey)) return false;
+  const payload = (cr.payload ?? {}) as { employeeId?: string; id?: string };
+  const employeeId =
+    payload.employeeId ??
+    (cr.actionKey === "leaves.decide" && payload.id
+      ? (await prisma.leave.findUnique({ where: { id: payload.id }, select: { employeeId: true } }))?.employeeId
+      : undefined);
+  return Boolean(employeeId && (await canViewEmployee(actor, employeeId)));
 }
 
 export async function rejectChangeRequest(id: string, reason?: string): Promise<ActionState> {
@@ -82,6 +99,7 @@ export async function rejectChangeRequest(id: string, reason?: string): Promise<
   const cr = await prisma.changeRequest.findUnique({ where: { id } });
   if (!cr) return { error: t.changeRequests.notFound };
   if (cr.status !== "pending") return { error: t.changeRequests.alreadyReviewed };
+  if (!(await mayReview(actor, cr))) return { error: t.validation.notAllowed };
 
   await recordChangeAs(
     actor.name,
@@ -111,6 +129,7 @@ export async function approveChangeRequest(id: string): Promise<ActionState> {
   const cr = await prisma.changeRequest.findUnique({ where: { id } });
   if (!cr) return { error: t.changeRequests.notFound };
   if (cr.status !== "pending") return { error: t.changeRequests.alreadyReviewed };
+  if (!(await mayReview(actor, cr))) return { error: t.validation.notAllowed };
 
   const apply = APPLIERS[cr.actionKey];
   if (!apply) return { error: t.changeRequests.applyFailed };

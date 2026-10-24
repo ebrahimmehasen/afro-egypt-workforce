@@ -1,14 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { requireAccess } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
+import { HR_APPROVALS, canReviewRequest } from "@/lib/permissions";
 import { PageHeader } from "@/components/shared/page-header";
 import { ChangeRequestsTable } from "@/components/change-requests/change-requests-table";
 
 export default async function ChangeRequestsPage() {
-  await requireAccess("/change-requests");
+  const user = await requireAccess("/change-requests");
   const t = await getT();
 
-  const requests = await prisma.changeRequest.findMany({ orderBy: { createdAt: "desc" } });
+  // The admin sees every request; HR only the ones it approves (leave decisions, deductions) — each approval
+  // still checks the employee is in its scope.
+  const keys = user.role === "admin" ? null : Object.keys(HR_APPROVALS).filter((k) => canReviewRequest(user, k));
+  const requests = await prisma.changeRequest.findMany({
+    where: keys ? { actionKey: { in: keys } } : undefined,
+    orderBy: { createdAt: "desc" },
+  });
 
   return (
     <div className="flex flex-col gap-6">

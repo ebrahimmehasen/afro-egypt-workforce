@@ -11,6 +11,7 @@ import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
 import { deductionTypeLabel } from "@/lib/i18n/labels";
 import { hasPermission } from "@/lib/permissions";
+import { canViewEmployee } from "@/lib/scope";
 import { dayStr } from "@/lib/serialize";
 import { scheduleAttendanceEffects } from "@/lib/attendance-effects";
 
@@ -30,8 +31,11 @@ export async function createDeduction(_prev: ActionState, formData: FormData): P
   const parsed = deductionSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.validation.invalidData };
   const actor = await getSession();
+  // only for an employee the account can see (a department supervisor: their department)
+  if (!actor || !(await canViewEmployee(actor, parsed.data.employeeId))) return { error: t.validation.notAllowed };
   const payload: DeductionPayload = { id: nextId("DED"), ...parsed.data };
 
+  // gate(): a non-admin needs "deductions"; the admin's or HR's goes through, anyone else's waits for them
   return gate(
     {
       actionKey: "deductions.create",

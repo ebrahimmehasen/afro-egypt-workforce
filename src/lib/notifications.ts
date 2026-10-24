@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { hasPermission } from "@/lib/permissions";
+import { HR_APPROVALS, canApprove, canReviewRequest, hasPermission, reviewsRequests } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
 import { leaveTypeLabel } from "@/lib/i18n/labels";
 import { User } from "@/lib/types";
@@ -43,7 +43,8 @@ export async function getNotifications(user: User): Promise<NotificationFeed> {
   const deptIds = user.departmentIds ?? [];
   const employeeScope = deptIds.length > 0 ? { employee: { departmentId: { in: deptIds } } } : {};
 
-  if (hasPermission(user, "leaves")) {
+  // a leave waits on whoever decides it: the admin or HR (with "leaves")
+  if (canApprove(user, "leaves")) {
     const where = { status: "pending" as const, ...employeeScope };
     const [count, rows] = await Promise.all([
       prisma.leave.count({ where }),
@@ -83,8 +84,10 @@ export async function getNotifications(user: User): Promise<NotificationFeed> {
     }
   }
 
-  if (user.role === "admin") {
-    const where = { status: "pending" as const };
+  if (reviewsRequests(user)) {
+    // the admin: every pending request; HR: the leave decisions and deductions it approves
+    const keys = user.role === "admin" ? null : Object.keys(HR_APPROVALS).filter((k) => canReviewRequest(user, k));
+    const where = { status: "pending" as const, ...(keys ? { actionKey: { in: keys } } : {}) };
     const [count, rows] = await Promise.all([
       prisma.changeRequest.count({ where }),
       prisma.changeRequest.findMany({ where, orderBy: { createdAt: "desc" }, take: PER_KIND }),

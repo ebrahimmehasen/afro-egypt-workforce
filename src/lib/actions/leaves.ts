@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recordChangeAs } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
-import { isSelfService } from "@/lib/permissions";
+import { canApprove, isSelfService } from "@/lib/permissions";
 import { canViewEmployee } from "@/lib/scope";
 import { gate } from "@/lib/change-requests";
 import { nextId } from "@/lib/id";
@@ -100,6 +100,11 @@ export async function decideLeave(id: string, decision: "approved" | "rejected")
   const leave = await prisma.leave.findUnique({ where: { id }, include: { employee: true } });
   if (!leave) return { error: t.validation.requestNotFound };
   const actor = await getSession();
+  // A leave or excuse is decided by the system admin or HR (holding "leaves") only — for an employee they can
+  // see. Anyone else, a department supervisor included, can file and follow it but not decide it.
+  if (!actor || !canApprove(actor, "leaves") || !(await canViewEmployee(actor, leave.employeeId))) {
+    return { error: t.validation.notAllowed };
+  }
 
   return gate(
     {
