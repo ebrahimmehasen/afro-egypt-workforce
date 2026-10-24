@@ -23,7 +23,8 @@ const leaveSchema = z.object({
   type: z.enum(["annual", "casual", "sick", "unpaid", "mission", "permission", "excused_absence"]),
   from: z.string().min(1),
   to: z.string().min(1),
-  reason: z.string().min(3),
+  // optional: a leave or excuse can be filed without one (saved as "")
+  reason: z.string().trim().max(2000).optional().default(""),
 });
 
 const dayDate = (s: string) => new Date(`${s}T00:00:00.000Z`);

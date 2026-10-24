@@ -95,8 +95,8 @@ export function LeaveFormDialog({
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="reason">{t.leaves.formReason}</Label>
-            <Textarea id="reason" name="reason" required />
+            <Label htmlFor="reason">{t.leaves.formReason} <span className="text-xs font-normal text-muted-foreground">({t.common.optional})</span></Label>
+            <Textarea id="reason" name="reason" />
           </div>
           <DialogFooter><SubmitButton /></DialogFooter>
         </form>

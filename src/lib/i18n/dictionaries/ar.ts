@@ -9,6 +9,7 @@ export const ar: Dictionary = {
     slogan: "Where 404 Becomes Legend.",
   },
   common: {
+    optional: "اختياري",
     save: "حفظ",
     saving: "جارِ الحفظ...",
     cancel: "إلغاء",

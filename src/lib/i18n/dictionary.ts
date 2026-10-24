@@ -9,6 +9,7 @@ export interface Dictionary {
     slogan: string;
   };
   common: {
+    optional: string;
     save: string;
     saving: string;
     cancel: string;
