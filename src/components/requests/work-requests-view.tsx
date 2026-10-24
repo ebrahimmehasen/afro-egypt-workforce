@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { MultiSelectFilter, type MultiSelectOption } from "@/components/shared/multi-select-filter";
 import { RequestStatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -46,10 +46,9 @@ export function WorkRequestDialog({ employees }: { employees: MultiSelectOption[
       <DialogTrigger asChild>
         <Button className="gap-2"><Plus className="h-4 w-4" />{t.workRequests.add}</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{t.workRequests.dialogTitle}</DialogTitle>
-          <DialogDescription>{t.workRequests.noPayEffect}</DialogDescription>
         </DialogHeader>
         <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

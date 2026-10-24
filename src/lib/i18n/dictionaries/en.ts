@@ -107,7 +107,6 @@ export const en: Dictionary = {
     description: "Late-work and other requests for your department's workers — approved by the system admin or HR.",
     add: "New request",
     dialogTitle: "File a request",
-    noPayEffect: "A request is a record only: it changes no attendance, overtime or pay.",
     type: "Request type",
     typeLateWork: "Late work",
     typeOther: "Other request",

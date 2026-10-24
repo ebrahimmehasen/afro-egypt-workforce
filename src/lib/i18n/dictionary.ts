@@ -108,7 +108,6 @@ export interface Dictionary {
     description: string;
     add: string;
     dialogTitle: string;
-    noPayEffect: string;
     type: string;
     typeLateWork: string;
     typeOther: string;

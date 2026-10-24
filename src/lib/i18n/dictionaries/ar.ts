@@ -107,7 +107,6 @@ export const ar: Dictionary = {
     description: "طلبات السهر وغيرها لعمال القسم — بيوافق عليها مدير النظام أو الموارد البشرية.",
     add: "طلب جديد",
     dialogTitle: "تقديم طلب",
-    noPayEffect: "الطلب تسجيل بس: مش بيغيّر الحضور ولا الإضافي ولا المرتبات.",
     type: "نوع الطلب",
     typeLateWork: "سهر",
     typeOther: "طلب آخر",
