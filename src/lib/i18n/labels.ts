@@ -111,6 +111,7 @@ export const NAV_ITEMS = [
   { href: "/attendance", key: "attendance", icon: "Fingerprint" },
   { href: "/leaves", key: "leaves", icon: "CalendarDays" },
   { href: "/overtime", key: "overtime", icon: "TimerReset" },
+  { href: "/requests", key: "requests", icon: "ClipboardList" },
   { href: "/deductions", key: "deductions", icon: "MinusCircle" },
   { href: "/payroll", key: "payroll", icon: "Wallet" },
   { href: "/reports", key: "reports", icon: "FileBarChart" },

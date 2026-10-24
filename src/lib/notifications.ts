@@ -153,6 +153,46 @@ export async function getNotifications(user: User): Promise<NotificationFeed> {
     }
   }
 
+  // work requests ("سهر" and others): pending ones wait on the admin / HR (within its departments); whoever filed
+  // one hears the decision
+  if (canApprove(user, "requests")) {
+    const rows = await prisma.workRequest.findMany({ where: { status: "pending" }, orderBy: { createdAt: "desc" } });
+    const inDepts =
+      user.role === "admin" || deptIds.length === 0
+        ? null
+        : new Set((await prisma.employee.findMany({ where: { departmentId: { in: deptIds } }, select: { id: true } })).map((e) => e.id));
+    const waiting = rows.filter((r) => !inDepts || (Array.isArray(r.employeeIds) && (r.employeeIds as string[]).some((id) => inDepts.has(id))));
+    pendingCount += waiting.length;
+    for (const r of waiting.slice(0, PER_KIND)) {
+      items.push({
+        id: `work-request-pending-${r.id}`,
+        title: t.notifications.workRequestPending,
+        body: `${r.requestedBy} — ${r.details.slice(0, 80)}`,
+        at: r.createdAt.toISOString(),
+        href: "/requests",
+        actionable: true,
+        tone: "info",
+      });
+    }
+  }
+  const decidedRequests = await prisma.workRequest.findMany({
+    where: { requestedById: user.id, status: { in: ["approved", "rejected"] }, decidedAt: { gte: since } },
+    orderBy: { decidedAt: "desc" },
+    take: PER_KIND,
+  });
+  for (const r of decidedRequests) {
+    const approved = r.status === "approved";
+    items.push({
+      id: `work-request-decided-${r.id}-${r.status}`,
+      title: approved ? t.notifications.workRequestApproved : t.notifications.workRequestRejected,
+      body: `${r.details.slice(0, 80)}${!approved && r.decisionNote ? ` — ${r.decisionNote}` : ""}`,
+      at: (r.decidedAt ?? r.createdAt).toISOString(),
+      href: "/requests",
+      actionable: false,
+      tone: approved ? "success" : "danger",
+    });
+  }
+
   items.sort((a, b) => (a.at < b.at ? 1 : -1));
   return { items, pendingCount };
 }

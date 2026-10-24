@@ -19,6 +19,8 @@ export const PERMISSION_DEFS = [
   { key: "audit_log", path: "/audit-log" },
   { key: "settings", path: "/settings" },
   { key: "biometric_device", path: "/biometric-device" },
+  /** work requests ("سهر" and others) for the workers of one's department — see src/lib/actions/work-requests.ts */
+  { key: "requests", path: "/requests" },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_DEFS)[number]["key"];

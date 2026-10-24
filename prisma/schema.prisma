@@ -769,3 +769,35 @@ model Holiday {
 
   @@index([from, to])
 }
+
+/// What a work request asks for: staying late ("سهر"), or anything else the supervisor writes in.
+enum WorkRequestType {
+  late_work
+  other
+}
+
+/// A request a supervisor or HR files for workers of their department (e.g. "سهر الخميس لـ 5 عمال"), approved
+/// or rejected by the system admin or HR. A record only: it changes no attendance, pay or overtime.
+model WorkRequest {
+  id            String          @id @default(cuid())
+  type          WorkRequestType
+  date          DateTime        @db.Date
+  /// "18:00" — optional for "other"
+  fromTime      String?
+  toTime        String?
+  details       String          @db.Text
+  /// The employees the request is for: string[] of Employee.id
+  employeeIds   Json
+  status        RequestStatus   @default(pending)
+  requestedById String
+  /// display name at request time
+  requestedBy   String
+  decidedBy     String?
+  decidedAt     DateTime?
+  decisionNote  String?         @db.Text
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([status])
+  @@index([date])
+}

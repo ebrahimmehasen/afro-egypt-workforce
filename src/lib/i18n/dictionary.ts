@@ -75,6 +75,7 @@ export interface Dictionary {
     users: string;
     permissions: string;
     changeRequests: string;
+    requests: string;
     biometricDevice: string;
     settings: string;
   };
@@ -100,6 +101,43 @@ export interface Dictionary {
     logout: string;
     language: string;
   };
+  /** الطلبات — /requests: requests a supervisor or HR files for workers of their department (a record only) */
+  workRequests: {
+    title: string;
+    description: string;
+    add: string;
+    dialogTitle: string;
+    noPayEffect: string;
+    type: string;
+    typeLateWork: string;
+    typeOther: string;
+    date: string;
+    from: string;
+    to: string;
+    details: string;
+    detailsPlaceholder: string;
+    employees: string;
+    employeesPlaceholder: string;
+    selectedEmployees: string;
+    submit: string;
+    submitted: string;
+    approve: string;
+    reject: string;
+    approvedMessage: string;
+    rejectedMessage: string;
+    rejectTitle: string;
+    decisionNote: string;
+    decisionNotePlaceholder: string;
+    requestedBy: string;
+    decidedBy: string;
+    pending: string;
+    approved: string;
+    rejected: string;
+    noRecords: string;
+    errNoEmployees: string;
+    errTime: string;
+    errNotPending: string;
+  };
   notifications: {
     title: string;
     empty: string;
@@ -110,6 +148,9 @@ export interface Dictionary {
     leaveRejected: string;
     changeApproved: string;
     changeRejected: string;
+    workRequestPending: string;
+    workRequestApproved: string;
+    workRequestRejected: string;
     hours: string;
   };
   dashboard: {
@@ -903,6 +944,7 @@ export interface Dictionary {
       audit_log: string;
       settings: string;
       biometric_device: string;
+      requests: string;
     };
     biometricDeviceHint: string;
   };
@@ -1089,6 +1131,9 @@ export interface Dictionary {
     periodExists: string;
   };
   auditActions: {
+    addWorkRequest: string;
+    approveWorkRequest: string;
+    rejectWorkRequest: string;
     addEmployee: string;
     editEmployee: string;
     archiveEmployee: string;
