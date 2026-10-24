@@ -420,6 +420,7 @@ export const en: Dictionary = {
     },
   },
   overtime: {
+    notEligible: "This employee isn't set to receive overtime (\"له إضافي\" is off).",
     title: "Overtime",
     description: "Record and approve overtime hours",
     addOvertime: "Add Overtime",

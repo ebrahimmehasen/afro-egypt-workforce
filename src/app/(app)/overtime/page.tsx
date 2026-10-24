@@ -43,7 +43,8 @@ export default async function OvertimePage({
       <PageHeader
         title={t.overtime.title}
         description={t.overtime.description}
-        actions={<OvertimeFormDialog employees={employees} defaultRates={defaultRates} />}
+        // only employees with "له إضافي" can be given overtime
+        actions={<OvertimeFormDialog employees={employees.filter((e) => e.overtimeEligible !== false)} defaultRates={defaultRates} />}
       />
       <OvertimeTable
         key={initialStatus}

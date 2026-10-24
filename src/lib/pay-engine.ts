@@ -208,9 +208,11 @@ export function computeDayPay(input: DayPayInput): DayPay {
   if (!actualIn || !actualOut || actualOut <= actualIn) return empty;
 
   const workedMinutes = (actualOut.getTime() - actualIn.getTime()) / MS_PER_MIN;
+  // "له إضافي" off: no addition of any kind — no overtime, no weekly-day-off / holiday work, no Thursday time
+  const additions = input.pay.overtimeEligible !== false;
 
   if (input.kind !== "workday") {
-    item(input.kind === "holiday" ? "holiday" : "friday", "addition", workedMinutes, input.kind === "holiday" ? rules.holidayMultiplier : rules.fridayMultiplier);
+    if (additions) item(input.kind === "holiday" ? "holiday" : "friday", "addition", workedMinutes, input.kind === "holiday" ? rules.holidayMultiplier : rules.fridayMultiplier);
     return { ...empty, workedMinutes };
   }
 
@@ -222,7 +224,7 @@ export function computeDayPay(input: DayPayInput): DayPay {
   if (input.hasPermission) item("permission", "deduction", earlyMinutes, rules.permissionMultiplier);
   else item("unauthorized_exit", "deduction", earlyMinutes, rules.unauthorizedExitMultiplier);
 
-  if (times.thursdayExtra) {
+  if (times.thursdayExtra && additions) {
     const from = Math.max(times.thursdayExtra.from.getTime(), actualIn.getTime());
     const to = Math.min(times.thursdayExtra.to.getTime(), actualOut.getTime());
     item("thursday_extra", "addition", Math.max(0, (to - from) / MS_PER_MIN), rules.thursdayExtraMultiplier);
@@ -234,7 +236,7 @@ export function computeDayPay(input: DayPayInput): DayPay {
   // "له إضافي" = لا: the time worked past the overtime start is still tracked (for the day's own
   // display), but the system posts nothing for it. A manual overtime entry is a separate flow
   // entirely (src/lib/actions/overtime.ts) and is never touched by this flag.
-  if (input.pay.overtimeEligible !== false) item("overtime", "addition", overtimeCountedMinutes, rules.overtimeMultiplier);
+  if (additions) item("overtime", "addition", overtimeCountedMinutes, rules.overtimeMultiplier);
 
   return { times, hourlyRate: hourly, workedMinutes, lateMinutes, earlyMinutes, overtimeRawMinutes, overtimeCountedMinutes, items };
 }

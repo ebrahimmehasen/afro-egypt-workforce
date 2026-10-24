@@ -420,6 +420,7 @@ export const ar: Dictionary = {
     },
   },
   overtime: {
+    notEligible: "الموظف ده مش متفعّله \"له إضافي\"، فمينفعش يتسجّله إضافي.",
     title: "الإضافي",
     description: "تسجيل واعتماد ساعات العمل الإضافي",
     addOvertime: "إضافة إضافي",

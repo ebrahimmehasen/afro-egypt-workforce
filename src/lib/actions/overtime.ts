@@ -27,9 +27,13 @@ export async function createOvertime(_prev: ActionState, formData: FormData): Pr
 
   const actor = await getSession();
   if (!actor) return { error: t.validation.invalidData };
-  if (actor.role !== "admin" && (isSelfService(actor) || !(await canViewEmployee(actor, parsed.data.employeeId)))) {
+  if (actor.role !== "admin" && (isSelfService(actor) || !hasPermission(actor, "overtime") || !(await canViewEmployee(actor, parsed.data.employeeId)))) {
     return { error: t.validation.notAllowed };
   }
+  // "له إضافي" off: nothing goes on the overtime page for them, a manual entry included
+  const employee = await prisma.employee.findFirst({ where: { id: parsed.data.employeeId, deletedAt: null }, select: { overtimeEligible: true } });
+  if (!employee) return { error: t.validation.employeeNotFound };
+  if (!employee.overtimeEligible) return { error: t.overtime.notEligible, fields: ["employeeId"] };
 
   await prisma.overtime.create({
     data: {

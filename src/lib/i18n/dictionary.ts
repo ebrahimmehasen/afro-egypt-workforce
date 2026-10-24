@@ -422,6 +422,8 @@ export interface Dictionary {
     };
   };
   overtime: {
+    /** a manual entry for an employee whose "له إضافي" is off */
+    notEligible: string;
     title: string;
     description: string;
     addOvertime: string;
