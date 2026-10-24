@@ -49,6 +49,9 @@ const seqOf = async (code: string) => (await prisma.departmentNumberSequence.fin
 async function makeEmployee(number: string, departmentId: string, status: "active" | "terminated" = "active") {
   const e = await prisma.employee.create({
     data: {
+      // an id that sorts after the seeded "EMP-…" ones, so a test running in parallel that takes "the first
+      // active employee" never picks this temporary one
+      id: `ZZ-${number}`,
       employeeNumber: number,
       name: `اختبار ${number}`,
       departmentId,

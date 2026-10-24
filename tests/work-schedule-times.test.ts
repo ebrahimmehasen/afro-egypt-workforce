@@ -212,7 +212,8 @@ describe.skipIf(!sampleDb)("one list of working hours on /shifts and in the sett
     const shiftId = (await prisma.shift.findFirstOrThrow()).id;
     const dept = (await prisma.department.findFirstOrThrow()).id;
     const e = await prisma.employee.create({
-      data: { employeeNumber: "ZZWS-001", name: `${PREFIX} موظف`, departmentId: dept, jobTitle: "x", hireDate: new Date("2024-01-01"), shiftId, basicSalary: 6000, workScheduleId: row.id },
+      // an id that sorts after the seeded "EMP-…" ones (see employee-number-department-move.test.ts)
+      data: { id: "ZZ-ZZWS-001", employeeNumber: "ZZWS-001", name: `${PREFIX} موظف`, departmentId: dept, jobTitle: "x", hireDate: new Date("2024-01-01"), shiftId, basicSalary: 6000, workScheduleId: row.id },
     });
 
     const refused = await deleteWorkSchedule(row.id, "shifts");
