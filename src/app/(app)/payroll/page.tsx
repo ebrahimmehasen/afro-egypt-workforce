@@ -5,8 +5,6 @@ import { hasPermission, isSelfService } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
 import { today } from "@/lib/today";
 import { payday, payPeriodOf, payPeriodRange } from "@/lib/pay-rules";
-import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
-import { missingAcknowledgmentKeys, requiredAcknowledgmentKeys } from "@/lib/acknowledgments";
 import { intlLocale } from "@/lib/i18n/format";
 import { getT, format } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
@@ -23,8 +21,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
-import { FileWarning, Wallet } from "lucide-react";
-import Link from "next/link";
+import { Wallet } from "lucide-react";
 
 const STATUS_VARIANT: Record<string, "secondary" | "warning" | "success" | "outline"> = {
   draft: "secondary",
@@ -72,18 +69,6 @@ export default async function PayrollPage({
   }
 
   const totalNet = records.reduce((s, r) => s + r.record.netSalary, 0);
-
-  // the bylaws: pay is only settled once the hiring documents are complete — flagged here, not withheld
-  const incompleteDocs = isSelfService(user)
-    ? []
-    : db.employees
-        .filter((e) => e.status !== "terminated")
-        .filter((e) => {
-          const missingDocs = missingDocumentTypes(db.employeeDocuments.filter((d) => d.employeeId === e.id), requiredDocumentTypes(e));
-          const missingAcks = missingAcknowledgmentKeys(db.employeeAcknowledgments.filter((a) => a.employeeId === e.id), requiredAcknowledgmentKeys(e));
-          return missingDocs.length > 0 || missingAcks.length > 0;
-        })
-        .sort((a, b) => a.name.localeCompare(b.name, locale === "ar" ? "ar" : "en"));
 
   const dayFmt = new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "long", timeZone: "UTC" });
   const showDay = (day: string) => dayFmt.format(new Date(`${day}T00:00:00Z`));
@@ -136,25 +121,6 @@ export default async function PayrollPage({
         </Card>
       ) : (
         <EmptyState icon={Wallet} title={t.payroll.noPeriods} />
-      )}
-
-      {incompleteDocs.length > 0 && (
-        <Card className="border-warning/40 bg-warning/5">
-          <CardContent className="flex flex-col gap-2 p-5">
-            <p className="flex items-center gap-2 font-semibold text-foreground">
-              <FileWarning className="h-5 w-5 text-warning" />
-              {format(t.payroll.incompleteDocsTitle, { count: incompleteDocs.length })}
-            </p>
-            <p className="text-sm text-muted-foreground">{t.payroll.incompleteDocsDesc}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {incompleteDocs.map((e) => (
-                <Link key={e.id} href={`/employees/${e.employeeNumber}`}>
-                  <Badge variant="outline" className="hover:bg-muted">{e.name}</Badge>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       )}
 
       {records.length === 0 ? (

@@ -531,8 +531,6 @@ export const ar: Dictionary = {
     description: "حساب واعتماد رواتب الموظفين",
     employeesCount: "{count} موظف",
     periodRange: "من {from} لـ {to} — الصرف {payday}",
-    incompleteDocsTitle: "{count} موظف ورق تعيينهم ناقص",
-    incompleteDocsDesc: "حسب اللائحة، المرتب مايتحسبش غير بعد استكمال مصوغات التعيين. المرتبات محسوبة عادي، بس راجع ورق دول:",
     totalNet: "إجمالي صافي",
     trialNote: "حساب تجريبي وفق قواعد المصنع",
     calculate: "حساب الرواتب",

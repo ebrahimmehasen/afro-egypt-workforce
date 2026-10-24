@@ -531,8 +531,6 @@ export const en: Dictionary = {
     description: "Calculate and approve employee payroll",
     employeesCount: "{count} employees",
     periodRange: "{from} to {to} — paid on {payday}",
-    incompleteDocsTitle: "{count} employees with incomplete hiring documents",
-    incompleteDocsDesc: "Per the bylaws, pay is only settled once the hiring documents are complete. Pay is calculated as usual; review these files:",
     totalNet: "Total net",
     trialNote: "Trial calculation per factory rules",
     calculate: "Calculate Payroll",

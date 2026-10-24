@@ -534,8 +534,6 @@ export interface Dictionary {
     description: string;
     employeesCount: string;
     periodRange: string;
-    incompleteDocsTitle: string;
-    incompleteDocsDesc: string;
     totalNet: string;
     trialNote: string;
     calculate: string;
