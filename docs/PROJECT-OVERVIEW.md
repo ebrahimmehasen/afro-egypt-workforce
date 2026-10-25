@@ -744,6 +744,7 @@ sequenceDiagram
 - **الجهاز:** `device-link` · `device-resilience` · `zk-device-*` (اتصال، حالة مشتركة، جهاز مش متاح).
 - **المساعد:** `assistant-run` · `assistant-tools` · `assistant-markdown` · `assistant-live` (محتاج مفتاح NVIDIA حقيقي).
 - **الواجهة:** `tabs-direction` · `image-view` · `employee-order`.
+- **ترتيب التشغيل** (`vitest.config.mjs`): كل الملفات بتشتغل بالتوازي، ما عدا `payroll-recalc`، اللي بيشتغل لوحده **بعد** ما الباقي يخلص (project اسمه `payroll-db` و`sequence.groupOrder: 1`). السبب إنه بيحسب رواتب كل الموظفين النشطين في القاعدة المشتركة، فلو اشتغل جنب الملفات اللي بتعمل موظفين مؤقتين وتمسحهم بيحصل FK error.
 - **اختبارات التكامل** بتشتغل على **MySQL حقيقي**، وبتعدّي نفسها لوحدها لو مفيش قاعدة بيانات أو مفيش بيانات sample (`sample-seed` وغيره). الموظفين المؤقتين في الاختبارات أرقامهم بتبدأ بـ `ZZ-` عشان يترتّبوا بعد بيانات الـseed.
 - الـCI بيشغّل `npm test` **قبل** أي نشر.
 
