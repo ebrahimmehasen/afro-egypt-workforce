@@ -1231,6 +1231,8 @@ export const ar: Dictionary = {
     linkDeviceUser: "ربط مستخدم جهاز البصمة بموظف",
     unlinkDeviceUser: "إلغاء ربط مستخدم جهاز البصمة",
     unlinkDeviceOnTermination: "فك ربط البصمة عند انتهاء الخدمة",
+    voidOvertimeNotEligible: "شيل الإضافي — اتقفل \"له إضافي\"",
+    restoreOvertimeEligible: "رجوع الإضافي التلقائي — اتفتح \"له إضافي\"",
     renameDeviceUser: "تعديل اسم مستخدم على جهاز البصمة",
     syncAttendance: "مزامنة الحضور من جهاز البصمة",
     pauseRealtimeSync: "إيقاف المزامنة اللحظية مؤقتًا",

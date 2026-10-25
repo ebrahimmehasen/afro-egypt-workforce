@@ -1231,6 +1231,8 @@ export const en: Dictionary = {
     linkDeviceUser: "Link biometric device user to employee",
     unlinkDeviceUser: "Unlink biometric device user",
     unlinkDeviceOnTermination: "Fingerprint link cleared when service ended",
+    voidOvertimeNotEligible: "Overtime removed — \"له إضافي\" switched off",
+    restoreOvertimeEligible: "Automatic overtime restored — \"له إضافي\" switched on",
     renameDeviceUser: "Rename biometric device user",
     syncAttendance: "Sync attendance from the biometric device",
     pauseRealtimeSync: "Pause real-time sync",

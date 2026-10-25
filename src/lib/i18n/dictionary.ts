@@ -1188,6 +1188,8 @@ export interface Dictionary {
     linkDeviceUser: string;
     unlinkDeviceUser: string;
     unlinkDeviceOnTermination: string;
+    voidOvertimeNotEligible: string;
+    restoreOvertimeEligible: string;
     renameDeviceUser: string;
     syncAttendance: string;
     pauseRealtimeSync: string;

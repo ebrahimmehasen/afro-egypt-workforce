@@ -65,7 +65,8 @@ export async function getNotifications(user: User): Promise<NotificationFeed> {
   }
 
   if (hasPermission(user, "overtime")) {
-    const where = { status: "pending" as const, ...employeeScope };
+    // a removed (voided) addition waits on nobody
+    const where = { status: "pending" as const, voidedAt: null, ...employeeScope };
     const [count, rows] = await Promise.all([
       prisma.overtime.count({ where }),
       prisma.overtime.findMany({ where, include: { employee: true }, orderBy: { createdAt: "desc" }, take: PER_KIND }),

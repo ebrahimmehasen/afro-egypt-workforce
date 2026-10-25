@@ -54,7 +54,7 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined, s
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/lib/auth", () => ({ getSession: async () => session }));
 
-const { createOvertime } = await import("@/lib/actions/overtime");
+const { createOvertime, decideOvertime, applyDecideOvertime, updateOvertime, applyUpdateOvertime } = await import("@/lib/actions/overtime");
 const prisma = new PrismaClient();
 let sampleDb = false;
 let eligibleId = "";
@@ -102,5 +102,34 @@ describe.skipIf(!sampleDb)("a manual overtime entry", () => {
     session = { id: "U-ot", name: "x", email: "o@x", role: "supervisor", permissions: ["overtime"] };
     expect(await entry(eligibleId)).toMatchObject({ success: true });
     expect(await prisma.overtime.findFirstOrThrow({ where: { notes: NOTE } })).toMatchObject({ employeeId: eligibleId, status: "pending" });
+  });
+});
+
+describe.skipIf(!sampleDb)("an addition of an employee whose له إضافي is off", () => {
+  const admin: User = { id: "U-admin", name: "x", email: "a@x", role: "admin", permissions: [] };
+  const pending = () =>
+    prisma.overtime.create({ data: { employeeId: NOT_ELIGIBLE, date: new Date("2030-04-08T00:00:00.000Z"), hours: 2, hourlyRate: 50, amount: 100, notes: NOTE, status: "pending" } });
+  const edit = (id: string) => {
+    const f = new FormData();
+    for (const [k, v] of Object.entries({ id, hours: "3", hourlyRate: "50", notes: NOTE })) f.set(k, v);
+    return f;
+  };
+
+  it("can't be approved — even by the admin, and not when a waiting request is approved later (apply)", async () => {
+    session = admin;
+    const row = await pending();
+    expect(await decideOvertime(row.id, "approved")).toHaveProperty("error");
+    expect(await applyDecideOvertime({ id: row.id, decision: "approved" }, "x")).toHaveProperty("error");
+    expect((await prisma.overtime.findUniqueOrThrow({ where: { id: row.id } })).status).toBe("pending");
+    // rejecting it still works
+    expect(await applyDecideOvertime({ id: row.id, decision: "rejected" }, "x")).toMatchObject({ success: true });
+  });
+
+  it("can't be edited — even by the admin, and not through a waiting request either (apply)", async () => {
+    session = admin;
+    const row = await pending();
+    expect(await updateOvertime({}, edit(row.id))).toHaveProperty("error");
+    expect(await applyUpdateOvertime({ id: row.id, hours: 3, hourlyRate: 50, notes: NOTE }, "x")).toHaveProperty("error");
+    expect((await prisma.overtime.findUniqueOrThrow({ where: { id: row.id } })).amount).toBe(100);
   });
 });

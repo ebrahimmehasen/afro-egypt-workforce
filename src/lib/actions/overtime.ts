@@ -57,6 +57,8 @@ export async function decideOvertime(id: string, decision: "approved" | "rejecte
   const t = await getT();
   const overtime = await prisma.overtime.findUnique({ where: { id }, include: { employee: true } });
   if (!overtime) return { error: t.validation.requestNotFound };
+  // "له إضافي" off: nothing of theirs can be approved (rejecting still can)
+  if (decision === "approved" && !overtime.employee.overtimeEligible) return { error: t.overtime.notEligible };
   const actor = await getSession();
 
   return gate(
@@ -77,6 +79,8 @@ export async function applyDecideOvertime(payload: OvertimeDecisionPayload, acto
   const { id, decision } = payload;
   const overtime = await prisma.overtime.findUnique({ where: { id }, include: { employee: true } });
   if (!overtime) return { error: t.validation.requestNotFound };
+  // checked again here: "له إضافي" may have been switched off while the request waited
+  if (decision === "approved" && !overtime.employee.overtimeEligible) return { error: t.overtime.notEligible };
 
   await recordChangeAs(
     actorName,
@@ -117,6 +121,7 @@ export async function updateOvertime(_prev: ActionState, formData: FormData): Pr
   if (!parsed.success) return { error: t.validation.invalidData };
   const existing = await prisma.overtime.findUnique({ where: { id: parsed.data.id }, include: { employee: true } });
   if (!existing) return { error: t.validation.requestNotFound };
+  if (!existing.employee.overtimeEligible) return { error: t.overtime.notEligible };
 
   return gate(
     {
@@ -133,8 +138,10 @@ export async function updateOvertime(_prev: ActionState, formData: FormData): Pr
 
 export async function applyUpdateOvertime(payload: UpdateOvertimePayload, actorName: string): Promise<ActionState> {
   const t = await getT();
-  const existing = await prisma.overtime.findUnique({ where: { id: payload.id } });
+  const existing = await prisma.overtime.findUnique({ where: { id: payload.id }, include: { employee: { select: { overtimeEligible: true } } } });
   if (!existing) return { error: t.validation.requestNotFound };
+  // checked again here: "له إضافي" may have been switched off while the request waited
+  if (!existing.employee.overtimeEligible) return { error: t.overtime.notEligible };
   const amount = Math.round(payload.hours * payload.hourlyRate);
   await recordChangeAs(
     actorName,
