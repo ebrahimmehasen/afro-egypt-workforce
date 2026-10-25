@@ -60,7 +60,8 @@ function SidebarBrand() {
   return (
     <Link href="/dashboard" className="flex items-center gap-3 px-4 py-4">
       <div className={cn("relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white p-1 ring-1 ring-border")}>
-        <Image src={COMPANY.logo} alt={COMPANY.name} fill className="object-contain" />
+        {/* sizes = the box it fills (h-10 w-10): without it the browser asks for a 1920px-wide copy */}
+        <Image src={COMPANY.logo} alt={COMPANY.name} fill sizes="40px" className="object-contain" />
       </div>
       <div className="flex flex-col leading-tight">
         <span className="text-sm font-extrabold text-foreground">{COMPANY.name}</span>

@@ -43,7 +43,7 @@ export default async function SettingsPage() {
       <Card>
         <CardContent className="flex items-center gap-4 p-5">
           <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-white p-1 ring-1 ring-border">
-            <Image src={db.companySettings.logoUrl} alt={db.companySettings.companyName} fill className="object-contain" />
+            <Image src={db.companySettings.logoUrl} alt={db.companySettings.companyName} fill sizes="64px" className="object-contain" />
           </div>
           <div>
             <p className="font-semibold text-foreground">{db.companySettings.companyName}</p>
