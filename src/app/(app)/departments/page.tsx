@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
+import Link from "next/link";
 import { viewerScope } from "@/lib/scope";
 import { hasPermission } from "@/lib/permissions";
 import { formatEGP } from "@/lib/constants";
@@ -11,6 +12,8 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { DepartmentFormDialog } from "@/components/departments/department-form-dialog";
 import { DeleteDepartmentButton } from "@/components/departments/delete-department-button";
+import { CardActions, ClickableCard } from "@/components/departments/department-card-link";
+import { canViewDepartment } from "@/lib/department-report";
 import { Building2, Users, Wallet, Percent } from "lucide-react";
 
 export default async function DepartmentsPage() {
@@ -19,7 +22,8 @@ export default async function DepartmentsPage() {
   const t = await getT();
   const locale = await getLocale();
   const canEdit = hasPermission(user, "departments");
-  const rates = await getAttendanceByDepartment(viewerScope(user, db.employees));
+  const scope = viewerScope(user, db.employees);
+  const rates = await getAttendanceByDepartment(scope);
 
   const managerOptions = db.employees
     .filter((e) => e.status !== "terminated")
@@ -43,8 +47,11 @@ export default async function DepartmentsPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {rows.map(({ dept, employeeCount, cost, rate }) => (
-          <Card key={dept.id}>
+        {rows.map(({ dept, employeeCount, cost, rate }) => {
+          // a department inside the account's departments opens its report (/departments/[id])
+          const reportHref = canViewDepartment(scope, user, dept.id) ? `/departments/${encodeURIComponent(dept.id)}` : null;
+          const card = (
+          <Card key={dept.id} className={reportHref ? "h-full transition-colors hover:border-primary/50" : undefined}>
             <CardContent className="flex flex-col gap-4 p-5">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
@@ -52,15 +59,21 @@ export default async function DepartmentsPage() {
                     <Building2 className="h-[18px] w-[18px]" />
                   </div>
                   <div>
-                    <p className="font-semibold text-foreground">{translateLabel(dept.name, locale)}</p>
+                    {reportHref ? (
+                      <Link href={reportHref} className="font-semibold text-foreground hover:underline" aria-label={`${t.departmentReport.openReport}: ${translateLabel(dept.name, locale)}`}>
+                        {translateLabel(dept.name, locale)}
+                      </Link>
+                    ) : (
+                      <p className="font-semibold text-foreground">{translateLabel(dept.name, locale)}</p>
+                    )}
                     <p className="text-xs text-muted-foreground">{dept.managerName ?? "—"}</p>
                   </div>
                 </div>
                 {canEdit && (
-                  <div className="flex items-center">
+                  <CardActions>
                     <DepartmentFormDialog department={dept} employees={managerOptions} />
                     <DeleteDepartmentButton id={dept.id} name={translateLabel(dept.name, locale)} />
-                  </div>
+                  </CardActions>
                 )}
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
@@ -70,7 +83,15 @@ export default async function DepartmentsPage() {
               </div>
             </CardContent>
           </Card>
-        ))}
+          );
+          return reportHref ? (
+            <ClickableCard key={dept.id} href={reportHref}>
+              {card}
+            </ClickableCard>
+          ) : (
+            card
+          );
+        })}
       </div>
     </div>
   );

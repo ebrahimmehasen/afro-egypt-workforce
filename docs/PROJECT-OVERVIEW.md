@@ -1,6 +1,6 @@
 # Afro Egypt — Factory Workforce · شرح المشروع كامل (فرونت + باك)
 
-> شرح تفصيلي للمشروع زي ما هو على فرع **`development`** (آخر تحديث: 2026-10-25، بعد مراجعة "له إضافي" اللي جت بعد الـcommit `5a18bb0`).
+> شرح تفصيلي للمشروع زي ما هو على فرع **`development`** (آخر تحديث: 2026-10-25، بعد إضافة تقرير القسم، وآخر commit قبله `4b59b15`).
 > **مصدر الحقيقة هو الكود.** كل جزء هنا بيشاور على الملف اللي فيه التنفيذ، فلو حصل تعارض بين الوثيقة والكود، اللي في الكود هو الصح.
 > الوثائق التانية في الريبو: `README.md` (التشغيل والنشر) · `PROJECT.md` (مرجع قديم، آخر تحديث له 2026-10-11) · `PLAN.md` / `PLAN-payroll-hr.md` (خطط المراحل) · `docs/DEMO-GUIDE.md` (سيناريو العرض).
 
@@ -138,7 +138,7 @@ afro-egypt-workforce/
 │       ├── i18n/                  ← القاموس والترجمة
 │       ├── *-engine.ts            ← محرّكات حساب نقية
 │       └── … (خدمات، قراءة، صلاحيات، نطاق، تدقيق، جهاز…)
-└── tests/                         ← 46 ملف Vitest
+└── tests/                         ← 47 ملف Vitest
 ```
 
 ---
@@ -369,7 +369,10 @@ flowchart TD
 | `src/lib/data.ts` | `getDb()`: بيحمّل **snapshot كامل** للجداول الأساسية بشكل `Store` مرة لكل request. ده قرار مقصود عشان البساطة، والحجم الحالي مستحمله. الجداول الكبيرة اللي بيتكتب فيها بس (`AttendanceLog` و`AuditLogEntry`) مش داخلة فيه |
 | `src/lib/store.ts` / `types.ts` | أنواع الـStore والكيانات بالشكل اللي بيتبعت للواجهة |
 | `src/lib/serialize.ts` | بيحوّل صفوف Prisma لأنواع الواجهة (التواريخ تبقى ISO، و`dayStr` بترجع `yyyy-MM-dd`) |
-| `src/lib/selectors.ts` | read models للداشبورد والتقارير، **وأول باراميتر فيها `Scope`** |
+| `src/lib/selectors.ts` | read models للداشبورد والتقارير، **وأول باراميتر فيها `Scope`**. وفيه `departmentWorkforceCost` (تكلفة قسم واحد)، ودي القاعدة الوحيدة لحساب التكلفة، وبيستخدمها `/workforce-cost` وتقرير القسم |
+| `src/lib/department-report.ts` | **تقرير القسم:** `departmentReport(scope, user, departmentId, range, locale)` بيرجّع `null` (يعني 404) لو القسم مش موجود أو محذوف أو برّه أقسام الحساب. والدالة النقية `buildDepartmentReport` بتعيد استخدام `attendanceSummary`، وصفوف الغياب المسجّلة، و`annualLeaveBalance`/`requestDays`، و`buildOvertimeStatement`، و`departmentWorkforceCost`، وقاعدة "أوراق ناقصة". وكل قسم في التقرير بيظهر حسب صلاحيته (`reportSections`). الصفحة والتصدير بيستخدموه الاتنين |
+| `src/lib/department-report-range.ts` | فترات التقرير (`week` · `current` · `previous`) و`reportRangeDates`، وده ملف آمن يتستورد في الـclient |
+| `src/lib/department-report-export.ts` | `buildDepartmentReportWorkbook`: دالة نقية بتبني ملف Excel للتقرير، شيت لكل قسم مسموح، بلغة الواجهة، وRTL في العربي |
 | `src/lib/pay-context.ts` | `loadPayContext()`: بيحمّل أنواع الأجر وجداول الدوام والإجازات الرسمية والإعدادات. وفيه `rulesFor` و`scheduleFor` و`kindOf` و`effectiveShift` |
 | `src/lib/work-schedules.ts` | `loadScheduleRows()`: قايمة مواعيد العمل مع الموظفين اللي عليها (`/shifts` و`/settings` بيقروا نفس القايمة) |
 | `src/lib/entry-context.ts` | بيضيف لكل صف إضافي/خصم القسم ونوع الأجر وحضور اليوم ده، عشان ديالوج التفاصيل |
@@ -423,6 +426,7 @@ flowchart TD
 | `/api/employees/[id]/acknowledgments` | GET / POST / DELETE | نفس الكلام للإقرارات (`?key=`، و`key=new` مع `label` لخانة مخصّصة) | نفس الحماية |
 | `/api/payroll/export` | GET `?period=` | ملف **"تفاصيل المرتبات"** xlsx (`payroll-details-YYYY-MM.xlsx`) | `requireAccess("/payroll")` + صلاحية `payroll` + النطاق |
 | `/api/overtime/statement/export` | GET `?month=&from=&to=` | ملف **"كشف الإضافي"** xlsx | صلاحية `overtime` + النطاق. لو مفيش بيانات مابيطلعش ملف |
+| `/api/departments/[id]/report/export` | GET `?range=week\|current\|previous` | ملف **تقرير القسم** xlsx (`department-report-<CODE>-<from>_<to>.xlsx`)، شيت لكل قسم في التقرير المستخدم معاه صلاحيته | الجلسة (401)، وصلاحية `departments` (403)، والقسم موجود ومش محذوف وجوّا أقسام الحساب (404). ولو مفيش موظفين في النطاق يرجّع 404 |
 
 ---
 
@@ -599,7 +603,8 @@ sequenceDiagram
 | `/dashboard` | KPIs يومية وشهرية، اتجاه الحضور في آخر 14 يوم، توزيع حسب القسم، أكتر الناس تأخير (`dashboard/charts.tsx`). **الموظف بيشوف لوحة بسيطة خاصة بيه** | الكل |
 | `/employees` | جدول فيه بحث وفلاتر متعددة الاختيار (قسم، حالة، تعيين جديد)، صورة مصغّرة، حالة الجهاز، تنبيه أوراق ناقصة، المنتهي خدمتهم في الآخر، زرار **الأرشيف**، زرار **كشف الإضافي**، والمساعد الذكي | `employees` |
 | `/employees/[employeeNumber]` | ملف الموظف بتابات: **بيانات أساسية** · **المستندات** (والإقرارات) · **الحضور** (فيه كارت رصيد الإجازات وأجر اليوم) · **الإضافي** · **الخصومات** · **الرواتب** · **إجراءات** (أرشفة، وبتظهر بس للي انتهت خدمته) | `employees` + النطاق |
-| `/departments` | الأقسام ورؤسائها | `departments` |
+| `/departments` | الأقسام ورؤسائها. والضغط على كارت أي قسم (جوّا نطاق الحساب) بيفتح تقريره | `departments` |
+| `/departments/[id]` | **تقرير القسم** (قراءة بس): الرأس وKPIs، وحضور النهارده، والحضور على فترة (آخر 7 أيام، أو الشهر المحاسبي الحالي، أو اللي فات، عن طريق `?range=`) مع رسم بياني وأكتر 10 تأخير وغياب، والإجازات ورصيدها، والإضافي، والخصومات والبدلات، والرواتب، والتكلفة، وطلبات العمل، والأوراق الناقصة (كل واحد حسب صلاحيته)، وقايمة الموظفين، وزرار تصدير Excel. الرابط بالـ`id` الداخلي، لأن كود القسم بيتحسب من الاسم ومش فريد ولا ثابت | `departments` + النطاق |
 | `/shifts` | **مواعيد العمل** (نفس القايمة اللي في الإعدادات: صباحي، ومسائي 16:00→00:00، وليلي 00:00→08:00) | `shifts` |
 | `/attendance` | تاب **يومي** (تنقّل بالتاريخ، تصحيح، حضور يدوي) وتاب **السجل الخام** | `attendance` |
 | `/leaves` | الطلبات، الاعتماد والرفض، وكارت الرصيد في الفورم. الأدمن يقدر يحذف | `leaves` |
@@ -636,7 +641,8 @@ sequenceDiagram
 | `requests/` | `work-requests-view` |
 | `settings/` | `settings-forms` · `pay-settings` (أنواع الأجر وقسم مواعيد العمل) · `holidays-card` |
 | `biometric-device/` | `connection-form` · `device-actions` · `sync-attendance-card` · `punched-today-card` · `users-table` · `device-user-detail` · `retry-button` · `device-data-section` |
-| `users/`، `permissions/`، `change-requests/`، `audit/`، `departments/`، `dashboard/`، `assistant/` | مكوّنات كل وحدة من دول |
+| `departments/` | `department-form-dialog` · `delete-department-button` · `department-card-link` (`ClickableCard` و`CardActions`: الكارت كله بيتداس، والتعديل والحذف مابيفتحوش التقرير) · `report-range-nav` · `department-report-export-button` · `department-report-sections` (أقسام التقرير) |
+| `users/`، `permissions/`، `change-requests/`، `audit/`، `dashboard/`، `assistant/` | مكوّنات كل وحدة من دول |
 
 ### 6.4 التدويل (عربي/إنجليزي)
 
@@ -729,11 +735,12 @@ sequenceDiagram
 
 ## 9. الاختبارات
 
-- **Vitest** (`vitest.config.mjs`)، والأمر `npm test`، و**46 ملف** في `tests/`.
+- **Vitest** (`vitest.config.mjs`)، والأمر `npm test`، و**47 ملف** في `tests/`.
 - **اختبارات وحدة للمحرّكات:** `attendance-engine` · `pay-engine` · `payroll-engine` · `leave-balance` · `leave-pay` · `absences` · `attendance-dates` · `attendance-open-shift` · `public-holiday-pay` · `monthly-bonus` · `overtime-eligibility` · `overtime-eligibility-switch` (قفل وفتح "له إضافي" بأثر رجعي) · `overtime-statement` · `work-schedule-times`.
 - **الصلاحيات والنطاق:** `scope` · `hr-approvals` · `biometric-permission` · `deductions-scope` · `employee-files-scope` · `work-requests`.
 - **التدقيق والتحقق:** `audit` · `validation` · `payload-labels` · `deduction-reason` · `entry-context`.
 - **الرواتب:** `payroll-recalc` · `payroll-export` · `payroll-breakdown-rows`.
+- **تقرير القسم:** `department-report` (حدود الفترات، والنطاق، ومطابقة الأرقام لمصادرها، والأقسام حسب الصلاحية، والـvoided، وشيتات الملف وأنواع خلاياه، ورفض الـroute بـ 401 و403 و404).
 - **الجهاز:** `device-link` · `device-resilience` · `zk-device-*` (اتصال، حالة مشتركة، جهاز مش متاح).
 - **المساعد:** `assistant-run` · `assistant-tools` · `assistant-markdown` · `assistant-live` (محتاج مفتاح NVIDIA حقيقي).
 - **الواجهة:** `tabs-direction` · `image-view` · `employee-order`.

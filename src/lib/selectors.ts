@@ -3,6 +3,7 @@ import { Scope, scopedSnapshot } from "@/lib/scope";
 import { addDays, today } from "@/lib/today";
 import { AttendanceStatus, DailyAttendance } from "@/lib/types";
 import { ATTENDANCE_STATUS_GROUPS } from "@/lib/attendance-engine";
+import type { Store } from "@/lib/store";
 
 /**
  * Dashboard / report read models. Each takes the viewer's `Scope` as its first
@@ -139,23 +140,28 @@ export async function getTopLateEmployees(scope: Scope, limit = 5, days = 30, en
 
 export async function getWorkforceCostByDepartment(scope: Scope, year: number, month: number) {
   const db = await snapshot(scope);
-  const records = db.payrollRecords.filter((r) => {
-    const period = db.payrollPeriods.find((p) => p.id === r.periodId);
-    return period && period.year === year && period.month === month;
-  });
-
   const departments = scope.all
     ? db.departments
     : db.departments.filter((dept) => db.employees.some((e) => e.departmentId === dept.id));
 
-  return departments.map((dept) => {
-    const deptEmployeeIds = db.employees.filter((e) => e.departmentId === dept.id).map((e) => e.id);
-    const deptRecords = records.filter((r) => deptEmployeeIds.includes(r.employeeId));
-    return {
-      department: dept.name,
-      total: deptRecords.reduce((sum, r) => sum + r.netSalary, 0),
-      overtime: deptRecords.reduce((sum, r) => sum + r.overtimeAmount, 0),
-      deductions: deptRecords.reduce((sum, r) => sum + r.totalDeductions, 0),
-    };
+  return departments.map((dept) => ({ department: dept.name, ...departmentWorkforceCost(db, year, month, dept.id) }));
+}
+
+/**
+ * One department's workforce cost for a payroll month: the net pay, overtime and deductions of its employees'
+ * payroll records in `db` (already narrowed to the viewer's scope). The one rule behind /workforce-cost and the
+ * department report.
+ */
+export function departmentWorkforceCost(db: Store, year: number, month: number, departmentId: string) {
+  const records = db.payrollRecords.filter((r) => {
+    const period = db.payrollPeriods.find((p) => p.id === r.periodId);
+    return period && period.year === year && period.month === month;
   });
+  const deptEmployeeIds = db.employees.filter((e) => e.departmentId === departmentId).map((e) => e.id);
+  const deptRecords = records.filter((r) => deptEmployeeIds.includes(r.employeeId));
+  return {
+    total: deptRecords.reduce((sum, r) => sum + r.netSalary, 0),
+    overtime: deptRecords.reduce((sum, r) => sum + r.overtimeAmount, 0),
+    deductions: deptRecords.reduce((sum, r) => sum + r.totalDeductions, 0),
+  };
 }
