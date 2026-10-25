@@ -75,6 +75,8 @@ Gotchas the driver already handles:
   `page.waitForURL(url, { waitUntil: "commit" })`.
 - Recharts animates its lines in: a screenshot taken right after load shows the axes with no lines. Wait
   about 3 s, or check that `.recharts-line-curve` has a `d` attribute.
+- Don't use `screenshot({ fullPage: true })`: it resizes the page for the shot and the charts re-animate from
+  empty. The driver grows the viewport to the page height, waits, then takes a normal screenshot.
 
 If the sidebar logo is blank, a Next image-optimizer request got stuck (later requests for the same width wait
 on it). Stop the server, `rm -rf .next/cache/images`, start again.

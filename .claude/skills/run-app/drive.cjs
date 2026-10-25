@@ -35,7 +35,13 @@ const pages = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_PAG
     const status = res ? res.status() : 0;
     if (status !== 200) failed = true;
     console.log(`${String(n).padStart(2, "0")} ${path.padEnd(22)} HTTP ${status} | h1: ${h1.trim()}`);
-    await page.screenshot({ path: `${OUT}/${String(n).padStart(2, "0")}-${path.replace(/\W+/g, "_")}.png`, fullPage: true });
+    // Not `fullPage: true`: that resizes the page for the shot, and Recharts re-animates its lines from empty.
+    // Grow the viewport to the page's height, let the charts finish, then take a normal screenshot.
+    const height = await page.evaluate(() => document.documentElement.scrollHeight);
+    await page.setViewportSize({ width: 1366, height: Math.min(height, 8000) });
+    await page.waitForTimeout(2500);
+    await page.screenshot({ path: `${OUT}/${String(n).padStart(2, "0")}-${path.replace(/\W+/g, "_")}.png` });
+    await page.setViewportSize({ width: 1366, height: 860 });
     n++;
   }
   console.log("errors:", JSON.stringify(errors));
