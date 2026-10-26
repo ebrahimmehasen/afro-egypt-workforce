@@ -106,6 +106,7 @@ export function payloadValueText(key: string, value: unknown, t: Dictionary): st
       advance: t.deductionTypes.advance,
       admin_deduction: t.deductionTypes.adminDeduction,
       other: t.deductionTypes.other,
+      permission_overrun: t.deductionTypes.permissionOverrun,
     },
   };
   return words[key]?.[text] ?? text;

@@ -16,6 +16,8 @@ import { terminatedLast } from "@/lib/employee-order";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
+import type { MidDayAnalysis } from "@/lib/mid-day-exits";
+import { MidDayExitsBadge } from "@/components/attendance/mid-day-exits-badge";
 
 export function DailyAttendanceTable({
   records,
@@ -23,11 +25,14 @@ export function DailyAttendanceTable({
   departments,
   canCorrect,
   initialStatus = "all",
+  midDay = {},
 }: {
   records: DailyAttendance[];
   employees: Employee[];
   departments: Department[];
   canCorrect: boolean;
+  /** record id → the day's exits in the middle of it / timed permissions, when it had any */
+  midDay?: Record<string, MidDayAnalysis>;
   /** Status filter to pre-select, e.g. from a dashboard KPI link (`?status=absent`). */
   initialStatus?: string;
 }) {
@@ -122,7 +127,13 @@ export function DailyAttendanceTable({
                   <TableCell className="tabular-nums" dir="ltr">{fmtTime(record.actualOut)}</TableCell>
                   <TableCell className="tabular-nums">{record.deductibleLateMinutes ? `${record.deductibleLateMinutes} ${t.common.minutes}` : "—"}</TableCell>
                   <TableCell className="tabular-nums">{record.earlyLeaveMinutes ? `${record.earlyLeaveMinutes} ${t.common.minutes}` : "—"}</TableCell>
-                  <TableCell><AttendanceStatusBadge status={record.status} /></TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {/* out on a temporary permission that hasn't run out: that, not early leave */}
+                      {!midDay[record.id]?.outOnPermission && <AttendanceStatusBadge status={record.status} />}
+                      {midDay[record.id] && <MidDayExitsBadge analysis={midDay[record.id]} />}
+                    </div>
+                  </TableCell>
                   {canCorrect && (
                     <TableCell className="text-end">
                       <CorrectAttendanceDialog record={record} employeeName={employee!.name} />

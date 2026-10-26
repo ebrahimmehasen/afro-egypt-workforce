@@ -73,6 +73,13 @@ export default async function PayrollPage({
   const dayFmt = new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "long", timeZone: "UTC" });
   const showDay = (day: string) => dayFmt.format(new Date(`${day}T00:00:00Z`));
   const range = period ? payPeriodRange(period.year, period.month, startDay) : null;
+  // the period's time past a permission, shown on its own line out of the late deduction that holds it
+  const overrunOf = (employeeId: string) =>
+    range
+      ? db.deductions
+          .filter((d) => d.employeeId === employeeId && d.type === "permission_overrun" && d.date >= range.from && d.date <= range.to)
+          .reduce((s, d) => s + d.amount, 0)
+      : 0;
   const payDay = period ? payday(period.year, period.month) : null;
 
   return (
@@ -161,7 +168,7 @@ export default async function PayrollPage({
                   <TableCell className="tabular-nums text-destructive">-{formatEGP(record.totalDeductions, locale)}</TableCell>
                   <TableCell className="tabular-nums font-bold">{formatEGP(record.netSalary, locale)}</TableCell>
                   <TableCell className="text-end">
-                    <BreakdownDialog record={record} employeeName={employee!.name} />
+                    <BreakdownDialog record={record} employeeName={employee!.name} permissionOverrun={overrunOf(record.employeeId)} />
                   </TableCell>
                 </TableRow>
               ))}

@@ -15,7 +15,7 @@ import type { AllowanceType, DeductionType, EmployeeStatus } from "@/lib/types";
 
 type Cell = string | number;
 
-const DEDUCTION_TYPES: DeductionType[] = ["late", "absence", "early_leave", "permission", "unauthorized_exit", "penalty", "advance", "admin_deduction", "other"];
+const DEDUCTION_TYPES: DeductionType[] = ["late", "permission_overrun", "absence", "early_leave", "permission", "unauthorized_exit", "penalty", "advance", "admin_deduction", "other"];
 const ALLOWANCE_TYPES: AllowanceType[] = ["transport", "meal", "fixed", "incentive", "bonus"];
 
 /** A sheet from rows (header row first), with column widths from the content — as the other exports do. */

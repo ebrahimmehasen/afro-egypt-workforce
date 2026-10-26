@@ -510,6 +510,23 @@ export interface Dictionary {
     deleteTitle: string;
     deleteConfirm: string;
     deleted: string;
+    formDate: string;
+    formStartTime: string;
+    formDuration: string;
+    kindTemporary: string;
+    kindEarlyLeave: string;
+    kindHint: string;
+    kindUnknown: string;
+    colTime: string;
+    timeAndDuration: string;
+    typeTemporary: string;
+    typeEarlyLeave: string;
+    errTimeRequired: string;
+    errDuration: string;
+    errOutsideHours: string;
+    errOverlap: string;
+    errDayOff: string;
+    errLockedPeriod: string;
     balance: {
       title: string;
       available: string;
@@ -639,6 +656,8 @@ export interface Dictionary {
       paidDays: string;
       dayRate: string;
       totalDeductions: string;
+      /** the part of the late deduction that was time past a temporary permission */
+      ofWhichPermissionOverrun: string;
     };
     title: string;
     description: string;
@@ -833,6 +852,7 @@ export interface Dictionary {
       | "overtimeStepMinutes"
       | "permissionMultiplier"
       | "unauthorizedExitMultiplier"
+      | "permissionOverrunMultiplier"
       | "fridayMultiplier"
       | "holidayMultiplier"
       | "thursdayExtraMultiplier"
@@ -1195,6 +1215,7 @@ export interface Dictionary {
     advance: string;
     adminDeduction: string;
     other: string;
+    permissionOverrun: string;
   };
   allowanceTypes: {
     transport: string;
@@ -1411,5 +1432,24 @@ export interface Dictionary {
     historyTitle: string;
     historyDesc: string;
     historyEmpty: string;
+  };
+  /** exits in the middle of the day and timed permissions, on the attendance pages */
+  midDay: {
+    badge: string;
+    outOnPermission: string;
+    missingPunch: string;
+    title: string;
+    exitBack: string;
+    exitNoBack: string;
+    leftForDay: string;
+    permission: string;
+    noPermission: string;
+    onPermission: string;
+    overrun: string;
+    unauthorized: string;
+    afterPermission: string;
+    missingPunchHint: string;
+    outOnPermissionHint: string;
+    note: string;
   };
 }

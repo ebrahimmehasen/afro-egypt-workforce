@@ -57,7 +57,8 @@ export function payrollExportSheet(input: {
     // as on the payslip: the total without overtime, then overtime on its own, then the deductions, then the net
     t.payslip.total,
     t.payslip.overtime,
-    ...EXPORT_DEDUCTION_TYPES.map((type) => deductionTypeLabel(type, t)),
+    // right after lateness: the part of it that was time past a temporary permission (already inside the late cell)
+    ...EXPORT_DEDUCTION_TYPES.flatMap((type) => (type === "late" ? [deductionTypeLabel(type, t), t.payroll.export.ofWhichPermissionOverrun] : [deductionTypeLabel(type, t)])),
     t.payroll.export.totalDeductions,
     t.payslip.netSalary,
   ];
@@ -80,6 +81,7 @@ export function payrollExportSheet(input: {
       // The combined fields are split without leaving the stored amount: the specific types take what the posted
       // rows say (never more than the field holds), the field's own type keeps the rest. So the columns always add
       // up to the stored total — also for a period whose rows were since removed or never posted.
+      const permissionOverrun = Math.min(byType(id, "permission_overrun"), record.lateDeduction);
       const permission = Math.min(byType(id, "permission"), record.earlyLeaveDeduction);
       const unauthorizedExit = Math.min(byType(id, "unauthorized_exit"), record.earlyLeaveDeduction - permission);
       const adminDeduction = Math.min(byType(id, "admin_deduction"), record.otherDeductions);
@@ -93,6 +95,7 @@ export function payrollExportSheet(input: {
         advance: record.advances,
         admin_deduction: adminDeduction,
         other: round2(record.otherDeductions - adminDeduction),
+        permission_overrun: permissionOverrun,
       };
       return [
         employee?.employeeNumber ?? "",
@@ -107,7 +110,7 @@ export function payrollExportSheet(input: {
         record.bonuses,
         record.grossSalary - record.overtimeAmount,
         record.overtimeAmount,
-        ...EXPORT_DEDUCTION_TYPES.map((type) => deductionCells[type]),
+        ...EXPORT_DEDUCTION_TYPES.flatMap((type) => (type === "late" ? [deductionCells.late, deductionCells.permission_overrun] : [deductionCells[type]])),
         record.totalDeductions,
         record.netSalary,
       ];

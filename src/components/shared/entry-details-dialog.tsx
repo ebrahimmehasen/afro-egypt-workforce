@@ -10,6 +10,8 @@ import { translateLabel } from "@/lib/i18n/data-labels";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AttendanceStatusBadge } from "@/components/shared/status-badge";
+import { MidDayDetails } from "@/components/attendance/mid-day-exits-badge";
+import type { MidDayAnalysis } from "@/lib/mid-day-exits";
 
 /** That day's attendance, for the row's own date — the punches the entry was calculated from. */
 export interface EntryDay {
@@ -28,6 +30,8 @@ export interface EntryContext {
   department?: string;
   payType?: string;
   day?: EntryDay;
+  /** the day's exits in the middle of it and timed permissions, when it had any */
+  midDay?: MidDayAnalysis;
 }
 
 
@@ -79,6 +83,9 @@ function useParts(ctx: EntryContext) {
           </Row>
           <Row label={t.entryDetails.lateMinutes}>{ctx.day.lateMinutes || "—"}</Row>
           <Row label={t.entryDetails.dayStatus}><AttendanceStatusBadge status={ctx.day.status as never} /></Row>
+          {ctx.midDay && (
+            <Row label={t.midDay.title}><MidDayDetails analysis={ctx.midDay} /></Row>
+          )}
         </>
       ) : (
         <p className="py-2 text-sm text-muted-foreground">{t.entryDetails.noDay}</p>

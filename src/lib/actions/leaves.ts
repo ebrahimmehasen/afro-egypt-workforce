@@ -17,6 +17,10 @@ import { checkAnnualLeaveRequest } from "@/lib/leave-balance";
 import { loadBalanceInputs, loadDayKindRule } from "@/lib/leave-days";
 import { leaveTypeLabel } from "@/lib/i18n/labels";
 import { scheduleAttendanceEffects } from "@/lib/attendance-effects";
+import { kindOf, loadPayContext, rulesFor, scheduleFor } from "@/lib/pay-context";
+import { lockedDayCheck } from "@/lib/attendance-deductions";
+import { checkTimedPermission } from "@/lib/permission-request";
+import { Dictionary } from "@/lib/i18n/dictionary";
 
 const leaveSchema = z.object({
   employeeId: z.string().min(1),
@@ -25,7 +29,53 @@ const leaveSchema = z.object({
   to: z.string().min(1),
   // optional: a leave or excuse can be filed without one (saved as "")
   reason: z.string().trim().max(2000).optional().default(""),
+  // a permission only: when the employee leaves and for how many minutes (blank on every other type)
+  startTime: z.union([z.literal(""), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)]).optional().default(""),
+  durationMinutes: z.union([z.literal(""), z.coerce.number().int().min(0).max(24 * 60)]).optional().default(""),
 });
+
+const clock = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+/**
+ * Checks a timed permission against the employee's day as it stands now — their working times, the day off and
+ * holidays, the approved or closed pay months, and their other permissions that day (`against`: still standing
+ * when filing, already approved when approving). Null when it may go ahead, else the message to show.
+ */
+async function timedPermissionError(
+  t: Dictionary,
+  p: { employeeId: string; date: string; startTime: string; durationMinutes: number; excludeId?: string },
+  against: ("pending" | "approved")[],
+): Promise<string | null> {
+  const employee = await prisma.employee.findFirst({ where: { id: p.employeeId, deletedAt: null } });
+  if (!employee) return t.validation.employeeNotFound;
+  const day = dayDate(p.date);
+  const [ctx, periods, others] = await Promise.all([
+    loadPayContext(),
+    prisma.payrollPeriod.findMany({ where: { status: { in: ["approved", "closed"] } } }),
+    prisma.leave.findMany({
+      where: { employeeId: p.employeeId, type: "permission", status: { in: against }, from: { lte: day }, to: { gte: day }, ...(p.excludeId ? { id: { not: p.excludeId } } : {}) },
+    }),
+  ]);
+  const check = checkTimedPermission({
+    date: p.date,
+    startTime: p.startTime,
+    durationMinutes: p.durationMinutes,
+    schedule: scheduleFor(ctx, employee),
+    rules: rulesFor(ctx, employee),
+    dayKind: kindOf(ctx, p.date),
+    locked: lockedDayCheck(periods, ctx)(p.date),
+    others,
+  });
+  if (check.ok) return null;
+  const l = t.leaves;
+  return {
+    duration: l.errDuration,
+    outside_hours: format(l.errOutsideHours, { start: clock(check.dayStart), end: clock(check.dayEnd) }),
+    overlap: l.errOverlap,
+    day_off: l.errDayOff,
+    locked: l.errLockedPeriod,
+  }[check.reason];
+}
 
 const dayDate = (s: string) => new Date(`${s}T00:00:00.000Z`);
 
@@ -47,6 +97,19 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
   // Annual leave is checked against the employee's balance, for every way a request arrives — the employee filing
   // for themselves or someone else filing for them — not just by what the form shows. Days the balance can't
   // cover are still accepted: they are charged to pay by the absence table when they come.
+  // A permission is filed for one day, with the time the employee leaves and for how long; whether it is
+  // temporary or for leaving early follows from that time and the employee's hours (see permission-request.ts).
+  const timed = parsed.data.type === "permission";
+  if (timed) {
+    if (!parsed.data.startTime || parsed.data.durationMinutes === "") return { error: t.leaves.errTimeRequired, fields: ["startTime", "durationMinutes"] };
+    const error = await timedPermissionError(
+      t,
+      { employeeId: parsed.data.employeeId, date: parsed.data.from, startTime: parsed.data.startTime, durationMinutes: parsed.data.durationMinutes },
+      ["pending", "approved"],
+    );
+    if (error) return { error };
+  }
+
   let submittedMessage = t.leaves.submitted;
   if (parsed.data.type === "annual") {
     const employee = await prisma.employee.findFirst({ where: { id: parsed.data.employeeId, deletedAt: null } });
@@ -85,8 +148,10 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
       employeeId: parsed.data.employeeId,
       type: parsed.data.type,
       from: dayDate(parsed.data.from),
-      to: dayDate(parsed.data.to),
+      to: dayDate(timed ? parsed.data.from : parsed.data.to),
       reason: parsed.data.reason,
+      startTime: timed ? parsed.data.startTime : null,
+      durationMinutes: timed && parsed.data.durationMinutes !== "" ? parsed.data.durationMinutes : null,
       status: "pending",
     },
   });
@@ -125,6 +190,16 @@ export async function applyDecideLeave(payload: LeaveDecisionPayload, actorName:
   const { id, decision } = payload;
   const leave = await prisma.leave.findUnique({ where: { id }, include: { employee: true } });
   if (!leave) return { error: t.validation.requestNotFound };
+
+  // approving a timed permission checks it again against the day as it is now (hours, pay month, other permissions)
+  if (decision === "approved" && leave.type === "permission" && leave.startTime && leave.durationMinutes != null) {
+    const error = await timedPermissionError(
+      t,
+      { employeeId: leave.employeeId, date: dayStr(leave.from), startTime: leave.startTime, durationMinutes: leave.durationMinutes, excludeId: leave.id },
+      ["approved"],
+    );
+    if (error) return { error };
+  }
 
   await recordChangeAs(
     actorName,

@@ -35,6 +35,7 @@ import { LeaveBalanceCard } from "@/components/leaves/leave-balance-card";
 import { today } from "@/lib/today";
 import { loadDayKindRule, trackedAbsentDays } from "@/lib/leave-days";
 import { dayPayRows } from "@/lib/day-pay-view";
+import { loadMidDayInputs } from "@/lib/mid-day-view";
 import { employeeFormOptions, kindOf, loadPayContext, rulesFor, scheduleFor } from "@/lib/pay-context";
 
 export default async function EmployeeProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -118,6 +119,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
       : Promise.resolve([[], []] as const),
     prisma.leave.findMany({ where: { employeeId: employee.id, status: "approved" } }),
   ]);
+  const midDayInputs = await loadMidDayInputs(ctx, [employee], dayDates);
   const dayRows = dayPayRows({
     employee,
     rules,
@@ -129,9 +131,12 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
       actualIn: a.actualIn ? new Date(a.actualIn) : null,
       actualOut: a.actualOut ? new Date(a.actualOut) : null,
       scheduledStart: new Date(a.scheduledStart),
+      corrected: Boolean(a.correctionReason),
       kind: kindOf(ctx, a.date),
     })),
-    leaveFor: (date) => leaves.find((l) => dayStr(l.from) <= date && dayStr(l.to) >= date) ?? null,
+    // a permission with a time isn't the day's leave: it is read against the punches (midDayFor)
+    leaveFor: (date) => leaves.find((l) => dayStr(l.from) <= date && dayStr(l.to) >= date && !(l.type === "permission" && l.startTime)) ?? null,
+    midDayFor: (date) => midDayInputs(employee.id, date),
     chargeFor,
     posted: [...posted[0], ...posted[1]].map((p) => ({
       systemKey: p.systemKey!,

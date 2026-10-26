@@ -1,5 +1,6 @@
 import { AttendanceDay, systemEntriesFor, systemKey } from "@/lib/attendance-deductions";
-import { DayKind, LeaveForAbsence, PayTypeRules, ScheduleTimes, computeDayPay } from "@/lib/pay-engine";
+import { DayKind, DayPayInput, LeaveForAbsence, PayTypeRules, ScheduleTimes, computeDayPay } from "@/lib/pay-engine";
+import type { MidDayAnalysis } from "@/lib/mid-day-exits";
 import { PayEmployee } from "@/lib/pay-context";
 import type { DayCharge } from "@/lib/leave-balance";
 
@@ -41,6 +42,8 @@ export interface DayPayRow {
   overtimePayHours: number;
   lines: DayPayLine[];
   net: number;
+  /** exits in the middle of the day and timed permissions, when the day had any */
+  midDay: MidDayAnalysis | null;
 }
 
 /**
@@ -53,7 +56,9 @@ export function dayPayRows(opts: {
   rules: PayTypeRules;
   schedule: ScheduleTimes;
   days: (AttendanceDay & { kind: DayKind })[];
-  leaveFor: (date: string) => (LeaveForAbsence & { type: string }) | null;
+  leaveFor: (date: string) => (LeaveForAbsence & { type: string; startTime?: string | null }) | null;
+  /** the day's punches and approved timed permissions, for the exits in the middle of the day */
+  midDayFor?: (date: string) => Omit<NonNullable<DayPayInput["midDay"]>, "corrected"> | undefined;
   posted: PostedEntry[];
   /** what the annual-leave balance made of a day of absence (see leaveCharges) — the same answer the posting job uses */
   chargeFor?: (date: string) => DayCharge | undefined;
@@ -61,7 +66,8 @@ export function dayPayRows(opts: {
   const byKey = new Map(opts.posted.map((p) => [p.systemKey, p]));
   return opts.days.map((day) => {
     const leave = opts.leaveFor(day.date);
-    const entries = systemEntriesFor(day, opts.employee, opts.rules, opts.schedule, day.kind, leave, opts.chargeFor?.(day.date));
+    const midDay = opts.midDayFor?.(day.date);
+    const entries = systemEntriesFor(day, opts.employee, opts.rules, opts.schedule, day.kind, leave, opts.chargeFor?.(day.date), midDay);
     const pay = computeDayPay({
       date: day.date,
       kind: day.kind,
@@ -70,7 +76,8 @@ export function dayPayRows(opts: {
       pay: opts.employee,
       actualIn: day.actualIn,
       actualOut: day.actualOut,
-      hasPermission: leave?.type === "permission",
+      hasPermission: leave?.type === "permission" && !leave.startTime,
+      midDay: midDay ? { ...midDay, corrected: day.corrected } : undefined,
     });
 
     const line = (key: string, type: string, direction: DayPayLine["direction"], calculated: number, reason: string): DayPayLine => {
@@ -93,7 +100,7 @@ export function dayPayRows(opts: {
       ...entries.additions.map((a) => line(a.systemKey, a.kind, "addition", a.amount, a.reason)),
     ];
     // entries a person kept after the system stopped calculating them (edited) still count
-    for (const kind of ["late", "absence", "permission", "unauthorized_exit", "overtime", "friday", "holiday", "thursday_extra"]) {
+    for (const kind of ["late", "absence", "permission", "unauthorized_exit", "permission_overrun", "overtime", "friday", "holiday", "thursday_extra"]) {
       const key = systemKey(day.employeeId, day.date, kind);
       const posted = byKey.get(key);
       if (posted && posted.editedBy && !lines.some((l) => l.type === kind)) {
@@ -118,6 +125,7 @@ export function dayPayRows(opts: {
       overtimePayHours: overtime?.payHours ?? 0,
       lines,
       net,
+      midDay: pay.midDay && (pay.midDay.intervals.length > 0 || pay.midDay.finalExit || pay.midDay.missingPunch) ? pay.midDay : null,
     };
   });
 }

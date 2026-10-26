@@ -39,7 +39,8 @@ export function calculatePayrollRecord(periodId: string, inputs: PayrollInputs):
 
   const grossSalary = basicSalary + allowances + overtimeAmount + incentives + bonuses;
 
-  const lateDeduction = sumByType(inputs.deductions, "late");
+  // time past a temporary permission is lateness of its own kind: it sits with the late deductions
+  const lateDeduction = sumByType(inputs.deductions, "late") + sumByType(inputs.deductions, "permission_overrun");
   const absenceDeduction = sumByType(inputs.deductions, "absence");
   // time missed at the end of the day, however it was charged: with a permission or without one
   const earlyLeaveDeduction =

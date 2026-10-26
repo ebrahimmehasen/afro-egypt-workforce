@@ -10,6 +10,7 @@ import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { payrollBreakdownRows } from "@/lib/i18n/labels";
+import { payPeriodRange } from "@/lib/pay-rules";
 import { Separator } from "@/components/ui/separator";
 import { PrintButton } from "@/components/payroll/print-button";
 
@@ -41,7 +42,12 @@ export default async function PayslipPage({ params }: { params: Promise<{ record
   const period = db.payrollPeriods.find((p) => p.id === record.periodId);
   if (!employee || !period) notFound();
 
-  const breakdown = payrollBreakdownRows(record, t);
+  // the period's time past a permission, shown on its own line out of the late deduction that holds it
+  const range = payPeriodRange(period.year, period.month, db.payrollSettings.payPeriodStartDay);
+  const permissionOverrun = db.deductions
+    .filter((d) => d.employeeId === record.employeeId && d.type === "permission_overrun" && d.date >= range.from && d.date <= range.to)
+    .reduce((s, d) => s + d.amount, 0);
+  const breakdown = payrollBreakdownRows(record, t, permissionOverrun);
 
   return (
     <div className="min-h-screen bg-white py-8 print:py-0">

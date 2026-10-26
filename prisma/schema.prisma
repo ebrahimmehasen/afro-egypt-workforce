@@ -104,6 +104,8 @@ enum DeductionType {
   advance
   admin_deduction
   other
+  /// Minutes past a temporary permission's duration (charged at the pay type's permissionOverrunMultiplier).
+  permission_overrun
 }
 
 enum AllowanceType {
@@ -359,6 +361,8 @@ model PayType {
   permissionMultiplier       Float      @default(1)
   /// Each hour missed by leaving without permission costs this many hours.
   unauthorizedExitMultiplier Float      @default(1.5)
+  /// Each minute past a temporary permission's duration costs this many minutes of pay.
+  permissionOverrunMultiplier Float     @default(2)
   /// Each hour worked on the weekly day off pays this many hours.
   fridayMultiplier           Float      @default(2)
   /// Each hour worked on a public holiday pays this many hours.
@@ -477,6 +481,10 @@ model Leave {
   from       DateTime      @db.Date
   to         DateTime      @db.Date
   reason     String        @db.Text
+  /// Permission only: when the employee leaves ("HH:mm") and for how many minutes. Null on older rows and
+  /// on every other type — a permission without them is a permission for the rest of the day, as before.
+  startTime       String?
+  durationMinutes Int?
   status     RequestStatus @default(pending)
   approvedBy String?
   createdAt  DateTime      @default(now())

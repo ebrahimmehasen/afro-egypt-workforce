@@ -17,6 +17,7 @@ const BASE: Omit<PayTypeRules, "id" | "code" | "name" | "basis" | "dayDivisor" |
   overtimeAutoApprove: true,
   permissionMultiplier: 1,
   unauthorizedExitMultiplier: 1.5,
+  permissionOverrunMultiplier: 2,
   fridayMultiplier: 2,
   holidayMultiplier: 2,
   thursdayExtraMultiplier: 1,

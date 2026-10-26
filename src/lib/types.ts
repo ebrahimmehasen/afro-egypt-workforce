@@ -141,6 +141,9 @@ export interface Leave {
   from: string; // ISO date
   to: string; // ISO date
   reason: string;
+  /** permission only: when the employee leaves ("HH:mm") and for how many minutes — none on older rows */
+  startTime?: string;
+  durationMinutes?: number;
   status: RequestStatus;
   approvedBy?: string;
   createdAt: string;
@@ -174,7 +177,8 @@ export type DeductionType =
   | "penalty"
   | "advance"
   | "admin_deduction"
-  | "other";
+  | "other"
+  | "permission_overrun";
 
 export interface Deduction {
   id: string;

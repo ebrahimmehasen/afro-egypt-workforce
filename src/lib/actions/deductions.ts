@@ -17,7 +17,7 @@ import { scheduleAttendanceEffects } from "@/lib/attendance-effects";
 
 const deductionSchema = z.object({
   employeeId: z.string().min(1),
-  type: z.enum(["late", "absence", "early_leave", "permission", "unauthorized_exit", "penalty", "advance", "admin_deduction", "other"]),
+  type: z.enum(["late", "absence", "early_leave", "permission", "unauthorized_exit", "penalty", "advance", "admin_deduction", "other", "permission_overrun"]),
   amount: z.coerce.number().positive(),
   date: z.string().min(1),
   reason: z.string().min(3),

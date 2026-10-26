@@ -170,6 +170,7 @@ function PayTypeDialog({ payType }: { payType?: PayTypeRow }) {
               {num("graceMinutes", `${r.graceMinutes.label} (${t.paySettings.unitMinutes})`, d.graceMinutes)}
               {num("permissionMultiplier", r.permissionMultiplier.label, d.permissionMultiplier)}
               {num("unauthorizedExitMultiplier", r.unauthorizedExitMultiplier.label, d.unauthorizedExitMultiplier)}
+              {num("permissionOverrunMultiplier", r.permissionOverrunMultiplier.label, d.permissionOverrunMultiplier)}
               {num("fridayMultiplier", r.fridayMultiplier.label, d.fridayMultiplier)}
               {num("holidayMultiplier", r.holidayMultiplier.label, d.holidayMultiplier)}
             </div>
@@ -382,6 +383,7 @@ const RULE_ROWS: { key: RuleKey; unit: "times" | "minutes" | "days" | "hours" | 
   { key: "graceMinutes", unit: "minutes" },
   { key: "permissionMultiplier", unit: "times" },
   { key: "unauthorizedExitMultiplier", unit: "times" },
+  { key: "permissionOverrunMultiplier", unit: "times" },
   { key: "fridayMultiplier", unit: "times" },
   { key: "holidayMultiplier", unit: "times" },
   { key: "thursdayExtraMultiplier", unit: "times" },
