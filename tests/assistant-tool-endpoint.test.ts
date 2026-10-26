@@ -88,6 +88,12 @@ describe("what it does", () => {
     expect((reply.json as { result: string }).result).toContain("db down");
   });
 
+  it("hands the admin tools the requests, audit trail and accounts too", async () => {
+    const extras = { changeRequests: [], workRequests: [], auditLog: [{ userName: "منى", action: "إضافة", module: "الموظفين", oldValue: "-", newValue: "x", reason: null, timestamp: "2026-09-18T07:00:00.000Z" }], users: [], holidays: [], devices: [], biometric: null };
+    const reply = await call(bearer("admin1"), { op: "call", name: "audit_log" }, deps({ loadExtras: async () => extras }));
+    expect(JSON.parse((reply.json as { result: string }).result).total).toBe(1);
+  });
+
   it("cuts a huge result", async () => {
     const big = {
       ...store,

@@ -16,6 +16,8 @@ export interface ToolContext {
   locale: Locale;
   /** yyyy-MM-dd */
   today: string;
+  /** What the admin sees beyond the Store: requests, audit trail, accounts, holidays, devices. */
+  extras?: import("@/lib/assistant/admin-tools").AdminExtras;
 }
 
 /** The placeholder department newly imported employees sit in until HR assigns a real one. */

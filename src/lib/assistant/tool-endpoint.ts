@@ -3,6 +3,7 @@ import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Role } from "@/lib/types";
 import { canUseAssistant } from "@/lib/permissions";
 import { listTools, runTool } from "@/lib/assistant/tools";
+import type { AdminExtras } from "@/lib/assistant/admin-tools";
 import { verifyToolToken } from "@/lib/assistant/tool-token";
 
 // What the assistant's tool process talks to. Kept free of Next and Prisma so it can be tested with fakes; the
@@ -14,6 +15,8 @@ const MAX_RESULT_CHARS = 14_000;
 export interface ToolEndpointDeps {
   loadUser(uid: string): Promise<{ role: Role; active: boolean } | null>;
   loadStore(): Promise<Store>;
+  /** Requests, audit trail, accounts, holidays and devices: what the admin sees outside the main store. */
+  loadExtras?(): Promise<AdminExtras>;
   dictionary(locale: "ar" | "en"): Dictionary;
   today(): string;
   now?: number;
@@ -38,7 +41,8 @@ export async function handleToolRequest(authorization: string | null, body: unkn
 
   if (b.op === "call" && typeof b.name === "string") {
     try {
-      const ctx = { db: await deps.loadStore(), t: deps.dictionary(token.loc), locale: token.loc, today: deps.today() };
+      const [db, extras] = await Promise.all([deps.loadStore(), deps.loadExtras?.()]);
+      const ctx = { db, extras, t: deps.dictionary(token.loc), locale: token.loc, today: deps.today() };
       const text = JSON.stringify(runTool(b.name, b.args, ctx));
       const result = text.length > MAX_RESULT_CHARS ? `${text.slice(0, MAX_RESULT_CHARS)}… [truncated — ask a narrower question for the rest]` : text;
       return { status: 200, json: { result } };

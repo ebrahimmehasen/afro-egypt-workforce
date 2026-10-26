@@ -21,8 +21,8 @@ import {
 // departments and shifts. Like the employee tools they work on a Store already narrowed to what the asking user
 // may see, return people by name (a number only to tell two same-named people apart) and never an internal id.
 
-const MAX_ROWS = 25;
-const TOP = 10;
+export const MAX_ROWS = 40;
+export const TOP = 10;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const WEEKDAYS: Record<"ar" | "en", string[]> = {
   ar: ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"],
@@ -125,16 +125,16 @@ export type SystemToolName = (typeof SYSTEM_TOOL_DEFINITIONS)[number]["function"
 // helpers
 // ---------------------------------------------------------------------------------------------------
 
-const isDay = (v: unknown): v is string => typeof v === "string" && DAY.test(v);
-const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : undefined);
-const round = (n: number) => Math.round(n * 100) / 100;
-const clip = (s: string | undefined, n = 80) => (s && s.length > n ? `${s.slice(0, n)}…` : (s ?? ""));
+export const isDay = (v: unknown): v is string => typeof v === "string" && DAY.test(v);
+export const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : undefined);
+export const round = (n: number) => Math.round(n * 100) / 100;
+export const clip = (s: string | undefined, n = 200) => (s && s.length > n ? `${s.slice(0, n)}…` : (s ?? ""));
 
 const cairoClock = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit", hour12: false });
-const clock = (iso: string | null | undefined) => (iso ? cairoClock.format(new Date(iso)) : null);
+export const clock = (iso: string | null | undefined) => (iso ? cairoClock.format(new Date(iso)) : null);
 
 /** A validated period; one `date`, or from/to, falling back to the last `defaultDays` days (or a custom window). */
-function period(
+export function period(
   a: Record<string, unknown>,
   today: string,
   fallback: { from: string; to: string },
@@ -148,9 +148,9 @@ function period(
   return { from, to };
 }
 
-const lastDays = (today: string, days: number) => ({ from: addDays(today, -(days - 1)), to: today });
+export const lastDays = (today: string, days: number) => ({ from: addDays(today, -(days - 1)), to: today });
 
-const person = (ctx: ToolContext, e: Employee) => ({ ...codeIfNeeded(ctx, e), name: e.name });
+export const person = (ctx: ToolContext, e: Employee) => ({ ...codeIfNeeded(ctx, e), name: e.name });
 
 type Who = { error: unknown } | { ids: Set<string> | null; only?: Employee };
 
@@ -178,11 +178,11 @@ function whoIs(ctx: ToolContext, a: Record<string, unknown>): Who {
 
 const inWho = (who: { ids: Set<string> | null }, id: string) => who.ids === null || who.ids.has(id);
 
-function byId(ctx: ToolContext) {
+export function byId(ctx: ToolContext) {
   return new Map(ctx.db.employees.map((e) => [e.id, e]));
 }
 
-function tally<T>(items: T[], key: (t: T) => string): Record<string, number> {
+export function tally<T>(items: T[], key: (t: T) => string): Record<string, number> {
   const out: Record<string, number> = {};
   for (const i of items) out[key(i)] = (out[key(i)] ?? 0) + 1;
   return out;
