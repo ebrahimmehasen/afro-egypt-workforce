@@ -20,7 +20,7 @@ import {
  * A floating chat: a round button that widens to say what it is when you hover it, and opens the
  * conversation. The conversation is saved per user on the server, so it is still there next time.
  */
-export function EmployeeAssistant() {
+export function AssistantWidget() {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);

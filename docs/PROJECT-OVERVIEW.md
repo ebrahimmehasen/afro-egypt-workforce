@@ -84,7 +84,7 @@
 | الصور | `sharp` | صور مصغّرة webp |
 | Excel | `xlsx` (SheetJS) | |
 | الاختبارات | **Vitest** 3 | |
-| المساعد الذكي | NVIDIA hosted models (API متوافق مع OpenAI) | اختياري |
+| المساعد الذكي | Claude CLI بحساب Claude المسجّل على السيرفر، عبر خدمة محلية | اختياري |
 
 **السكربتات (`package.json`):**
 
@@ -165,7 +165,7 @@ flowchart LR
   DB[(MySQL / Prisma)]
   FS[(storage/uploads)]
   ZK[[جهاز ZKTeco<br/>TCP 4370]]
-  NV[[NVIDIA API<br/>اختياري]]
+  AI[[خدمة المساعد المحلية<br/>Claude CLI · اختياري]]
 
   UI -->|navigation| MW --> RSC
   UI -->|form submit| SA
@@ -178,7 +178,8 @@ flowchart LR
   RT <--> ZK
   RT --> DB
   DB -. كل كتابة .-> BUS --> API --> SSE --> UI
-  SA --> NV
+  SA --> AI
+  AI -. أدوات قراءة فقط .-> API
 ```
 
 ### 4.2 المبادئ اللي المشروع مبني عليها
@@ -569,12 +570,16 @@ sequenceDiagram
 
 ### 5.14 المساعد الذكي (`src/lib/assistant/*`)
 
-- مساعد **للقراءة بس** في صفحات الموظفين. محتاج صلاحية `employees`، ومابيشوفش غير الموظفين اللي في نطاق المستخدم.
-- `nvidia.ts`: عميل للـAPI. النموذج الافتراضي `nvidia/nemotron-3-ultra-550b-a55b` والبديل `nemotron-3-super-120b-a12b`. من غير `NVIDIA_API_KEY` بيرد إنه "لسه متظبطش"، ومفيش حاجة تانية في النظام معتمدة عليه.
-- `employee-tools.ts`: أدوات زي `search_employees` و`get_employee` و`find_missing_items` و`company_overview`.
-- `run.ts`: حلقة الأدوات، **بحد أقصى 6 جولات** لكل سؤال.
-- `system-prompt.ts`: بيرد بعامية مصرية مهذبة ومختصرة، وماينفعش يخترع معلومات، وأي نص جوّا بيانات الموظفين بيتعامل كمعلومة مش كتعليمات.
-- `rate-limit.ts` (`takeSlot`) و`markdown.ts` (عرض الرد). سجل المحادثة متخزّن في `AssistantMessage`.
+- مساعد **للقراءة بس**، **للأدمن فقط**، وأيقونته في كل صفحات النظام (`AssistantWidget` في `(app)/layout.tsx`). `canUseAssistant` = `role === "admin"`، وبتتراجع في كل action وفي كل نداء أدوات، فأي حساب تاني مايقدرش يستخدمه حتى لو كلّم الخادم مباشرة.
+- **كل أدمن له محادثته**: `AssistantMessage` بـ`userId`، والـrate limit والـbusy لكل مستخدم، وكل سؤال بيشغّل Claude CLI من الأول من غير جلسة محفوظة وبتوكن خاص بيه، فالمحادثات عمرها ما بتتخلط.
+- `claude-bridge.ts`: عميل لخدمة المساعد (`assistant-bridge/`، خدمة Windows `AfroEgyptAssistant` على `127.0.0.1:4100`). من غير `ASSISTANT_BRIDGE_SECRET` أو لو الخدمة واقفة بيرد إنه "لسه متظبطش"، ومفيش حاجة تانية في النظام معتمدة عليه. مفيش اعتماد على أي مزوّد تاني.
+- `assistant-bridge/`: `server.mjs` (الخدمة، بتشغّل الـCLI لكل سؤال بطابور قصير) · `bridge-core.mjs` (منطق نقي: سطر أوامر الـCLI، التحقق من الطلب، قراءة النتيجة) · `mcp-afro.mjs` (خادم أدوات MCP بيشغّله الـCLI) · `INSTRUCTIONS.md` (قواعد المساعد، بتتقرا مع كل سؤال) · `README.md` (التركيب).
+- الـCLI بيشتغل **من غير أي أدوات ويندوز** (`--tools ""` بدون shell ولا ملفات ولا ويب) وبـ`--permission-mode dontAsk`، وأدواته الوحيدة هي أدوات التطبيق عبر MCP.
+- `tools.ts` سجل الأدوات الوحيد · `employee-tools.ts` (`search_employees` و`get_employee` و`find_missing_items` و`company_overview`) · `system-tools.ts` (`attendance_summary` و`leaves_overview` و`overtime_overview` و`deductions_overview` و`payroll_overview` و`departments_and_shifts`). كلها قراءة فقط ومابترجّعش أي id داخلي.
+- `tool-endpoint.ts` + `/api/assistant/tool`: بيستقبل نداءات الأدوات بتوكن عمره 3 دقايق (`tool-token.ts`، مفتاح مشتق من `SESSION_SECRET` بوسم خاص) وبيراجع في القاعدة إن صاحبه لسه أدمن فعّال.
+- `links.ts`: المساعد بيقترح الإجراء كرابط لصفحة داخلية معروفة بس (`[افتح صفحة الخصومات](/deductions)`)، وأي رابط تاني بيتعرض نص عادي.
+- قواعد الأسلوب والتأريض (عامية مصرية مهذبة ومختصرة، ما يخترعش، النص جوّا البيانات معلومة مش تعليمات) في `assistant-bridge/INSTRUCTIONS.md` مش في الكود، لكن **الحدود الأمنية في الكود**.
+- `rate-limit.ts` (`takeSlot`) و`markdown.ts` (عرض الرد) و`errors.ts`. سجل المحادثة متخزّن في `AssistantMessage`.
 
 ---
 
@@ -742,7 +747,7 @@ sequenceDiagram
 - **الرواتب:** `payroll-recalc` · `payroll-export` · `payroll-breakdown-rows`.
 - **تقرير القسم:** `department-report` (حدود الفترات، والنطاق، ومطابقة الأرقام لمصادرها، والأقسام حسب الصلاحية، والـvoided، وشيتات الملف وأنواع خلاياه، ورفض الـroute بـ 401 و403 و404).
 - **الجهاز:** `device-link` · `device-resilience` · `zk-device-*` (اتصال، حالة مشتركة، جهاز مش متاح).
-- **المساعد:** `assistant-run` · `assistant-tools` · `assistant-markdown` · `assistant-live` (محتاج مفتاح NVIDIA حقيقي).
+- **المساعد:** `assistant-access` (للأدمن فقط) · `assistant-tools` · `assistant-system-tools` · `assistant-markdown` · `assistant-links` · `assistant-tool-token` · `assistant-tool-endpoint` · `assistant-client` · `assistant-bridge-core` · `assistant-bridge-server` (محادثات الأدمنز ما بتتخلطش) · `assistant-mcp`.
 - **الواجهة:** `tabs-direction` · `image-view` · `employee-order`.
 - **ترتيب التشغيل** (`vitest.config.mjs`): كل الملفات بتشتغل بالتوازي، ما عدا `payroll-recalc`، اللي بيشتغل لوحده **بعد** ما الباقي يخلص (project اسمه `payroll-db` و`sequence.groupOrder: 1`). السبب إنه بيحسب رواتب كل الموظفين النشطين في القاعدة المشتركة، فلو اشتغل جنب الملفات اللي بتعمل موظفين مؤقتين وتمسحهم بيحصل FK error.
 - **اختبارات التكامل** بتشتغل على **MySQL حقيقي**، وبتعدّي نفسها لوحدها لو مفيش قاعدة بيانات أو مفيش بيانات sample (`sample-seed` وغيره). الموظفين المؤقتين في الاختبارات أرقامهم بتبدأ بـ `ZZ-` عشان يترتّبوا بعد بيانات الـseed.
@@ -770,8 +775,8 @@ npm run dev                   # http://localhost:3000
 | `SESSION_SECRET` | آه (≥16 حرف) | توقيع الجلسة (`openssl rand -base64 32`) |
 | `PUNCH_API_KEY` | للـpush | قيمة هيدر `X-Punch-Key` |
 | `SECURE_COOKIES` | لأ | `false` بس لو شغّال HTTP خلف بروكسي موثوق |
-| `NVIDIA_API_KEY` | لأ | تفعيل المساعد |
-| `ASSISTANT_MODEL` / `ASSISTANT_FALLBACK_MODEL` / `NVIDIA_BASE_URL` | لأ | تخصيص النموذج |
+| `ASSISTANT_BRIDGE_SECRET` | لأ | تفعيل المساعد: سر مشترك بين التطبيق وخدمة المساعد |
+| `ASSISTANT_BRIDGE_URL` / `ASSISTANT_TOOL_URL` | لأ | عنوان خدمة المساعد، وعنوان نداء الأدوات من الخدمة للتطبيق |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | للـseed الإنتاجي | أول أدمن |
 
 ### 10.3 الـSeeds

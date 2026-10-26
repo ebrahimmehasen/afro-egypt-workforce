@@ -119,10 +119,10 @@ export type ToolName = (typeof TOOL_DEFINITIONS)[number]["function"]["name"];
 // helpers
 // ---------------------------------------------------------------------------------------------------
 
-const norm = (s: string) => s.trim().toLowerCase();
-const contains = (haystack: string | undefined, needle: string) => (haystack ?? "").toLowerCase().includes(needle);
+export const norm = (s: string) => s.trim().toLowerCase();
+export const contains = (haystack: string | undefined, needle: string) => (haystack ?? "").toLowerCase().includes(needle);
 
-function addDays(day: string, delta: number): string {
+export function addDays(day: string, delta: number): string {
   const d = new Date(`${day}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + delta);
   return d.toISOString().slice(0, 10);
@@ -134,7 +134,7 @@ function monthsBetween(from: string, to: string): number {
   return Math.max(0, (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth()));
 }
 
-function deptName(ctx: ToolContext, e: Employee): string {
+export function deptName(ctx: ToolContext, e: Employee): string {
   return ctx.db.departments.find((d) => d.id === e.departmentId)?.name ?? UNASSIGNED_DEPARTMENT;
 }
 
@@ -147,7 +147,7 @@ function docLabel(ctx: ToolContext, type: EmployeeDocumentType): string {
  * repeat what it never saw. A number goes out only for someone who shares a name with another employee, where
  * it is the only way to tell them apart, and in a single person's own file.
  */
-function codeIfNeeded(ctx: ToolContext, e: Employee): { employeeNumber?: string } {
+export function codeIfNeeded(ctx: ToolContext, e: Employee): { employeeNumber?: string } {
   const sameName = ctx.db.employees.filter((x) => norm(x.name) === norm(e.name)).length > 1;
   return sameName ? { employeeNumber: e.employeeNumber } : {};
 }
@@ -215,7 +215,7 @@ export function searchEmployees(ctx: ToolContext, args: { query?: string; depart
   };
 }
 
-function resolveEmployee(ctx: ToolContext, query: string): { one?: Employee; candidates?: Employee[] } {
+export function resolveEmployee(ctx: ToolContext, query: string): { one?: Employee; candidates?: Employee[] } {
   const q = norm(query);
   const exact = ctx.db.employees.find((e) => norm(e.employeeNumber) === q);
   if (exact) return { one: exact };

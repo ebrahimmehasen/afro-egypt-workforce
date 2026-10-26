@@ -35,7 +35,7 @@
 | الصور | `sharp` (صور مصغّرة للصورة الشخصية) |
 | التصدير | `xlsx` (SheetJS) → Excel حقيقي |
 | الاختبارات | Vitest |
-| المساعد الذكي | نماذج NVIDIA المستضافة (اختياري) |
+| المساعد الذكي | Claude CLI بحساب Claude المسجّل على السيرفر (اختياري) |
 
 ### مبادئ معمارية اتفقنا عليها
 
@@ -246,11 +246,13 @@ tests/                     Vitest (29 ملف)
 
 ## 9. المساعد الذكي (اختياري)
 
-- مساعد قراءة فقط في صفحات الموظفين، **بيحتاج صلاحية `employees`**، ومابيشوفش غير اللي نطاقه يسمح.
-- بيشتغل بنماذج NVIDIA المستضافة عبر `NVIDIA_API_KEY` (سيرفر فقط). افتراضي `nvidia/nemotron-3-ultra-550b-a55b` (أذكى وأبطأ، 30–60 ثانية) وfallback `nemotron-3-super-120b-a12b` (~10 ثواني). من غير المفتاح بيرد "لسه متظبطش" وباقي النظام مش معتمد عليه.
-- **التأريض:** الإجابات من لقطة أرقام الشركة + نتائج أدوات (`search_employees`, `get_employee`, `find_missing_items`, …) بحد أقصى 6 جولات أدوات لكل سؤال. ما يخترعش حاجة، وما يعرضش مصطلحات النظام الداخلية.
-- **الأسلوب:** عامية مصرية مهذبة وقصير افتراضيًا، والتفصيل والرسمي بس لما المستخدم يطلبه. المعلومة العامة من برّه بتتعلّم "معلومة عامة (من خارج بيانات المصنع)" وما بتذكرش مواد قانونية.
-- **الأمان:** النص جوّه بيانات الموظفين = معلومة مش تعليمات. سجل المحادثة محفوظ في `AssistantMessage` لكل مستخدم، وفيه rate limit.
+- مساعد **للأدمن فقط**، وأيقونته عايمة في **كل صفحات النظام**. أي حساب تاني مايظهرلوش ومايقدرش يستخدمه حتى لو كلّم الخادم مباشرة (`canUseAssistant` بتتراجع في كل action وفي كل نداء أدوات).
+- **كل أدمن له محادثته المنفصلة** (`AssistantMessage` بـ`userId`، والـrate limit والـbusy لكل مستخدم). كل سؤال بيشغّل Claude CLI من الأول، من غير جلسة محفوظة، وبتوكن خاص بالسؤال، فمحادثات الأدمنز عمرها ما بتتخلط.
+- المخ: **Claude CLI** بحساب Claude المسجّل على السيرفر، عبر خدمة محلية صغيرة (`assistant-bridge/`، خدمة Windows `AfroEgyptAssistant`) على `127.0.0.1:4100`. من غيرها بيرد "لسه متظبطش" وباقي النظام مش معتمد عليه. مفيش أي اعتماد على مزوّد خارجي أو مفتاح API.
+- **قواعده في ملف:** `INSTRUCTIONS.md` (على السيرفر في `tools\assistant\`، بيتقرا مع كل سؤال فتعديله ساري فورًا). بيحدد الأسلوب والمسموح والممنوع، لكن **الحدود الأمنية في الكود** (الصلاحيات، قراءة فقط، أدوات محددة) مش في النص.
+- **الأدوات (قراءة فقط):** `search_employees` · `get_employee` · `find_missing_items` · `company_overview` · `attendance_summary` · `leaves_overview` · `overtime_overview` · `deductions_overview` · `payroll_overview` · `departments_and_shifts`. الـCLI بيشتغل من غير أي أدوات ويندوز (لا shell ولا ملفات ولا ويب)، وبيوصل للأدوات عبر MCP (`mcp-afro.mjs`) على `/api/assistant/tool` بتوكن عمره 3 دقايق، متوقّع بمفتاح مشتق من `SESSION_SECRET`.
+- **اقتراح إجراء:** بيدّي رابط للصفحة (`[افتح صفحة الخصومات](/deductions)`). بس الروابط الداخلية المعروفة (`links.ts`) هي اللي بتتفتح، والأدمن هو اللي يضغط حفظ.
+- **الأسلوب والتأريض:** عامية مصرية مهذبة وقصير افتراضيًا، والإجابات من أرقام الشركة + نتائج الأدوات بس ومايخترعش حاجة. النص جوّه بيانات الموظفين = معلومة مش تعليمات.
 
 ---
 
@@ -287,7 +289,6 @@ tests/                     Vitest (29 ملف)
 29 ملف في `tests/`، أبرزهم: `attendance-engine` · `payroll-engine` · `pay-engine` · `absences` · `attendance-dates` · `attendance-open-shift` · `monthly-bonus` · `scope` · `audit` · `employee-files-scope` (مصفوفة الأدوار على الملفات) · `documents` · `acknowledgments` · `employee-order` · `validation` · `device-*` / `zk-device-*` (مرونة الاتصال) · `assistant-*` · `image-view` · `tabs-direction` · `sample-seed`.
 
 - اختبارات التكامل بتشتغل على **MySQL حقيقي** وبتتخطّى نفسها لو مفيش DB أو مفيش بيانات sample (`sample-seed`, `monthly-bonus`).
-- `assistant-live` بيحتاج مفتاح NVIDIA فعلي.
 - الـCI بيشغّل `npm test` قبل أي نشر.
 
 ---
@@ -313,8 +314,8 @@ npm run dev                     # http://localhost:3000
 | `SESSION_SECRET` | مفتاح توقيع الجلسة (**إجباري**، `openssl rand -base64 32`) |
 | `PUNCH_API_KEY` | مفتاح `X-Punch-Key` لـ`/api/punch` |
 | `SECURE_COOKIES` | `false` فقط للتشغيل على HTTP خلف بروكسي موثوق |
-| `NVIDIA_API_KEY` | تفعيل المساعد الذكي (اختياري) |
-| `ASSISTANT_MODEL` / `ASSISTANT_FALLBACK_MODEL` / `NVIDIA_BASE_URL` | تخصيص النموذج (اختياري) |
+| `ASSISTANT_BRIDGE_SECRET` | تفعيل المساعد الذكي: سر مشترك بين التطبيق وخدمة المساعد (اختياري) |
+| `ASSISTANT_BRIDGE_URL` / `ASSISTANT_TOOL_URL` | عنوان خدمة المساعد، وعنوان نداء الأدوات من الخدمة للتطبيق (اختياري) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | للـseed الإنتاجي مرة واحدة |
 
 ### الـseeds

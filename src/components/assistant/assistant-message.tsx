@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import Link from "next/link";
 import { parseBlocks, parseInline } from "@/lib/assistant/markdown";
 
 function Inline({ text }: { text: string }) {
@@ -9,6 +10,10 @@ function Inline({ text }: { text: string }) {
           <strong key={i} className="font-semibold">
             {part.text}
           </strong>
+        ) : part.type === "link" ? (
+          <Link key={i} href={part.href} className="font-medium text-primary underline underline-offset-2">
+            {part.text}
+          </Link>
         ) : part.type === "code" ? (
           <code key={i} dir="ltr" className="rounded bg-background/70 px-1 py-0.5 text-[0.85em]">
             {part.text}

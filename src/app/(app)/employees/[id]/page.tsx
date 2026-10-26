@@ -9,11 +9,10 @@ import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { requestStatusLabel, deductionTypeLabel } from "@/lib/i18n/labels";
-import { canManageEmployeeFiles, canUseAssistant, hasPermission } from "@/lib/permissions";
+import { canManageEmployeeFiles, hasPermission } from "@/lib/permissions";
 import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
 import { missingAcknowledgmentKeys, requiredAcknowledgmentKeys } from "@/lib/acknowledgments";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
-import { EmployeeAssistant } from "@/components/assistant/employee-assistant";
 import { ArchiveEmployeeButton } from "@/components/employees/archive-employee-button";
 import { isArchived, isManuallyArchived } from "@/lib/employee-order";
 import { DocumentsPanel } from "@/components/employees/documents-panel";
@@ -393,7 +392,6 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
           </TabsContent>
         )}
       </Tabs>
-      {canUseAssistant(user) && <EmployeeAssistant />}
     </div>
   );
 }

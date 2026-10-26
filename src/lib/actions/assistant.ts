@@ -8,8 +8,10 @@ import { getLocale } from "@/lib/i18n/locale";
 import { canUseAssistant } from "@/lib/permissions";
 import { scopedSnapshot, viewerScope } from "@/lib/scope";
 import { today } from "@/lib/today";
-import { AssistantError } from "@/lib/assistant/nvidia";
-import { runAssistant } from "@/lib/assistant/run";
+import { AssistantError } from "@/lib/assistant/errors";
+import { askClaude } from "@/lib/assistant/claude-bridge";
+import { buildSnapshot } from "@/lib/assistant/employee-tools";
+import { signToolToken } from "@/lib/assistant/tool-token";
 import { takeSlot } from "@/lib/assistant/rate-limit";
 
 export interface AssistantMessageDTO {
@@ -69,6 +71,7 @@ function friendlyError(e: unknown, t: Awaited<ReturnType<typeof getT>>): string 
     if (e.code === "not_configured" || e.code === "auth") return t.assistant.errorNotConfigured;
     if (e.code === "rate_limited") return t.assistant.errorRateLimited;
     if (e.code === "timeout") return t.assistant.errorTimeout;
+    if (e.code === "busy") return t.assistant.errorBusy;
   }
   return t.assistant.errorGeneric;
 }
@@ -99,16 +102,17 @@ export async function sendAssistantMessage(
       }),
     ]);
 
-    // The model works on exactly what this user is allowed to see, never on the whole database.
+    // The figures handed to the model cover exactly what this user is allowed to see.
     const scoped = scopedSnapshot(viewerScope(user, db.employees), db);
+    const day = today();
 
     let run;
     try {
-      run = await runAssistant({
+      run = await askClaude({
         question,
         history: saved.reverse().map((m) => ({ role: m.role === "assistant" ? ("assistant" as const) : ("user" as const), content: m.content })),
-        ctx: { db: scoped, t, locale, today: today() },
-        userName: user.name,
+        context: { userName: user.name, today: day, locale, snapshot: JSON.parse(buildSnapshot({ db: scoped, t, locale, today: day })) },
+        toolToken: signToolToken({ uid: user.id, loc: locale }),
       });
     } catch (e) {
       console.error("[assistant] failed:", e instanceof AssistantError ? `${e.code}: ${e.message}` : e);
@@ -124,7 +128,7 @@ export async function sendAssistantMessage(
     await prisma.auditLogEntry.create({
       data: {
         userName: user.name,
-        module: t.nav.employees,
+        module: t.assistant.title,
         action: t.assistant.auditAsk,
         oldValue: "-",
         newValue: question.slice(0, 300),
