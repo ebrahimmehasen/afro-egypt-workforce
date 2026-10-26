@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // The assistant service: a small local HTTP server that answers one question at a time per request by running
 // the Claude CLI under the Claude account signed in on this machine. It keeps nothing between questions: every
 // question gets its own process, its own temporary folder and its own tool token, and no session is saved, so

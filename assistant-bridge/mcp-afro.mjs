@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // The assistant's tools, as an MCP server over stdio. The Claude CLI starts it for one question. It holds no data
 // and no logic of its own: the list of tools and every call go to the app (AFRO_TOOL_URL) with this question's
 // short-lived token, so the app decides what is allowed and what comes back.
