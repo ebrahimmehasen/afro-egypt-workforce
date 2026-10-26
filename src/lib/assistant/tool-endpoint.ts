@@ -4,6 +4,7 @@ import type { Role } from "@/lib/types";
 import { canUseAssistant } from "@/lib/permissions";
 import { listTools, runTool } from "@/lib/assistant/tools";
 import type { AdminExtras } from "@/lib/assistant/admin-tools";
+import type { FormDraft } from "@/lib/assistant/drafts";
 import { verifyToolToken } from "@/lib/assistant/tool-token";
 
 // What the assistant's tool process talks to. Kept free of Next and Prisma so it can be tested with fakes; the
@@ -17,6 +18,8 @@ export interface ToolEndpointDeps {
   loadStore(): Promise<Store>;
   /** Requests, audit trail, accounts, holidays and devices: what the admin sees outside the main store. */
   loadExtras?(): Promise<AdminExtras>;
+  /** Keeps a form the assistant filled in for this user; returns the id that opens it. */
+  saveDraft?(uid: string, draft: FormDraft): string;
   dictionary(locale: "ar" | "en"): Dictionary;
   today(): string;
   now?: number;
@@ -42,7 +45,7 @@ export async function handleToolRequest(authorization: string | null, body: unkn
   if (b.op === "call" && typeof b.name === "string") {
     try {
       const [db, extras] = await Promise.all([deps.loadStore(), deps.loadExtras?.()]);
-      const ctx = { db, extras, t: deps.dictionary(token.loc), locale: token.loc, today: deps.today() };
+      const ctx = { db, extras, drafts: deps.saveDraft ? { save: (d: FormDraft) => deps.saveDraft!(token.uid, d) } : undefined, t: deps.dictionary(token.loc), locale: token.loc, today: deps.today() };
       const text = JSON.stringify(runTool(b.name, b.args, ctx));
       const result = text.length > MAX_RESULT_CHARS ? `${text.slice(0, MAX_RESULT_CHARS)}… [truncated — ask a narrower question for the rest]` : text;
       return { status: 200, json: { result } };

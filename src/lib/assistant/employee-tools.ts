@@ -18,6 +18,8 @@ export interface ToolContext {
   today: string;
   /** What the admin sees beyond the Store: requests, audit trail, accounts, holidays, devices. */
   extras?: import("@/lib/assistant/admin-tools").AdminExtras;
+  /** Keeps a form the assistant filled in for the admin to review (see prepare-tools.ts). */
+  drafts?: { save(draft: import("@/lib/assistant/drafts").FormDraft): string };
 }
 
 /** The placeholder department newly imported employees sit in until HR assigns a real one. */

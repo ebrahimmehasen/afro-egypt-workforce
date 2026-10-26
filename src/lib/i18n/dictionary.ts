@@ -1137,6 +1137,8 @@ export interface Dictionary {
     thinking: string;
     lookingUp: string;
     stop: string;
+    draftExpired: string;
+    draftNotice: string;
     clear: string;
     clearTitle: string;
     clearConfirm: string;

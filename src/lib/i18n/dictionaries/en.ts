@@ -1156,6 +1156,8 @@ export const en: Dictionary = {
     thinking: "Analysing the data...",
     lookingUp: "Looking things up...",
     stop: "Stop",
+    draftExpired: "This prepared form has expired. Ask the assistant to prepare it again.",
+    draftNotice: "Prepared by the assistant. Check the details and press save if they are right.",
     clear: "Clear chat",
     clearTitle: "Clear chat",
     clearConfirm: "This deletes the whole saved conversation and can't be undone. Continue?",

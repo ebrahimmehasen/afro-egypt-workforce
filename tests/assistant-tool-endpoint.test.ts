@@ -94,6 +94,15 @@ describe("what it does", () => {
     expect(JSON.parse((reply.json as { result: string }).result).total).toBe(1);
   });
 
+  it("keeps a prepared form for the admin who asked, not for anyone else", async () => {
+    const kept: Array<{ uid: string; kind: string }> = [];
+    const saveDraft = (uid: string, d: { kind: string }) => (kept.push({ uid, kind: d.kind }), "draft-1");
+    const name = store.employees[0].name;
+    const reply = await call(bearer("admin2"), { op: "call", name: "prepare_form", args: { form: "leave", employee: name } }, deps({ saveDraft }));
+    expect(JSON.parse((reply.json as { result: string }).result)).toMatchObject({ ok: true, link: "/leaves?assistant=draft-1" });
+    expect(kept).toEqual([{ uid: "admin2", kind: "leave" }]);
+  });
+
   it("cuts a huge result", async () => {
     const big = {
       ...store,

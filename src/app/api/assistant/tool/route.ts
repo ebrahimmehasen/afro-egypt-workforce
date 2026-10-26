@@ -5,6 +5,7 @@ import { getDictionary } from "@/lib/i18n";
 import { today } from "@/lib/today";
 import { dayStr } from "@/lib/serialize";
 import type { AdminExtras } from "@/lib/assistant/admin-tools";
+import { saveDraft } from "@/lib/assistant/drafts";
 import { handleToolRequest } from "@/lib/assistant/tool-endpoint";
 import type { Store } from "@/lib/store";
 
@@ -114,6 +115,7 @@ export async function POST(req: Request) {
     },
     loadStore,
     loadExtras,
+    saveDraft,
     dictionary: getDictionary,
     today,
   });
