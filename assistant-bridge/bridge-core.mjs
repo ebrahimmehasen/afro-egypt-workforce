@@ -45,7 +45,10 @@ export function buildMcpConfig({ nodePath, mcpScript, toolUrl, toolToken, logFil
 export function buildCliArgs({ systemPrompt, mcpConfigPath, model, budgetUsd }) {
   return [
     "-p",
-    "--output-format", "json",
+    // one JSON line per event, with the answer arriving in small pieces as it is written
+    "--output-format", "stream-json",
+    "--verbose",
+    "--include-partial-messages",
     "--system-prompt", systemPrompt,
     "--tools", "",
     "--strict-mcp-config",
@@ -84,6 +87,30 @@ export function parseCliResult(stdout, stderr = "") {
   }
   if (!text) return fail("bad_response", "The CLI returned an empty answer.");
   return { ok: true, answer: text, costUsd: typeof json.total_cost_usd === "number" ? json.total_cost_usd : null };
+}
+
+/**
+ * One line of the CLI's event stream, as what the app needs to hear about: a piece of the answer, the start of a
+ * tool call (whatever was written before it was only the model thinking aloud), or the final result. Everything
+ * else (setup, status, a sub-agent's chatter) is ignored.
+ */
+export function readStreamLine(line) {
+  let json;
+  try {
+    json = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  if (!json || typeof json !== "object") return null;
+
+  if (json.type === "stream_event" && !json.parent_tool_use_id) {
+    const e = json.event ?? {};
+    if (e.type === "content_block_delta" && e.delta?.type === "text_delta" && typeof e.delta.text === "string") return { type: "delta", text: e.delta.text };
+    if (e.type === "content_block_start" && e.content_block?.type === "tool_use") return { type: "tool" };
+    return null;
+  }
+  if (json.type === "result") return { type: "result", parsed: parseCliResult(line) };
+  return null;
 }
 
 /** The tool process only ever calls back to this machine. */

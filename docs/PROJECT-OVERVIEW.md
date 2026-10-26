@@ -409,7 +409,7 @@ flowchart TD
 | `biometric-device.ts` | اختبار الاتصال، تحديث الإعدادات، حذف مستخدم/بصمة من الجهاز، تسجيل بصمة، إعادة تشغيل، تفعيل/تعطيل، تعديل الاسم، **ربط/فك ربط موظف**، مسح سجل الجهاز، حالة الاتصال اللحظي، مزامنة يدوية، إيقاف/استئناف | الربط بيعمل backfill للتاريخ |
 | `device-users.ts` | `getDeviceUserNamesAction` | أسماء مستخدمي الجهاز لقايمة الموظفين، وبتتجاب بعد ما الصفحة تظهر |
 | `employee-documents.ts` / `employee-acknowledgments.ts` | `setDocumentRequired` / `setAcknowledgmentRequired` | تخصيص قايمة المطلوب لموظف معيّن |
-| `assistant.ts` | `sendAssistantMessage` · `loadAssistantHistory` · `clearAssistantHistory` | |
+| `assistant.ts` | `loadAssistantHistory` · `clearAssistantHistory` | |
 | `locale.ts` | `setLocale` | كوكي اللغة |
 
 ---

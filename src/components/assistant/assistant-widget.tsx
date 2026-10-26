@@ -1,13 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Send, Sparkles, Trash2, X } from "lucide-react";
-import {
-  AssistantMessageDTO,
-  clearAssistantHistory,
-  loadAssistantHistory,
-  sendAssistantMessage,
-} from "@/lib/actions/assistant";
+import { Loader2, Send, Sparkles, Square, Trash2, X } from "lucide-react";
+import { clearAssistantHistory, loadAssistantHistory } from "@/lib/actions/assistant";
+import type { AssistantMessageDTO } from "@/lib/assistant/dto";
+import { readEventStream } from "@/lib/assistant/stream-client";
 import { useT } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
 import { AssistantMessage } from "@/components/assistant/assistant-message";
@@ -19,6 +16,7 @@ import {
 /**
  * A floating chat: a round button that widens to say what it is when you hover it, and opens the
  * conversation. The conversation is saved per user on the server, so it is still there next time.
+ * Answers are typed out live as the assistant writes them.
  */
 export function AssistantWidget() {
   const t = useT();
@@ -29,6 +27,9 @@ export function AssistantWidget() {
   const [error, setError] = useState<string | null>(null);
   // an explicit flag, not useTransition: an async transition's pending state can end before the request does
   const [pending, setPending] = useState(false);
+  // the answer being written right now; `lookingUp` is true while the assistant fetches data instead of writing
+  const [live, setLive] = useState<{ text: string; lookingUp: boolean } | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -46,49 +47,73 @@ export function AssistantWidget() {
     };
   }, [open, loaded]);
 
-  // A new answer is read from its first line, so scroll to its top; the question you just sent, the
-  // "thinking" note and a freshly opened chat go to the bottom.
+  // Follow the conversation down as it grows, including while an answer is being typed.
   useEffect(() => {
     const list = listRef.current;
     if (!open || !list) return;
-    const last = messages[messages.length - 1];
-    if (!pending && last?.role === "assistant") {
-      list.querySelector<HTMLElement>(`[data-msg-id="${last.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    } else {
-      list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
-    }
-  }, [messages, pending, open]);
+    list.scrollTo({ top: list.scrollHeight, behavior: live?.text ? "auto" : "smooth" });
+  }, [messages, pending, open, live]);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
 
-  function send(raw: string) {
+  // leaving the page must not leave a question running
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  async function send(raw: string) {
     const text = raw.trim();
     if (!text || pending) return;
     setError(null);
     setInput("");
     const temp: AssistantMessageDTO = { id: `pending-${Date.now()}`, role: "user", content: text, createdAt: new Date().toISOString() };
     setMessages((m) => [...m, temp]);
-
     setPending(true);
-    sendAssistantMessage(text)
-      .then((res) => {
-        if ("error" in res) {
-          // take the question back out of the thread and into the box so it can be sent again
-          setMessages((m) => m.filter((x) => x.id !== temp.id));
-          setInput(text);
-          setError(res.error);
-          return;
+    setLive({ text: "", lookingUp: false });
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    // take the question back out of the thread and into the box so it can be sent again
+    const giveBack = (message: string | null) => {
+      setMessages((m) => m.filter((x) => x.id !== temp.id));
+      setInput(text);
+      setError(message);
+    };
+    let settled = false;
+    try {
+      const res = await fetch("/api/assistant/stream", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+        signal: controller.signal,
+      });
+      if (!res.ok || !res.body) {
+        const json = (await res.json().catch(() => null)) as { error?: unknown } | null;
+        settled = true;
+        giveBack(typeof json?.error === "string" ? json.error : t.assistant.errorGeneric);
+        return;
+      }
+      await readEventStream(res.body, (ev) => {
+        if (ev.type === "delta") setLive((l) => ({ text: (l?.text ?? "") + ev.text, lookingUp: false }));
+        // whatever was written before a lookup was only the assistant thinking aloud
+        else if (ev.type === "tool") setLive({ text: "", lookingUp: true });
+        else if (ev.type === "saved") {
+          settled = true;
+          setMessages((m) => [...m.filter((x) => x.id !== temp.id), ...ev.messages]);
+        } else if (ev.type === "error") {
+          settled = true;
+          giveBack(ev.message);
         }
-        setMessages((m) => [...m.filter((x) => x.id !== temp.id), ...res.messages]);
-      })
-      .catch(() => {
-        setMessages((m) => m.filter((x) => x.id !== temp.id));
-        setInput(text);
-        setError(t.assistant.errorGeneric);
-      })
-      .finally(() => setPending(false));
+      });
+      if (!settled) giveBack(t.assistant.errorGeneric);
+    } catch {
+      // stopped by the user: nothing was saved, and the question is back in the box
+      if (!settled) giveBack(controller.signal.aborted ? null : t.assistant.errorGeneric);
+    } finally {
+      abortRef.current = null;
+      setLive(null);
+      setPending(false);
+    }
   }
 
   function clear() {
@@ -178,11 +203,18 @@ export function AssistantWidget() {
               ),
             )}
 
-            {pending && (
-              <div className="flex items-center gap-2 self-start rounded-2xl rounded-es-sm bg-muted px-3 py-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t.assistant.thinking}
+            {pending && live?.text ? (
+              <div dir="auto" className="max-w-[92%] self-start rounded-2xl rounded-es-sm bg-muted px-3 py-2">
+                <AssistantMessage text={live.text} />
+                <span aria-hidden className="ms-0.5 inline-block h-4 w-1.5 translate-y-0.5 animate-pulse bg-foreground/60" />
               </div>
+            ) : (
+              pending && (
+                <div className="flex items-center gap-2 self-start rounded-2xl rounded-es-sm bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {live?.lookingUp ? t.assistant.lookingUp : t.assistant.thinking}
+                </div>
+              )
             )}
           </div>
 
@@ -198,15 +230,21 @@ export function AssistantWidget() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                     e.preventDefault();
-                    send(input);
+                    void send(input);
                   }
                 }}
                 placeholder={t.assistant.placeholder}
                 className="max-h-28 min-h-10 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
-              <Button size="icon" onClick={() => send(input)} disabled={pending || !input.trim()} aria-label={t.assistant.send}>
-                <Send className="h-4 w-4 rtl:-scale-x-100" />
-              </Button>
+              {pending && abortRef.current ? (
+                <Button size="icon" variant="outline" onClick={() => abortRef.current?.abort()} aria-label={t.assistant.stop} title={t.assistant.stop}>
+                  <Square className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button size="icon" onClick={() => void send(input)} disabled={pending || !input.trim()} aria-label={t.assistant.send}>
+                  <Send className="h-4 w-4 rtl:-scale-x-100" />
+                </Button>
+              )}
             </div>
             <p className="mt-2 text-center text-[11px] text-muted-foreground">{t.assistant.disclaimer}</p>
           </div>

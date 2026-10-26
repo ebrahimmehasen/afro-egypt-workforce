@@ -18,7 +18,14 @@ process.stdin.on("data", (d) => (prompt += d));
 process.stdin.on("end", async () => {
   if (prompt.includes("[[HANG]]")) return void setInterval(() => {}, 1000);
   if (prompt.includes("[[LOGIN]]")) return void process.stdout.write("Not logged in \\u00b7 Please run /login\\n");
-  if (prompt.includes("[[LIMIT]]")) return void process.stdout.write(JSON.stringify({ is_error: true, result: "API Error: 429 usage limit reached" }));
+  if (prompt.includes("[[LIMIT]]")) return void process.stdout.write(JSON.stringify({ type: "result", is_error: true, result: "API Error: 429 usage limit reached" }) + "\\n");
+  const delta = (text) => JSON.stringify({ type: "stream_event", parent_tool_use_id: null, event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } } }) + "\\n";
+  const pidFile = (prompt.match(/\\[\\[PIDFILE:([^\\]]+)\\]\\]/) || [])[1];
+  if (pidFile) {
+    fs.writeFileSync(pidFile, String(process.pid));
+    process.stdout.write(delta("started "));
+    return void setInterval(() => {}, 1000);
+  }
   await new Promise((r) => setTimeout(r, prompt.includes("[[SLOW]]") ? 700 : 80));
   const cfg = JSON.parse(fs.readFileSync(flag("--mcp-config"), "utf8"));
   fs.appendFileSync(cfg.mcpServers.afro.env.AFRO_TOOL_LOG, "attendance_summary\\n");
@@ -35,7 +42,18 @@ process.stdin.on("end", async () => {
     "CWD=" + process.cwd(),
     "TOKEN=" + cfg.mcpServers.afro.env.AFRO_TOOL_TOKEN,
   ].join("\\n");
-  process.stdout.write(JSON.stringify({ is_error: false, result, total_cost_usd: 0.01 }));
+  // like the real CLI: some thinking aloud, a tool call, then the answer in pieces (one cut in the middle of a line)
+  process.stdout.write(delta("let me check "));
+  process.stdout.write(JSON.stringify({ type: "stream_event", parent_tool_use_id: null, event: { type: "content_block_start", index: 1, content_block: { type: "tool_use", name: "x" } } }) + "\\n");
+  const third = Math.ceil(result.length / 3);
+  const lines = [0, 1, 2].map((i) => delta(result.slice(i * third, (i + 1) * third)));
+  const first = lines[0];
+  process.stdout.write(first.slice(0, 20));
+  await new Promise((r) => setTimeout(r, 250));
+  process.stdout.write(first.slice(20));
+  await new Promise((r) => setTimeout(r, 250));
+  process.stdout.write(lines[1] + lines[2]);
+  process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_error: false, result, total_cost_usd: 0.01 }) + "\\n");
 });
 `;
 
@@ -220,6 +238,91 @@ describe("the assistant service", () => {
     } finally {
       await new Promise((resolve) => s.close(resolve));
     }
+  });
+
+  describe("streaming the answer", () => {
+    const stream = (url: string, payload: unknown) =>
+      fetch(`${url}/ask-stream`, { method: "POST", headers: { "content-type": "application/json", "x-bridge-secret": SECRET }, body: JSON.stringify(payload) });
+
+    async function readAll(res: Response) {
+      const events: Array<Record<string, unknown> & { type: string; at: number }> = [];
+      const startedAt = Date.now();
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let pending = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        pending += decoder.decode(value, { stream: true });
+        let i;
+        while ((i = pending.indexOf("\n")) >= 0) {
+          const line = pending.slice(0, i);
+          pending = pending.slice(i + 1);
+          if (line.trim()) events.push({ ...JSON.parse(line), at: Date.now() - startedAt });
+        }
+      }
+      return events;
+    }
+
+    it("sends the pieces while the CLI is still writing, then the whole answer", async () => {
+      const res = await stream(base, body());
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("application/x-ndjson");
+      const events = await readAll(res);
+
+      const types = events.map((e) => e.type);
+      expect(types[0]).toBe("delta");
+      expect(types).toContain("tool");
+      expect(types[types.length - 1]).toBe("done");
+      expect(types.indexOf("tool")).toBeGreaterThan(types.indexOf("delta"));
+
+      // the pieces after the lookup add up to the answer, and the first one arrived long before the last
+      const done = events[events.length - 1];
+      const afterTool = events.slice(types.indexOf("tool") + 1).filter((e) => e.type === "delta");
+      expect(afterTool.map((e) => e.text).join("")).toBe(done.answer);
+      expect(done.toolsUsed).toEqual(["attendance_summary"]);
+      expect(done.at - events[0].at).toBeGreaterThan(300);
+    });
+
+    it("reports a failure as an error event once the stream has started", async () => {
+      const events = await readAll(await stream(base, body({ question: "[[LOGIN]]" })));
+      expect(events[events.length - 1]).toMatchObject({ type: "error", code: "auth" });
+      expect(events.some((e) => e.type === "done")).toBe(false);
+    });
+
+    it("still refuses a wrong secret and a bad request with a plain HTTP error", async () => {
+      expect((await fetch(`${base}/ask-stream`, { method: "POST", headers: { "x-bridge-secret": "wrong" }, body: "{}" })).status).toBe(401);
+      expect((await stream(base, { question: "" })).status).toBe(400);
+    });
+
+    it("stops the CLI when the caller goes away", async () => {
+      const pidFile = path.join(dir, "cli.pid");
+      const controller = new AbortController();
+      const res = await fetch(`${base}/ask-stream`, {
+        method: "POST",
+        signal: controller.signal,
+        headers: { "content-type": "application/json", "x-bridge-secret": SECRET },
+        body: JSON.stringify(body({ question: `[[PIDFILE:${pidFile}]]` })),
+      });
+      const reader = res.body!.getReader();
+      expect(new TextDecoder().decode((await reader.read()).value)).toContain("started");
+      const pid = Number(fs.readFileSync(pidFile, "utf8"));
+      expect(() => process.kill(pid, 0)).not.toThrow();
+
+      controller.abort();
+      await reader.read().catch(() => {});
+      const alive = () => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      for (let i = 0; i < 50 && alive(); i++) await new Promise((r) => setTimeout(r, 100));
+      expect(alive()).toBe(false);
+      expect(tmpDirs()).toEqual([]);
+    });
   });
 
   it("lets a waiting question go once a place frees up", async () => {

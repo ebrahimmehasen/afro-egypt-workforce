@@ -7,6 +7,7 @@ import {
   buildSystemPrompt,
   isLoopbackUrl,
   parseCliResult,
+  readStreamLine,
   validateAsk,
 } from "../assistant-bridge/bridge-core.mjs";
 
@@ -81,7 +82,9 @@ describe("the CLI options", () => {
     expect(after("--system-prompt")).toBe("SYS");
     expect(after("--model")).toBe("sonnet");
     expect(after("--max-budget-usd")).toBe("1.00");
-    expect(after("--output-format")).toBe("json");
+    expect(after("--output-format")).toBe("stream-json");
+    expect(args).toContain("--include-partial-messages");
+    expect(args).toContain("--verbose");
   });
 
   it("never turns permissions off or names a shell or file tool", () => {
@@ -159,5 +162,33 @@ describe("checking a request from the app", () => {
     ["no tool token", { ...valid, toolToken: "" }],
   ])("refuses %s", (_name, body) => {
     expect(validateAsk(body).ok).toBe(false);
+  });
+});
+
+describe("reading the CLI event stream", () => {
+  const event = (e: unknown, extra: Record<string, unknown> = {}) => JSON.stringify({ type: "stream_event", parent_tool_use_id: null, event: e, ...extra });
+
+  it("turns a text delta into a piece of the answer", () => {
+    expect(readStreamLine(event({ type: "content_block_delta", delta: { type: "text_delta", text: "أهلا" } }))).toEqual({ type: "delta", text: "أهلا" });
+  });
+
+  it("notices the start of a tool call", () => {
+    expect(readStreamLine(event({ type: "content_block_start", content_block: { type: "tool_use", name: "x" } }))).toEqual({ type: "tool" });
+    expect(readStreamLine(event({ type: "content_block_start", content_block: { type: "text" } }))).toBeNull();
+  });
+
+  it("ignores a sub-agent text, thinking and everything else it does not need", () => {
+    expect(readStreamLine(event({ type: "content_block_delta", delta: { type: "text_delta", text: "x" } }, { parent_tool_use_id: "toolu_1" }))).toBeNull();
+    expect(readStreamLine(event({ type: "content_block_delta", delta: { type: "thinking_delta", thinking: "hmm" } }))).toBeNull();
+    expect(readStreamLine(JSON.stringify({ type: "system", subtype: "init" }))).toBeNull();
+    expect(readStreamLine("Not logged in")).toBeNull();
+    expect(readStreamLine("")).toBeNull();
+  });
+
+  it("reads the final result like a plain one", () => {
+    const ok = readStreamLine(JSON.stringify({ type: "result", is_error: false, result: " تمام ", total_cost_usd: 0.02 }));
+    expect(ok).toEqual({ type: "result", parsed: { ok: true, answer: "تمام", costUsd: 0.02 } });
+    const bad = readStreamLine(JSON.stringify({ type: "result", is_error: true, result: "Invalid API key · Please run /login" }));
+    expect(bad).toMatchObject({ type: "result", parsed: { ok: false, code: "auth" } });
   });
 });

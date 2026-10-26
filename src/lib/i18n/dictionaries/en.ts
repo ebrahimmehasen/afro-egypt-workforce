@@ -1154,6 +1154,8 @@ export const en: Dictionary = {
     placeholder: "Ask about attendance, payroll or any employee...",
     send: "Send",
     thinking: "Analysing the data...",
+    lookingUp: "Looking things up...",
+    stop: "Stop",
     clear: "Clear chat",
     clearTitle: "Clear chat",
     clearConfirm: "This deletes the whole saved conversation and can't be undone. Continue?",
