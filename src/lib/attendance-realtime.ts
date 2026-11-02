@@ -1,4 +1,4 @@
-import { startRealtimeListener, stopRealtimeListener, isRealtimeListenerActive, getRealtimeConnectionStatus, RawAttendanceRecord } from "@/lib/zk-device";
+import { startRealtimeListener, stopRealtimeListener, isRealtimeListenerActive, getRealtimeConnectionStatus, syncDeviceClock, RawAttendanceRecord } from "@/lib/zk-device";
 import { ingestOneRecord } from "@/lib/attendance-ingest";
 import { syncDeviceAttendance } from "@/lib/attendance-sync";
 import { recordAbsences } from "@/lib/attendance-service";
@@ -27,6 +27,15 @@ async function catchUp(reason: string) {
   if (flags.catchingUp) return;
   flags.catchingUp = true;
   try {
+    // the device stamps the punches with its own clock, which does not follow Egypt summer time; keep it right
+    try {
+      const clock = await syncDeviceClock();
+      if (clock.driftSeconds !== 0 && (clock.corrected || Math.abs(clock.driftSeconds) > 120)) {
+        console.warn(`[attendance-realtime] device clock was ${clock.driftSeconds}s off the server; ${clock.corrected ? "set it right" : "could not set it right"}`);
+      }
+    } catch (e) {
+      console.error("[attendance-realtime] could not check the device clock:", e instanceof Error ? e.message : e);
+    }
     const r = await syncDeviceAttendance();
     console.log(`[attendance-realtime] catch-up (${reason}): ${r.imported} new punch(es)`);
     // Only right after a successful sync: then every punch the device has is already in, so someone with

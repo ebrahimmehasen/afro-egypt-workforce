@@ -1,6 +1,7 @@
 // Server-only: talks to hardware over raw TCP via node-zklib — never import from client components.
 const ZKLib = require("node-zklib");
 const { COMMANDS, REQUEST_DATA } = require("node-zklib/constants");
+import { clockDriftSeconds, decodeDeviceTime, encodeDeviceTime, needsClockSync } from "@/lib/device-clock";
 import { prisma } from "@/lib/prisma";
 import { BoundedCache, createBoundedCache, createMutex, reconnectDelay, realtimeStatus, RealtimeStatus } from "@/lib/device-resilience";
 
@@ -587,4 +588,25 @@ export async function setDeviceEnabled(enabled: boolean): Promise<void> {
 /** Wipes the device's own internal attendance log buffer. Irreversible; does not touch our AttendanceLog table. */
 export async function clearDeviceAttendanceLog(): Promise<void> {
   await withDeviceWrite((zk) => zk.clearAttendanceLog());
+}
+
+/**
+ * Reads the device's clock and, if it is more than a couple of minutes off the server's, sets it to the server's.
+ * The punches are stamped by the device, so a clock that is an hour out puts every punch an hour out - which is
+ * exactly what happened when Egypt's summer time ended and the device did not follow. Returns what it found.
+ */
+export async function syncDeviceClock(): Promise<{ driftSeconds: number; corrected: boolean }> {
+  return withDevice(async (zk) => {
+    const read = async () => decodeDeviceTime((await zk.executeCmd(COMMANDS.CMD_GET_TIME, Buffer.alloc(0))).readUInt32LE(8));
+    const drift = clockDriftSeconds(await read(), new Date());
+    if (!needsClockSync(drift)) return { driftSeconds: drift, corrected: false };
+
+    const payload = Buffer.alloc(4);
+    payload.writeUInt32LE(encodeDeviceTime(new Date()), 0);
+    await zk.executeCmd(COMMANDS.CMD_SET_TIME, payload);
+    // the device can take a moment to apply it; read it back to be sure it did
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const after = clockDriftSeconds(await read(), new Date());
+    return { driftSeconds: drift, corrected: !needsClockSync(after) };
+  });
 }
