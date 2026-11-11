@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Bot } from "lucide-react";
 import { DayPayRow } from "@/lib/day-pay-view";
 import { Dictionary } from "@/lib/i18n/dictionary";
-import { format, intlLocale } from "@/lib/i18n/format";
+import { format, APP_TIME_ZONE, intlLocale } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import { deductionTypeLabel, overtimeKindLabel } from "@/lib/i18n/labels";
 import { formatEGP } from "@/lib/constants";
@@ -42,7 +42,7 @@ export function DayPayCard({
   payTypeName: string;
   times: { start: string; end: string; overtime: string };
 }) {
-  const timeFmt = (d: Date | null) => (d ? d.toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" }) : "—");
+  const timeFmt = (d: Date | null) => (d ? d.toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit", timeZone: APP_TIME_ZONE }) : "—");
   const hours = (minutes: number) => (minutes > 0 ? `${round2(minutes / 60)} ${t.dayPay.hoursShort}` : "—");
   const lineLabel = (type: string, direction: string) =>
     direction === "addition" ? overtimeKindLabel(type, t) : deductionTypeLabel(type as DeductionType, t);

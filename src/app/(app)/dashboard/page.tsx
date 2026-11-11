@@ -11,7 +11,7 @@ import { formatEGP } from "@/lib/constants";
 import { today as todayDate, currentYearMonth } from "@/lib/today";
 import { getT, format } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
-import { intlLocale, monthName } from "@/lib/i18n/format";
+import { APP_TIME_ZONE, intlLocale, monthName } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { displayUserName } from "@/lib/i18n/labels";
 import {
@@ -198,7 +198,7 @@ async function EmployeeDashboard({ employeeId, userName }: { employeeId: string;
     : undefined;
   const upcomingLeaves = db.leaves.filter((l) => l.employeeId === employeeId && l.status === "approved" && l.to >= todayIso);
   const timeFmt = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" }) : "—";
+    iso ? new Date(iso).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit", timeZone: APP_TIME_ZONE }) : "—";
 
   return (
     <div className="flex flex-col gap-6">

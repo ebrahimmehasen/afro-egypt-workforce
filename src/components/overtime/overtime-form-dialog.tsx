@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { createOvertime } from "@/lib/actions/overtime";
 import { useActionFeedback, keepFilledFields } from "@/hooks/use-action-feedback";
@@ -18,6 +18,10 @@ import {
 } from "@/components/ui/select";
 import { Employee } from "@/lib/types";
 import { today } from "@/lib/today";
+import { useAssistantDraft } from "@/components/assistant/draft-provider";
+import { AssistantDraftNotice } from "@/components/assistant/draft-notice";
+import { typeIntoField } from "@/lib/assistant/type-into";
+import type { DraftValues } from "@/lib/assistant/drafts";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -33,15 +37,31 @@ export function OvertimeFormDialog({ employees, defaultRates }: { employees: Emp
   // an overtime hour: the hourly wage × the overtime multiplier of the employee's pay type (from settings)
   const defaultRate = employee ? defaultRates[employee.id] ?? 0 : 0;
   const [state, formAction] = useActionState(createOvertime, {});
-  useActionFeedback(state, () => setOpen(false));
+  useActionFeedback(state, () => {
+    setOpen(false);
+    setSeed(null);
+  });
+
+  // a form the assistant filled in: open the dialog with it, typing the notes in; the admin still presses submit
+  const { values: draft, clear } = useAssistantDraft("overtime");
+  const [seed, setSeed] = useState<DraftValues | null>(null);
+  useEffect(() => {
+    if (!draft) return;
+    if (typeof draft.employeeId === "string" && employees.some((e) => e.id === draft.employeeId)) setEmployeeId(draft.employeeId);
+    setSeed(draft);
+    setOpen(true);
+    clear();
+    if (typeof draft.notes === "string") typeIntoField("notes", draft.notes);
+  }, [draft, clear, employees]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setSeed(null); }}>
       <DialogTrigger asChild>
         <Button className="gap-2"><Plus className="h-4 w-4" />{t.overtime.addOvertime}</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>{t.overtime.dialogTitle}</DialogTitle></DialogHeader>
+        {seed && <AssistantDraftNotice />}
         <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label>{t.common.employee}</Label>
@@ -55,16 +75,16 @@ export function OvertimeFormDialog({ employees, defaultRates }: { employees: Emp
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="date">{t.overtime.formDate}</Label>
-              <Input id="date" name="date" type="date" defaultValue={today()} required />
+              <Input id="date" name="date" type="date" defaultValue={typeof seed?.date === "string" ? seed.date : today()} required />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="hours">{t.overtime.formHours}</Label>
-              <Input id="hours" name="hours" type="number" step="0.5" min={0.5} defaultValue={2} required />
+              <Input id="hours" name="hours" type="number" step="0.5" min={0.5} defaultValue={typeof seed?.hours === "number" ? seed.hours : 2} required />
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="hourlyRate">{t.overtime.formRate}</Label>
-            <Input id="hourlyRate" name="hourlyRate" type="number" min={0} key={employeeId} defaultValue={defaultRate} required />
+            <Input id="hourlyRate" name="hourlyRate" type="number" min={0} key={employeeId} defaultValue={typeof seed?.hourlyRate === "number" && seed.employeeId === employeeId ? seed.hourlyRate : defaultRate} required />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="notes">{t.overtime.formNotes}</Label>

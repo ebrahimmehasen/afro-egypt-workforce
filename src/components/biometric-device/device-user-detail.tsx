@@ -17,7 +17,7 @@ import {
   updateDeviceUserNameAction,
 } from "@/lib/actions/biometric-device";
 import { useLocale, useT } from "@/components/providers/locale-provider";
-import { format, intlLocale } from "@/lib/i18n/format";
+import { format, APP_TIME_ZONE, intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -283,7 +283,7 @@ function HistorySection({ history }: { history: DevicePunchEntry[] }) {
                 {history.map((log, i) => (
                   <TableRow key={`${log.timestamp}-${i}`}>
                     <TableCell dir={locale === "ar" ? "rtl" : "ltr"} className="text-center tabular-nums text-xs">
-                      {new Date(log.timestamp).toLocaleString(intlLocale(locale))}
+                      {new Date(log.timestamp).toLocaleString(intlLocale(locale), { timeZone: APP_TIME_ZONE })}
                     </TableCell>
                     <TableCell>
                       <Badge variant={log.punchType === "in" ? "success" : "secondary"}>

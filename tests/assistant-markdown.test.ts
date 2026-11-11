@@ -75,3 +75,32 @@ describe("takeSlot", () => {
     expect(takeSlot(hits, "u", 1002, 3, 1000)).toBe(true);
   });
 });
+
+describe("links to pages of the app", () => {
+  it("turns a link to a known page into a link", () => {
+    expect(parseInline("افتح [صفحة الخصومات](/deductions) وراجع")).toEqual([
+      { type: "text", text: "افتح " },
+      { type: "link", text: "صفحة الخصومات", href: "/deductions" },
+      { type: "text", text: " وراجع" },
+    ]);
+  });
+
+  it("allows an employee page and a query on a page", () => {
+    expect(parseInline("[ملفه](/employees/PROD-001)")).toEqual([{ type: "link", text: "ملفه", href: "/employees/PROD-001" }]);
+    expect(parseInline("[الحضور](/attendance?date=2026-09-19)")).toEqual([{ type: "link", text: "الحضور", href: "/attendance?date=2026-09-19" }]);
+  });
+
+  it.each([
+    ["an outside address", "[اضغط](https://evil.example/login)"],
+    ["a scheme-relative address", "[اضغط](//evil.example)"],
+    ["a script address", "[اضغط](javascript:alert(1))"],
+    ["an API path", "[اضغط](/api/assistant/tool)"],
+    ["a page that doesn't exist", "[اضغط](/nowhere)"],
+    ["a path that climbs out", "[اضغط](/employees/../api)"],
+  ])("shows %s as its plain label, never as a link", (_name, input) => {
+    const parts = parseInline(input);
+    expect(parts.some((p) => p.type === "link")).toBe(false);
+    // only the label shows (an address with brackets of its own can leave a stray ")" behind, as text)
+    expect(parts[0]).toEqual({ type: "text", text: "اضغط" });
+  });
+});

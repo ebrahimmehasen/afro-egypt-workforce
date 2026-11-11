@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import Link from "next/link";
 import { parseBlocks, parseInline } from "@/lib/assistant/markdown";
 
 function Inline({ text }: { text: string }) {
@@ -9,6 +10,18 @@ function Inline({ text }: { text: string }) {
           <strong key={i} className="font-semibold">
             {part.text}
           </strong>
+        ) : part.type === "link" ? (
+          <Link
+            key={i}
+            href={part.href}
+            className={
+              part.href.includes("assistant=")
+                ? "my-1 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground no-underline shadow-sm transition-opacity hover:opacity-90"
+                : "font-medium text-primary underline underline-offset-2"
+            }
+          >
+            {part.text}
+          </Link>
         ) : part.type === "code" ? (
           <code key={i} dir="ltr" className="rounded bg-background/70 px-1 py-0.5 text-[0.85em]">
             {part.text}

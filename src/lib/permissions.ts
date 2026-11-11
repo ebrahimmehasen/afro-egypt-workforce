@@ -151,9 +151,10 @@ export function canManageEmployeeFiles(user: SessionLike): boolean {
 }
 
 /**
- * The virtual assistant reads whole employee files (national ID, salary, attendance), so it needs the same
- * grant as the employees module, and it only ever sees the records that grant's department scope allows.
+ * The virtual assistant reads the whole system (pay, attendance, national IDs), so it belongs to the admin
+ * alone: no grant, department scope or "اداري" account ever reaches it. Every assistant action re-checks this
+ * on the server; hiding the button is not the protection.
  */
 export function canUseAssistant(user: SessionLike): boolean {
-  return hasPermission(user, "employees");
+  return user.role === "admin";
 }

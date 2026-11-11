@@ -7,12 +7,11 @@ import { requireAccess } from "@/lib/auth";
 import { employeesInScope, viewerScope } from "@/lib/scope";
 import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
 import { missingAcknowledgmentKeys, requiredAcknowledgmentKeys } from "@/lib/acknowledgments";
-import { canUseAssistant, hasPermission } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { isArchived } from "@/lib/employee-order";
 import { EmployeesView } from "@/components/employees/employees-view";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
 import { employeeFormOptions, loadPayContext } from "@/lib/pay-context";
-import { EmployeeAssistant } from "@/components/assistant/employee-assistant";
 
 export default async function EmployeesPage() {
   const db = await getDb();
@@ -75,7 +74,6 @@ export default async function EmployeesPage() {
           ) : null
         }
       />
-      {canUseAssistant(user) && <EmployeeAssistant />}
     </div>
   );
 }

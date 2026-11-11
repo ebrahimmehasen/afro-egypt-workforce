@@ -13,6 +13,13 @@ export function intlLocale(locale: "ar" | "en"): string {
   return locale === "ar" ? "ar-EG-u-nu-latn" : "en-US";
 }
 
+/**
+ * The time zone every time in the app is shown in: Egypt's, whoever is looking and whatever their phone or PC is
+ * set to. Without it the browser uses its own device's zone, so one punch read 08:00 on one screen and 09:00 on a
+ * device set an hour off (a wrong zone, or one that missed Egypt's summer-time change).
+ */
+export const APP_TIME_ZONE = "Africa/Cairo";
+
 const MONTHS: Record<"ar" | "en", string[]> = {
   ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
   en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],

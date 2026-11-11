@@ -11,6 +11,7 @@ import { recalculateDailyAttendance } from "@/lib/attendance-service";
 import { toShift } from "@/lib/serialize";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT, intlLocale } from "@/lib/i18n";
+import { APP_TIME_ZONE } from "@/lib/i18n/format";
 import { getLocale } from "@/lib/i18n/locale";
 import { scheduleAttendanceEffects } from "@/lib/attendance-effects";
 
@@ -39,7 +40,7 @@ export async function correctAttendance(_prev: ActionState, formData: FormData):
   if (!before) return { error: t.validation.noAttendanceRecordForDay };
 
   const timeFmt = (d: Date | null) =>
-    d ? d.toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" }) : "—";
+    d ? d.toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit", timeZone: APP_TIME_ZONE }) : "—";
   const newOut = correctedOut ? new Date(`${date}T${correctedOut}:00`) : before.actualOut;
 
   const actor = await getSession();
@@ -79,7 +80,7 @@ export async function applyCorrectAttendance(payload: CorrectionPayload, actorNa
   const computed = computeFromActuals(before.scheduledStart, before.scheduledEnd, shiftForEngine, newIn, newOut);
 
   const timeFmt = (d: Date | null) =>
-    d ? d.toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" }) : "—";
+    d ? d.toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit", timeZone: APP_TIME_ZONE }) : "—";
 
   await recordChangeAs(
     actorName,

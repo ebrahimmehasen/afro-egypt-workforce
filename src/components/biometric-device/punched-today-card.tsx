@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CalendarCheck2 } from "lucide-react";
 import { useLocale, useT } from "@/components/providers/locale-provider";
-import { intlLocale } from "@/lib/i18n/format";
+import { APP_TIME_ZONE, intlLocale } from "@/lib/i18n/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -30,7 +30,7 @@ export function PunchedTodayCard({ count, people }: { count: number | null; peop
   const [open, setOpen] = useState(false);
   const clickable = count !== null;
 
-  const timeFmt = (iso: string) => new Date(iso).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" });
+  const timeFmt = (iso: string) => new Date(iso).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit", timeZone: APP_TIME_ZONE });
 
   return (
     <>

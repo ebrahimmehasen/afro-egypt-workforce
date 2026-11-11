@@ -1,6 +1,8 @@
 // A deliberately small markdown reader for the assistant's answers: headings, bullet and numbered lists,
-// pipe tables, bold and inline code. It produces plain data that React renders as elements, so model output
-// is never injected as HTML.
+// pipe tables, bold, inline code and links to pages of this app. It produces plain data that React renders as
+// elements, so model output is never injected as HTML, and a link is only a link when it is a known in-app path.
+
+import { safeInternalHref } from "@/lib/assistant/links";
 
 export type Block =
   | { type: "heading"; level: 1 | 2 | 3; text: string }
@@ -9,7 +11,7 @@ export type Block =
   | { type: "ol"; items: string[] }
   | { type: "table"; header: string[]; rows: string[][] };
 
-export type Inline = { type: "text" | "bold" | "code"; text: string };
+export type Inline = { type: "text" | "bold" | "code"; text: string } | { type: "link"; text: string; href: string };
 
 const isTableRow = (line: string) => /^\s*\|.*\|\s*$/.test(line);
 const isTableSeparator = (line: string) => /^\s*\|?[\s:|-]+\|?\s*$/.test(line) && line.includes("-");
@@ -84,12 +86,18 @@ export function parseBlocks(input: string): Block[] {
 
 export function parseInline(text: string): Inline[] {
   const out: Inline[] = [];
-  const re = /\*\*(.+?)\*\*|`([^`]+)`/g;
+  const re = /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]\n]+)\]\(([^)\s]+)\)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     if (m.index > last) out.push({ type: "text", text: text.slice(last, m.index) });
-    out.push(m[1] !== undefined ? { type: "bold", text: m[1] } : { type: "code", text: m[2] });
+    if (m[1] !== undefined) out.push({ type: "bold", text: m[1] });
+    else if (m[2] !== undefined) out.push({ type: "code", text: m[2] });
+    else {
+      // an address that isn't a known page of this app shows as its plain label
+      const href = safeInternalHref(m[4]);
+      out.push(href ? { type: "link", text: m[3], href } : { type: "text", text: m[3] });
+    }
     last = m.index + m[0].length;
   }
   if (last < text.length) out.push({ type: "text", text: text.slice(last) });

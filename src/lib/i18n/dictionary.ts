@@ -1155,6 +1155,10 @@ export interface Dictionary {
     placeholder: string;
     send: string;
     thinking: string;
+    lookingUp: string;
+    stop: string;
+    draftExpired: string;
+    draftNotice: string;
     clear: string;
     clearTitle: string;
     clearConfirm: string;

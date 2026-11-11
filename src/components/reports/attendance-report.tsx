@@ -5,7 +5,7 @@ import { FileBarChart } from "lucide-react";
 import { DailyAttendance, Department, Employee } from "@/lib/types";
 import { addDays, today } from "@/lib/today";
 import { attendanceStatusLabel } from "@/lib/i18n/labels";
-import { intlLocale } from "@/lib/i18n/format";
+import { APP_TIME_ZONE, intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { Input } from "@/components/ui/input";
@@ -64,7 +64,7 @@ export function AttendanceReport({
 
   function fmtTime(iso: string | null) {
     if (!iso) return "—";
-    return new Date(iso).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit", timeZone: APP_TIME_ZONE });
   }
 
   const empMap = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);

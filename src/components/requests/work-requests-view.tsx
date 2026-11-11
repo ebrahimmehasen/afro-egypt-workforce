@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import { Check, ClipboardList, Plus, X } from "lucide-react";
 import { toast } from "sonner";
@@ -21,6 +21,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { MultiSelectFilter, type MultiSelectOption } from "@/components/shared/multi-select-filter";
 import { RequestStatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
+import { useAssistantDraft } from "@/components/assistant/draft-provider";
+import { AssistantDraftNotice } from "@/components/assistant/draft-notice";
+import { typeIntoField } from "@/lib/assistant/type-into";
+import type { DraftValues } from "@/lib/assistant/drafts";
 
 function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -38,11 +42,26 @@ export function WorkRequestDialog({ employees }: { employees: MultiSelectOption[
   useActionFeedback(state, () => {
     setOpen(false);
     setSelected([]);
+    setSeed(null);
   });
+
+  // a form the assistant filled in: open the dialog with it, typing the details in; the admin still presses submit
+  const { values: draft, clear } = useAssistantDraft("work_request");
+  const [seed, setSeed] = useState<DraftValues | null>(null);
+  useEffect(() => {
+    if (!draft) return;
+    const ids = Array.isArray(draft.employeeIds) ? draft.employeeIds.filter((id) => employees.some((o) => o.value === id)) : [];
+    setType(draft.type === "other" ? "other" : "late_work");
+    setSelected(ids);
+    setSeed(draft);
+    setOpen(true);
+    clear();
+    if (typeof draft.details === "string") typeIntoField("details", draft.details);
+  }, [draft, clear, employees]);
   const bad = (f: string) => (state.fields?.includes(f) ? "border-destructive ring-1 ring-destructive" : "");
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setSeed(null); }}>
       <DialogTrigger asChild>
         <Button className="gap-2"><Plus className="h-4 w-4" />{t.workRequests.add}</Button>
       </DialogTrigger>
@@ -50,7 +69,8 @@ export function WorkRequestDialog({ employees }: { employees: MultiSelectOption[
         <DialogHeader>
           <DialogTitle>{t.workRequests.dialogTitle}</DialogTitle>
         </DialogHeader>
-        <form action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
+        {seed && <AssistantDraftNotice />}
+        <form key={seed ? "draft" : "plain"} action={formAction} ref={keepFilledFields} className="flex flex-col gap-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label>{t.workRequests.type}</Label>
@@ -64,15 +84,15 @@ export function WorkRequestDialog({ employees }: { employees: MultiSelectOption[
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="wr-date">{t.workRequests.date}</Label>
-              <Input id="wr-date" name="date" type="date" className={bad("date")} required />
+              <Input id="wr-date" name="date" type="date" defaultValue={typeof seed?.date === "string" ? seed.date : undefined} className={bad("date")} required />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="wr-from">{t.workRequests.from}</Label>
-              <Input id="wr-from" name="fromTime" type="time" className={bad("fromTime")} required={type === "late_work"} />
+              <Input id="wr-from" name="fromTime" type="time" defaultValue={typeof seed?.fromTime === "string" ? seed.fromTime : undefined} className={bad("fromTime")} required={type === "late_work"} />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="wr-to">{t.workRequests.to}</Label>
-              <Input id="wr-to" name="toTime" type="time" className={bad("toTime")} required={type === "late_work"} />
+              <Input id="wr-to" name="toTime" type="time" defaultValue={typeof seed?.toTime === "string" ? seed.toTime : undefined} className={bad("toTime")} required={type === "late_work"} />
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
