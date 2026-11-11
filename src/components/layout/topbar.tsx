@@ -2,9 +2,8 @@
 
 import { LogOut, Menu } from "lucide-react";
 import { User } from "@/lib/types";
-import { today } from "@/lib/today";
 import { roleLabel, displayUserName } from "@/lib/i18n/labels";
-import { intlLocale } from "@/lib/i18n/format";
+import { APP_TIME_ZONE, intlLocale } from "@/lib/i18n/format";
 import { useLocale, useT } from "@/components/providers/locale-provider";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
@@ -21,14 +20,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "@/lib/actions/auth";
 
+/** Today's date in Egypt — not by the clock of the device showing the page. */
 function formatToday(locale: "ar" | "en") {
-  const d = new Date(`${today()}T00:00:00`);
   return new Intl.DateTimeFormat(intlLocale(locale), {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
-  }).format(d);
+    timeZone: APP_TIME_ZONE,
+  }).format(new Date());
 }
 
 export function Topbar({ user, onMenuClick }: { user: User; onMenuClick?: () => void }) {

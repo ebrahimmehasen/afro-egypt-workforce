@@ -4,7 +4,7 @@ import { Bot, Hand } from "lucide-react";
 import { Deduction, Employee, Overtime } from "@/lib/types";
 import { formatEGP } from "@/lib/constants";
 import { useLocale, useT } from "@/components/providers/locale-provider";
-import { intlLocale } from "@/lib/i18n/format";
+import { APP_TIME_ZONE, intlLocale } from "@/lib/i18n/format";
 import { deductionTypeLabel, overtimeKindLabel, requestStatusLabel } from "@/lib/i18n/labels";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { Badge } from "@/components/ui/badge";
@@ -53,8 +53,8 @@ function useParts(ctx: EntryContext) {
   const t = useT();
   const locale = useLocale();
   const timeFmt = (iso: string | null | undefined) =>
-    iso ? new Date(iso).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" }) : "—";
-  const stampFmt = (iso: string) => new Date(iso).toLocaleString(intlLocale(locale), { dateStyle: "medium", timeStyle: "short" });
+    iso ? new Date(iso).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit", timeZone: APP_TIME_ZONE }) : "—";
+  const stampFmt = (iso: string) => new Date(iso).toLocaleString(intlLocale(locale), { dateStyle: "medium", timeStyle: "short", timeZone: APP_TIME_ZONE });
 
   const employee = (
     <Section title={t.entryDetails.sectionEmployee}>

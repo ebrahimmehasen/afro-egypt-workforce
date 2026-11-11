@@ -8,7 +8,7 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import { Lock } from "lucide-react";
 import { useLocale, useT } from "@/components/providers/locale-provider";
-import { intlLocale } from "@/lib/i18n/format";
+import { APP_TIME_ZONE, intlLocale } from "@/lib/i18n/format";
 
 export function RawLogsTable({ logs, employees }: { logs: AttendanceLog[]; employees: Employee[] }) {
   const t = useT();
@@ -43,7 +43,7 @@ export function RawLogsTable({ logs, employees }: { logs: AttendanceLog[]; emplo
               </TableCell>
               <TableCell dir="ltr" className="font-mono text-xs">{log.deviceId}</TableCell>
               <TableCell dir="ltr" className="tabular-nums text-xs">
-                {new Date(log.timestamp).toLocaleString(intlLocale(locale))}
+                {new Date(log.timestamp).toLocaleString(intlLocale(locale), { timeZone: APP_TIME_ZONE })}
               </TableCell>
               <TableCell>
                 <Badge variant={log.punchType === "in" ? "success" : "secondary"}>

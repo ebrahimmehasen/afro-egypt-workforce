@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Check, X, ClipboardCheck } from "lucide-react";
 import { approveChangeRequest, rejectChangeRequest } from "@/lib/actions/change-requests";
 import { useT, useLocale } from "@/components/providers/locale-provider";
-import { intlLocale } from "@/lib/i18n/format";
+import { APP_TIME_ZONE, intlLocale } from "@/lib/i18n/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,7 +52,7 @@ export function ChangeRequestsTable({ requests }: { requests: ChangeRequestRow[]
   const [reason, setReason] = useState("");
   const [details, setDetails] = useState<ChangeRequestRow | null>(null);
 
-  const fmt = (iso: string) => new Date(iso).toLocaleString(intlLocale(locale));
+  const fmt = (iso: string) => new Date(iso).toLocaleString(intlLocale(locale), { timeZone: APP_TIME_ZONE });
 
   const grouped = useMemo(() => {
     const byStatus: Record<Status, ChangeRequestRow[]> = { pending: [], approved: [], rejected: [] };

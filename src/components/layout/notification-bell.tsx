@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import type { AppNotification, NotificationFeed } from "@/lib/notifications";
 import { useLocale, useT } from "@/components/providers/locale-provider";
-import { intlLocale } from "@/lib/i18n/format";
+import { APP_TIME_ZONE, intlLocale } from "@/lib/i18n/format";
 import { DATA_CHANGED_EVENT } from "@/components/shared/live-refresh";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -71,7 +71,7 @@ export function NotificationBell() {
   };
 
   const fmt = (iso: string) =>
-    new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+    new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: APP_TIME_ZONE }).format(new Date(iso));
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>

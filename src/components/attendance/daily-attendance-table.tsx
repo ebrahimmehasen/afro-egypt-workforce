@@ -14,7 +14,7 @@ import { CorrectAttendanceDialog } from "@/components/attendance/correct-attenda
 import { EmptyState } from "@/components/shared/empty-state";
 import { terminatedLast } from "@/lib/employee-order";
 import { useLocale, useT } from "@/components/providers/locale-provider";
-import { intlLocale } from "@/lib/i18n/format";
+import { APP_TIME_ZONE, intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 
 export function DailyAttendanceTable({
@@ -39,7 +39,7 @@ export function DailyAttendanceTable({
 
   function fmtTime(iso: string | null) {
     if (!iso) return "—";
-    return new Date(iso).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit", timeZone: APP_TIME_ZONE });
   }
 
   const empMap = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);

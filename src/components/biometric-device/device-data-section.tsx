@@ -1,7 +1,7 @@
 import { CircleCheck, CircleX, HardDrive, ListOrdered, Users } from "lucide-react";
 import { getDb } from "@/lib/data";
 import { getT } from "@/lib/i18n";
-import { format, intlLocale } from "@/lib/i18n/format";
+import { format, APP_TIME_ZONE, intlLocale } from "@/lib/i18n/format";
 import { getLocale } from "@/lib/i18n/locale";
 import { getDeviceConnection, getDeviceOverview } from "@/lib/zk-device";
 import { KpiCard } from "@/components/shared/kpi-card";
@@ -74,7 +74,7 @@ export async function DeviceDataSection() {
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
             <span>
               {format(t.biometricDevice.staleNotice, {
-                time: new Date(overview.fetchedAt).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" }),
+                time: new Date(overview.fetchedAt).toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit", timeZone: APP_TIME_ZONE }),
               })}
             </span>
             <RetryButton />
