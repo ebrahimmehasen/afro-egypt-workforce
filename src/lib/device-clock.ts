@@ -36,3 +36,25 @@ export function clockDriftSeconds(device: Date, server: Date): number {
 export function needsClockSync(driftSeconds: number): boolean {
   return Math.abs(driftSeconds) > MAX_CLOCK_DRIFT_SECONDS;
 }
+
+/**
+ * The real moment of a punch the listener got live. The device sends the event the instant the finger is read,
+ * so the moment the server receives it is when it happened; the device's own stamp is only as good as its clock.
+ * While that clock is right the stamp is kept (to the second, as before); once it is more than the allowed drift
+ * off — an hour after a summer-time change it got wrong — the server's moment is used instead.
+ */
+export function trueRealtimeTime(deviceTime: Date, receivedAt: Date): Date {
+  return needsClockSync(clockDriftSeconds(deviceTime, receivedAt)) ? receivedAt : deviceTime;
+}
+
+/**
+ * The real moment of a punch pulled from the device's log afterwards (after the device was unreachable, say).
+ * Its stamp is from the device's clock at the time. When the clock is found `driftSeconds` off now, the punches
+ * made since the clock was last known right carry that same error, so it is taken off them; older punches, and
+ * any punch at all while the clock is right, keep their stamp.
+ */
+export function trueLoggedTime(deviceTime: Date, driftSeconds: number, clockRightSince: Date | null): Date {
+  if (!needsClockSync(driftSeconds) || !clockRightSince) return deviceTime;
+  const corrected = new Date(deviceTime.getTime() - driftSeconds * 1000);
+  return corrected.getTime() >= clockRightSince.getTime() ? corrected : deviceTime;
+}
