@@ -9,7 +9,7 @@ import { canLinkDeviceEmployee } from "@/lib/scope";
 import { getSession } from "@/lib/auth";
 import { canUseBiometricDevice } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
-import { syncDeviceAttendance, backfillDeviceUser } from "@/lib/attendance-sync";
+import { syncDeviceAttendanceWithClock, backfillDeviceUser } from "@/lib/attendance-sync";
 import { removeDeviceUserAttendance } from "@/lib/attendance-ingest";
 import { attendanceRealtimeStatus, pauseAttendanceRealtime, resumeAttendanceRealtime } from "@/lib/attendance-realtime";
 import { ActionState } from "@/hooks/use-action-feedback";
@@ -403,7 +403,7 @@ export async function syncAttendanceNowAction() {
   const denied = await guard(t);
   if (denied) return denied;
   try {
-    const result = await syncDeviceAttendance();
+    const result = await syncDeviceAttendanceWithClock();
     await logDeviceAction(
       t,
       t.auditActions.syncAttendance,

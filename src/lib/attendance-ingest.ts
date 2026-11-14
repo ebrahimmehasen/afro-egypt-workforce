@@ -29,21 +29,39 @@ export interface IngestOutcome {
   reason?: "unlinked" | "duplicate";
 }
 
+/** How far apart a punch's real moment and the device's stamp of it can be (a device clock hours out). */
+const DEVICE_STAMP_RANGE_MS = 12 * 60 * 60_000;
+
 /** Looks up the employee, dedupes, infers in/out, writes the log row, and
  * recalculates that day's attendance. Safe to call more than once for the
  * same punch (e.g. a punch seen by both the real-time listener and a
- * catch-up poll that overlaps it). */
-export async function ingestOneRecord(deviceUserId: string, recordTime: Date): Promise<IngestOutcome> {
+ * catch-up poll that overlaps it).
+ *
+ * `recordTime` is when the punch really happened; `deviceTime` is the stamp the device gave it, which differs
+ * when the device clock was off (see device-clock.ts). The device keeps every punch in its log under that stamp
+ * and the catch-up reads the whole log again, so a punch is recognised by either: the moment stored, or the
+ * device stamp kept with a corrected one. */
+export async function ingestOneRecord(deviceUserId: string, recordTime: Date, deviceTime: Date = recordTime): Promise<IngestOutcome> {
   const employee = await prisma.employee.findFirst({
     where: { biometricDeviceUserId: deviceUserId, deletedAt: null },
   });
   if (!employee) return { imported: false, reason: "unlinked" };
 
-  const existing = await prisma.attendanceLog.findFirst({
-    where: { employeeId: employee.id, timestamp: recordTime },
-    select: { id: true },
+  const near = await prisma.attendanceLog.findMany({
+    where: {
+      employeeId: employee.id,
+      timestamp: { gte: new Date(deviceTime.getTime() - DEVICE_STAMP_RANGE_MS), lte: new Date(deviceTime.getTime() + DEVICE_STAMP_RANGE_MS) },
+    },
+    select: { timestamp: true, rawPayload: true },
   });
-  if (existing) return { imported: false, reason: "duplicate" };
+  const stamp = deviceTime.toISOString();
+  const seen = near.some(
+    (l) =>
+      l.timestamp.getTime() === recordTime.getTime() ||
+      l.timestamp.getTime() === deviceTime.getTime() ||
+      (l.rawPayload as { deviceTime?: string } | null)?.deviceTime === stamp,
+  );
+  if (seen) return { imported: false, reason: "duplicate" };
 
   const ctx = await loadPayContext();
   const { days, shift } = punchDays(ctx, employee, recordTime);
@@ -58,6 +76,8 @@ export async function ingestOneRecord(deviceUserId: string, recordTime: Date): P
       timestamp: recordTime,
       punchType: priorInShift === 0 ? "in" : "out",
       source: "biometric",
+      // the device's own stamp, when its clock was off and the real moment was used instead
+      ...(deviceTime.getTime() !== recordTime.getTime() ? { rawPayload: { deviceTime: stamp } } : {}),
     },
   });
 

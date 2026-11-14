@@ -1,6 +1,7 @@
-import { startRealtimeListener, stopRealtimeListener, isRealtimeListenerActive, getRealtimeConnectionStatus, syncDeviceClock, RawAttendanceRecord } from "@/lib/zk-device";
+import { startRealtimeListener, stopRealtimeListener, isRealtimeListenerActive, getRealtimeConnectionStatus, RawAttendanceRecord } from "@/lib/zk-device";
 import { ingestOneRecord } from "@/lib/attendance-ingest";
-import { syncDeviceAttendance } from "@/lib/attendance-sync";
+import { syncDeviceAttendanceWithClock } from "@/lib/attendance-sync";
+import { trueRealtimeTime } from "@/lib/device-clock";
 import { recordAbsences } from "@/lib/attendance-service";
 import { runAttendanceEffects, scheduleAttendanceEffects } from "@/lib/attendance-effects";
 
@@ -14,8 +15,13 @@ const flags = (globalRef.__afroAttendanceRealtime ??= { initialized: false, catc
 const SAFETY_NET_INTERVAL_MS = 10 * 60 * 1000;
 
 async function handleRealtimeRecord(r: RawAttendanceRecord) {
+  // the punch happened when it reached us; the device's stamp counts only while its clock is right
+  const at = trueRealtimeTime(r.recordTime, new Date());
+  if (at !== r.recordTime) {
+    console.warn(`[attendance-realtime] device stamped a punch ${r.recordTime.toISOString()}, received ${at.toISOString()}: the device clock is off, the received moment is used`);
+  }
   try {
-    await ingestOneRecord(r.deviceUserId, r.recordTime);
+    await ingestOneRecord(r.deviceUserId, at, r.recordTime);
   } catch (e) {
     console.error("[attendance-realtime] failed to ingest a punch:", e instanceof Error ? e.message : e);
   }
@@ -27,16 +33,9 @@ async function catchUp(reason: string) {
   if (flags.catchingUp) return;
   flags.catchingUp = true;
   try {
-    // the device stamps the punches with its own clock, which does not follow Egypt summer time; keep it right
-    try {
-      const clock = await syncDeviceClock();
-      if (clock.driftSeconds !== 0 && (clock.corrected || Math.abs(clock.driftSeconds) > 120)) {
-        console.warn(`[attendance-realtime] device clock was ${clock.driftSeconds}s off the server; ${clock.corrected ? "set it right" : "could not set it right"}`);
-      }
-    } catch (e) {
-      console.error("[attendance-realtime] could not check the device clock:", e instanceof Error ? e.message : e);
-    }
-    const r = await syncDeviceAttendance();
+    // the device stamps the punches with its own clock, which does not follow Egypt summer time: it is checked
+    // and set right first, and punches it stamped while it was off are put right as they come in
+    const r = await syncDeviceAttendanceWithClock();
     console.log(`[attendance-realtime] catch-up (${reason}): ${r.imported} new punch(es)`);
     // Only right after a successful sync: then every punch the device has is already in, so someone with
     // no record on a working day really didn't punch. While the device is unreachable nothing is marked.
