@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { ASSISTANT_LINK_ROOTS, safeInternalHref } from "@/lib/assistant/links";
+import { isDownloadHref, ASSISTANT_LINK_ROOTS, safeInternalHref } from "@/lib/assistant/links";
 
 describe("safeInternalHref", () => {
   it.each(["/dashboard", "/employees", "/employees/PROD-001", "/overtime/statement", "/attendance?date=2026-09-19", "/workforce-cost"])(
@@ -24,6 +24,26 @@ describe("safeInternalHref", () => {
   ])("refuses %j", (href) => expect(safeInternalHref(href)).toBeNull());
 
   it("trims surrounding spaces", () => expect(safeInternalHref("  /payroll ")).toBe("/payroll"));
+});
+
+describe("the overtime statement download", () => {
+  it.each(["/api/overtime/statement/export", "/api/overtime/statement/export?month=2026-11", "/api/overtime/statement/export?from=2026-11-01&to=2026-11-15"])("is accepted: %s", (href) => {
+    expect(isDownloadHref(href)).toBe(true);
+    expect(safeInternalHref(href)).toBe(href);
+  });
+
+  it.each([
+    "/api/payroll/export",
+    "/api/overtime/statement/export?month=bad",
+    "/api/overtime/statement/export?month=2026-11&month=2026-10&from=2026-11-01&to=2026-11-02",
+    "/api/overtime/statement/export?x=1",
+    "/api/overtime/statement/export?month=2026-11?x=1",
+    "/api/overtime/statement/export/other",
+    "/api/overtime/statement",
+  ])("is refused: %s", (href) => {
+    expect(isDownloadHref(href)).toBe(false);
+    expect(safeInternalHref(href)).toBeNull();
+  });
 });
 
 describe("the list of pages", () => {

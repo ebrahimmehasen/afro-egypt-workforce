@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
+import { isDownloadHref } from "@/lib/assistant/links";
 import { parseBlocks, parseInline } from "@/lib/assistant/markdown";
 
 function Inline({ text }: { text: string }) {
@@ -10,6 +11,16 @@ function Inline({ text }: { text: string }) {
           <strong key={i} className="font-semibold">
             {part.text}
           </strong>
+        ) : part.type === "link" && isDownloadHref(part.href) ? (
+          // a file, not a page: a plain anchor, so the browser downloads it instead of the router trying to open it
+          <a
+            key={i}
+            href={part.href}
+            download
+            className="my-1 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground no-underline shadow-sm transition-opacity hover:opacity-90"
+          >
+            {part.text}
+          </a>
         ) : part.type === "link" ? (
           <Link
             key={i}
