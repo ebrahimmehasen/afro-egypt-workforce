@@ -1,8 +1,11 @@
+import Link from "next/link";
+import { Clock3 } from "lucide-react";
 import { getDb } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { employeesInScope, rowsInScope, viewerScope } from "@/lib/scope";
 import { hasPermission } from "@/lib/permissions";
 import { getT } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { OvertimeFormDialog } from "@/components/overtime/overtime-form-dialog";
 import { OvertimeTable } from "@/components/overtime/overtime-table";
@@ -44,7 +47,20 @@ export default async function OvertimePage({
         title={t.overtime.title}
         description={t.overtime.description}
         // only employees with "له إضافي" can be given overtime
-        actions={<OvertimeFormDialog employees={employees.filter((e) => e.overtimeEligible !== false)} defaultRates={defaultRates} />}
+        actions={
+          <>
+            {/* the monthly statement (and its Excel export) is the same page the employees screen links to */}
+            {hasPermission(user, "overtime") && (
+              <Button asChild variant="outline" className="gap-2">
+                <Link href="/overtime/statement">
+                  <Clock3 className="h-4 w-4" />
+                  {t.overtime.statement.button}
+                </Link>
+              </Button>
+            )}
+            <OvertimeFormDialog employees={employees.filter((e) => e.overtimeEligible !== false)} defaultRates={defaultRates} />
+          </>
+        }
       />
       <OvertimeTable
         key={initialStatus}
