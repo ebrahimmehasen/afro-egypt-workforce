@@ -35,6 +35,7 @@ import type {
   PayrollRecord,
   Shift,
 } from "@/lib/types";
+import { quarantineOf } from "@/lib/punch-quarantine";
 import { parseRequiredDocuments } from "@/lib/documents";
 import { parseRequiredAcknowledgments } from "@/lib/acknowledgments";
 
@@ -126,6 +127,7 @@ export function toShift(s: PShift): Shift {
 }
 
 export function toAttendanceLog(l: PAttendanceLog): AttendanceLog {
+  const quarantine = quarantineOf(l.rawPayload);
   return {
     id: l.id,
     employeeId: l.employeeId,
@@ -133,6 +135,7 @@ export function toAttendanceLog(l: PAttendanceLog): AttendanceLog {
     timestamp: iso(l.timestamp),
     punchType: l.punchType,
     source: l.source,
+    ...(quarantine ? { quarantined: { twinId: quarantine.twinId, correctionStamp: quarantine.correctionStamp } } : {}),
   };
 }
 

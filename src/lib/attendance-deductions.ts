@@ -10,6 +10,7 @@ import { MidDayAnalysis } from "@/lib/mid-day-exits";
 import { payPeriodOf } from "@/lib/pay-rules";
 import { DayCharge, leaveCharges } from "@/lib/leave-balance";
 import { trackedAbsentDays } from "@/lib/leave-days";
+import { withoutQuarantined } from "@/lib/punch-quarantine";
 
 // Posts what each finished day of attendance costs and earns, by the employee's pay-type rules: deductions
 // (absence, lateness, permission, leaving without permission) to the Deduction table and additions
@@ -318,7 +319,7 @@ export async function postAttendanceDeductions(now: Date = new Date()): Promise<
     // exits in the middle of the day
     prisma.attendanceLog.findMany({
       where: { timestamp: { gte: new Date(`${addDays(firstDay, -1)}T00:00:00`), lt: new Date(`${addDays(lastDay, 2)}T00:00:00`) } },
-      select: { employeeId: true, timestamp: true, source: true },
+      select: { employeeId: true, timestamp: true, source: true, rawPayload: true },
       orderBy: { timestamp: "asc" },
     }),
   ]);
@@ -351,7 +352,7 @@ export async function postAttendanceDeductions(now: Date = new Date()): Promise<
   };
 
   const logsByEmployee = new Map<string, typeof logs>();
-  for (const l of logs) {
+  for (const l of withoutQuarantined(logs)) {
     const list = logsByEmployee.get(l.employeeId);
     if (list) list.push(l);
     else logsByEmployee.set(l.employeeId, [l]);

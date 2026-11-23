@@ -468,6 +468,8 @@ export const en: Dictionary = {
     rawColTimestamp: "Date & Time",
     rawColType: "Punch Type",
     rawColSource: "Source",
+    quarantinedPunch: "Duplicate (quarantined)",
+    quarantinedPunchHint: "A copy of a punch that was corrected after the device clock error — shown for review only and never counted in attendance or deductions",
     sourceBiometric: "Biometric Device",
     sourceSimulated: "Simulated",
     sourceManual: "Manual Correction",

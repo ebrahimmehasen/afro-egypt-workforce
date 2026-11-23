@@ -2,6 +2,7 @@ import { fetchDeviceAttendanceLogs, syncDeviceClock } from "@/lib/zk-device";
 import { ingestOneRecord } from "@/lib/attendance-ingest";
 import { needsClockSync, trueLoggedTime } from "@/lib/device-clock";
 import { prisma } from "@/lib/prisma";
+import { withoutQuarantined } from "@/lib/punch-quarantine";
 
 export interface AttendanceSyncResult {
   imported: number;
@@ -83,10 +84,10 @@ export async function syncDeviceAttendanceWithClock(): Promise<AttendanceSyncRes
     console.error("[device-clock] could not check the device clock:", e instanceof Error ? e.message : e);
   }
 
-  const clockRightSince =
-    clockState.rightAt ??
-    (await prisma.attendanceLog.findFirst({ where: { source: "biometric" }, orderBy: { timestamp: "desc" }, select: { timestamp: true } }))?.timestamp ??
-    null;
+  // the newest real punch on file (a quarantined copy stamped by the wrong clock is not one)
+  const newest = async () =>
+    withoutQuarantined(await prisma.attendanceLog.findMany({ where: { source: "biometric" }, orderBy: { timestamp: "desc" }, take: 25, select: { timestamp: true, rawPayload: true } }))[0]?.timestamp ?? null;
+  const clockRightSince = clockState.rightAt ?? (await newest());
   const result = await syncDeviceAttendance({ driftSeconds, clockRightSince });
   if (result.corrected > 0) console.warn(`[device-clock] ${result.corrected} punch(es) stamped by the wrong device clock were put right`);
   // from here on the device stamps right again (or always did)

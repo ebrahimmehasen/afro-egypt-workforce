@@ -14,6 +14,7 @@ import { getT, intlLocale } from "@/lib/i18n";
 import { APP_TIME_ZONE } from "@/lib/i18n/format";
 import { getLocale } from "@/lib/i18n/locale";
 import { scheduleAttendanceEffects } from "@/lib/attendance-effects";
+import { withoutQuarantined } from "@/lib/punch-quarantine";
 
 const correctionSchema = z.object({
   employeeId: z.string().min(1),
@@ -181,7 +182,8 @@ export async function applyAddManualAttendance(payload: ManualAttendancePayload,
     },
     async (tx) => {
       for (const [timestamp, punchType] of [[inTime, "in"], [outTime, "out"]] as const) {
-        const existing = await tx.attendanceLog.findFirst({ where: { employeeId, timestamp }, select: { id: true } });
+        // a quarantined copy at the same moment is not a punch: the correction is still written
+        const existing = withoutQuarantined(await tx.attendanceLog.findMany({ where: { employeeId, timestamp }, select: { id: true, rawPayload: true } }))[0];
         if (!existing) {
           await tx.attendanceLog.create({ data: { employeeId, timestamp, punchType, source: "manual_correction" } });
         }

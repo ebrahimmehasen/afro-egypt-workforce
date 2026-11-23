@@ -36,7 +36,7 @@ export function RawLogsTable({ logs, employees }: { logs: AttendanceLog[]; emplo
           {sorted.map((log) => {
             const employee = empMap.get(log.employeeId);
             return (
-            <TableRow key={log.id}>
+            <TableRow key={log.id} className={log.quarantined ? "bg-muted/40 text-muted-foreground" : undefined}>
               <TableCell>
                 <div className="font-medium">{employee?.name ?? "-"}</div>
                 {employee && <div dir="ltr" className="text-xs text-muted-foreground">{employee.employeeNumber}</div>}
@@ -51,6 +51,11 @@ export function RawLogsTable({ logs, employees }: { logs: AttendanceLog[]; emplo
                 </Badge>
               </TableCell>
               <TableCell className="text-xs text-muted-foreground">
+                {log.quarantined && (
+                  <Badge variant="outline" className="mb-1 block w-fit" title={t.attendance.quarantinedPunchHint}>
+                    {t.attendance.quarantinedPunch}
+                  </Badge>
+                )}
                 {log.source === "biometric"
                   ? t.attendance.sourceBiometric
                   : log.source === "manual_correction"

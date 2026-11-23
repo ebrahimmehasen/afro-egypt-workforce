@@ -468,6 +468,8 @@ export const ar: Dictionary = {
     rawColTimestamp: "التاريخ والوقت",
     rawColType: "نوع البصمة",
     rawColSource: "المصدر",
+    quarantinedPunch: "بصمة مكررة (معزولة)",
+    quarantinedPunchHint: "نسخة من بصمة اتصححت بعد خطأ ساعة الجهاز — ظاهرة للمراجعة بس ومش بتتحسب في الحضور ولا الخصومات",
     sourceBiometric: "جهاز البصمة",
     sourceSimulated: "محاكاة",
     sourceManual: "تصحيح يدوي",

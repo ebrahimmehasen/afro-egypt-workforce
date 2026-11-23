@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { dayStr, toDailyAttendance } from "@/lib/serialize";
 import { DailyAttendance } from "@/lib/types";
 import { PayContext, effectiveShift, kindOf, loadPayContext } from "@/lib/pay-context";
+import { withoutQuarantined } from "@/lib/punch-quarantine";
 
 /** yyyy-MM-dd for each calendar day in [from, to] inclusive. */
 export function datesInRange(from: string, to: string): string[] {
@@ -49,10 +50,13 @@ export async function recalculateDailyAttendance(
   const windowStart = new Date(scheduledStart.getTime() - PUNCH_WINDOW_MS);
   const windowEnd = new Date(scheduledEnd.getTime() + PUNCH_WINDOW_MS);
 
-  const rawLogs = await prisma.attendanceLog.findMany({
-    where: { employeeId, timestamp: { gte: windowStart, lte: windowEnd } },
-    orderBy: { timestamp: "asc" },
-  });
+  // a quarantined copy of a corrected punch is not a punch (punch-quarantine.ts)
+  const rawLogs = withoutQuarantined(
+    await prisma.attendanceLog.findMany({
+      where: { employeeId, timestamp: { gte: windowStart, lte: windowEnd } },
+      orderBy: { timestamp: "asc" },
+    }),
+  );
 
   const dateOnly = new Date(`${date}T00:00:00.000Z`);
   const leave = await prisma.leave.findFirst({

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recalculateDailyAttendance } from "@/lib/attendance-service";
 import { punchDays, punchWindow } from "@/lib/attendance-ingest";
+import { withoutQuarantined } from "@/lib/punch-quarantine";
 import { loadPayContext } from "@/lib/pay-context";
 
 /**
@@ -57,9 +58,12 @@ export async function POST(req: NextRequest) {
   const { days, shift } = punchDays(ctx, employee, at);
   const resolvedType =
     punchType ??
-    ((await prisma.attendanceLog.count({
-      where: { employeeId: employee.id, timestamp: { ...punchWindow(days[0], shift), lt: at } },
-    })) === 0
+    (withoutQuarantined(
+      await prisma.attendanceLog.findMany({
+        where: { employeeId: employee.id, timestamp: { ...punchWindow(days[0], shift), lt: at } },
+        select: { rawPayload: true },
+      }),
+    ).length === 0
       ? "in"
       : "out");
 

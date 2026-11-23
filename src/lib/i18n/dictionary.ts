@@ -470,6 +470,8 @@ export interface Dictionary {
     rawColTimestamp: string;
     rawColType: string;
     rawColSource: string;
+    quarantinedPunch: string;
+    quarantinedPunchHint: string;
     sourceBiometric: string;
     sourceSimulated: string;
     sourceManual: string;

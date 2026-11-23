@@ -4,6 +4,7 @@ import { timedPermissions } from "@/lib/attendance-deductions";
 import { MidDayAnalysis, analyzeMidDay } from "@/lib/mid-day-exits";
 import { DayPayInput, at, dayTimes } from "@/lib/pay-engine";
 import { PayContext, PayEmployee, effectiveShift, kindOf, rulesFor, scheduleFor } from "@/lib/pay-context";
+import { withoutQuarantined } from "@/lib/punch-quarantine";
 import { dayStr } from "@/lib/serialize";
 import { addDays } from "@/lib/today";
 
@@ -26,7 +27,7 @@ export async function loadMidDayInputs(
   const [logs, leaves] = await Promise.all([
     prisma.attendanceLog.findMany({
       where: { employeeId: { in: ids }, timestamp: { gte: new Date(`${addDays(first, -1)}T00:00:00`), lt: new Date(`${addDays(last, 2)}T00:00:00`) } },
-      select: { employeeId: true, timestamp: true, source: true },
+      select: { employeeId: true, timestamp: true, source: true, rawPayload: true },
       orderBy: { timestamp: "asc" },
     }),
     prisma.leave.findMany({
@@ -39,7 +40,7 @@ export async function loadMidDayInputs(
     if (!employee) return undefined;
     const window = punchWindow(date, effectiveShift(ctx, employee, date));
     return {
-      punches: logs
+      punches: withoutQuarantined(logs)
         .filter((l) => l.employeeId === employeeId && l.timestamp >= window.gte && l.timestamp <= window.lte)
         .map((l) => ({ at: l.timestamp, source: l.source })),
       permissions: timedPermissions(leaves.filter((l) => l.employeeId === employeeId && dayStr(l.from) <= date && dayStr(l.to) >= date)),

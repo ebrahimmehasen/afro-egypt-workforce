@@ -3,6 +3,7 @@ import { recalculateDailyAttendance } from "@/lib/attendance-service";
 import { PUNCH_WINDOW_MS, getShiftWindow, shiftDaysForPunch } from "@/lib/attendance-engine";
 import { PayContext, PayEmployee, effectiveShift, loadPayContext } from "@/lib/pay-context";
 import { localDay } from "@/lib/today";
+import { withoutQuarantined } from "@/lib/punch-quarantine";
 import { Shift } from "@/lib/types";
 
 /** The stretch of time whose punches count towards one shift day — the same one recalculation reads. */
@@ -47,6 +48,8 @@ export async function ingestOneRecord(deviceUserId: string, recordTime: Date, de
   });
   if (!employee) return { imported: false, reason: "unlinked" };
 
+  // Recognition looks at EVERY row, quarantined copies included: a copy holds the device's own stamp, which is what
+  // tells the next catch-up that the device's record was already taken (punch-quarantine.ts).
   const near = await prisma.attendanceLog.findMany({
     where: {
       employeeId: employee.id,
@@ -65,9 +68,12 @@ export async function ingestOneRecord(deviceUserId: string, recordTime: Date, de
 
   const ctx = await loadPayContext();
   const { days, shift } = punchDays(ctx, employee, recordTime);
-  const priorInShift = await prisma.attendanceLog.count({
-    where: { employeeId: employee.id, timestamp: { ...punchWindow(days[0], shift), lt: recordTime } },
-  });
+  const priorInShift = withoutQuarantined(
+    await prisma.attendanceLog.findMany({
+      where: { employeeId: employee.id, timestamp: { ...punchWindow(days[0], shift), lt: recordTime } },
+      select: { rawPayload: true },
+    }),
+  ).length;
 
   await prisma.attendanceLog.create({
     data: {

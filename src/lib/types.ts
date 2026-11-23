@@ -83,7 +83,7 @@ export interface Shift {
 export type PunchType = "in" | "out";
 export type PunchSource = "biometric" | "manual_correction" | "simulated";
 
-/** Immutable raw biometric record. Never edited or deleted. */
+/** Raw biometric record. Its time and source are never edited, and it is never deleted. */
 export interface AttendanceLog {
   id: string;
   employeeId: string;
@@ -91,6 +91,8 @@ export interface AttendanceLog {
   timestamp: string; // ISO datetime
   punchType: PunchType;
   source: PunchSource;
+  /** Set when this row is a copy of a corrected punch: still listed, never counted (punch-quarantine.ts). */
+  quarantined?: { twinId: string; correctionStamp: string };
 }
 
 export type AttendanceStatus =
