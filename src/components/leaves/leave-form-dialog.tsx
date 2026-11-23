@@ -19,6 +19,7 @@ import {
 import { Employee, LeaveType } from "@/lib/types";
 import type { LeaveBalance } from "@/lib/leave-balance";
 import { LeaveBalanceCard } from "@/components/leaves/leave-balance-card";
+import { PermissionDurationPicker } from "@/components/leaves/permission-duration-picker";
 import { today } from "@/lib/today";
 import { format } from "@/lib/i18n/format";
 import { PayTypeRules, ScheduleTimes, at, dayTimes, isTime } from "@/lib/pay-engine";
@@ -58,13 +59,14 @@ export function LeaveFormDialog({
   const [type, setType] = useState<LeaveType>("annual");
   const [date, setDate] = useState(today());
   const [startTime, setStartTime] = useState("");
-  const [duration, setDuration] = useState("");
+  // the minutes the duration picker comes to (null until it has some)
+  const [duration, setDuration] = useState<number | null>(null);
   const isPermission = type === "permission";
 
   // The same rule the server and the pay engine apply: ending before the day does, it is temporary; else leaving early.
   const kindLine = (() => {
     const r = dayRules[employeeId];
-    const minutes = Number(duration);
+    const minutes = duration ?? 0;
     if (!r || !isTime(startTime) || !(minutes > 0)) return t.leaves.kindUnknown;
     const start = at(date, startTime, r.schedule.start);
     const end = dayTimes(date, r.schedule, r.rules as PayTypeRules).end;
@@ -134,7 +136,7 @@ export function LeaveFormDialog({
           {type === "annual" && balances[employeeId] && <LeaveBalanceCard balance={balances[employeeId]} />}
           {isPermission ? (
             <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="from">{t.leaves.formDate}</Label>
                   <Input id="from" name="from" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
@@ -145,11 +147,8 @@ export function LeaveFormDialog({
                   <Label htmlFor="startTime">{t.leaves.formStartTime}</Label>
                   <Input id="startTime" name="startTime" type="time" dir="ltr" value={startTime} onChange={(e) => setStartTime(e.target.value)} required />
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="durationMinutes">{t.leaves.formDuration}</Label>
-                  <Input id="durationMinutes" name="durationMinutes" type="number" min={1} step={1} dir="ltr" value={duration} onChange={(e) => setDuration(e.target.value)} required />
-                </div>
               </div>
+              <PermissionDurationPicker startTime={startTime} onMinutesChange={setDuration} />
               <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
                 <p className="font-medium text-foreground">{kindLine}</p>
                 <p className="mt-1 text-muted-foreground">{t.leaves.kindHint}</p>

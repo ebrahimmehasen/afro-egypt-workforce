@@ -20,6 +20,7 @@ import { scheduleAttendanceEffects } from "@/lib/attendance-effects";
 import { kindOf, loadPayContext, rulesFor, scheduleFor } from "@/lib/pay-context";
 import { lockedDayCheck } from "@/lib/attendance-deductions";
 import { checkTimedPermission } from "@/lib/permission-request";
+import { durationFromUntil } from "@/lib/permission-duration";
 import { Dictionary } from "@/lib/i18n/dictionary";
 
 const leaveSchema = z.object({
@@ -32,6 +33,8 @@ const leaveSchema = z.object({
   // a permission only: when the employee leaves and for how many minutes (blank on every other type)
   startTime: z.union([z.literal(""), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)]).optional().default(""),
   durationMinutes: z.union([z.literal(""), z.coerce.number().int().min(0).max(24 * 60)]).optional().default(""),
+  // or the time they will be back (the same day): it becomes the duration, the server stores minutes only
+  untilTime: z.union([z.literal(""), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)]).optional().default(""),
 });
 
 const clock = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -79,6 +82,24 @@ async function timedPermissionError(
 
 const dayDate = (s: string) => new Date(`${s}T00:00:00.000Z`);
 
+/**
+ * The permission's minutes from what the form sent: the minutes, or the time the employee will be back (turned
+ * into minutes from the time they leave). Anything missing or not later than the departure is an error to show.
+ */
+function resolveDuration(
+  t: Dictionary,
+  startTime: string,
+  durationMinutes: number | "",
+  untilTime: string,
+): { minutes: number } | { error: string; fields: string[] } {
+  if (!startTime || (durationMinutes === "" && !untilTime)) return { error: t.leaves.errTimeRequired, fields: ["startTime", "durationMinutes"] };
+  if (durationMinutes === "") {
+    const until = durationFromUntil(startTime, untilTime);
+    return until.ok ? { minutes: until.minutes } : { error: until.reason === "not_later" ? t.leaves.errUntilNotLater : t.leaves.errUntilInvalid, fields: ["untilTime"] };
+  }
+  return { minutes: durationMinutes };
+}
+
 export async function createLeave(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const t = await getT();
   const parsed = leaveSchema.safeParse(Object.fromEntries(formData));
@@ -100,11 +121,14 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
   // A permission is filed for one day, with the time the employee leaves and for how long; whether it is
   // temporary or for leaving early follows from that time and the employee's hours (see permission-request.ts).
   const timed = parsed.data.type === "permission";
+  let durationMinutes = 0;
   if (timed) {
-    if (!parsed.data.startTime || parsed.data.durationMinutes === "") return { error: t.leaves.errTimeRequired, fields: ["startTime", "durationMinutes"] };
+    const resolved = resolveDuration(t, parsed.data.startTime, parsed.data.durationMinutes, parsed.data.untilTime);
+    if ("error" in resolved) return resolved;
+    durationMinutes = resolved.minutes;
     const error = await timedPermissionError(
       t,
-      { employeeId: parsed.data.employeeId, date: parsed.data.from, startTime: parsed.data.startTime, durationMinutes: parsed.data.durationMinutes },
+      { employeeId: parsed.data.employeeId, date: parsed.data.from, startTime: parsed.data.startTime, durationMinutes },
       ["pending", "approved"],
     );
     if (error) return { error };
@@ -151,7 +175,7 @@ export async function createLeave(_prev: ActionState, formData: FormData): Promi
       to: dayDate(timed ? parsed.data.from : parsed.data.to),
       reason: parsed.data.reason,
       startTime: timed ? parsed.data.startTime : null,
-      durationMinutes: timed && parsed.data.durationMinutes !== "" ? parsed.data.durationMinutes : null,
+      durationMinutes: timed ? durationMinutes : null,
       status: "pending",
     },
   });
@@ -269,4 +293,92 @@ export async function deleteLeave(id: string): Promise<ActionState> {
   // the leave changes what those days cost: re-post them now and refresh any calculated payroll
   scheduleAttendanceEffects();
   return { success: true, message: t.leaves.deleted };
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Classifying an exit the day view detected: a permission for exactly that stretch, recorded already approved.
+// Only a permission for a duration creates anything: a mission and an excused absence are whole-day leaves in the
+// system (no time window on them), so a Leave is never created from a stretch for them. They are recorded as a
+// note with no pay effect instead (exit-annotations.ts).
+
+const classifySchema = z.object({
+  employeeId: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  // only "permission" is accepted (anything else gets the refusal below), so a crafted request can't file a whole day
+  kind: z.string().optional().default("permission"),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  durationMinutes: z.union([z.literal(""), z.coerce.number().int().min(0).max(24 * 60)]).optional().default(""),
+  untilTime: z.union([z.literal(""), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)]).optional().default(""),
+  reason: z.string().trim().max(2000).optional().default(""),
+});
+export type ClassifyExitInput = z.input<typeof classifySchema>;
+
+const hhmmPlus = (hhmm: string, minutes: number) => {
+  const total = (Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3)) + minutes) % (24 * 60);
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+};
+
+export async function classifyExit(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const t = await getT();
+  const parsed = classifySchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: t.validation.invalidData };
+
+  // It records an APPROVED permission, so it needs the same right as approving a leave (the admin, or HR holding
+  // "leaves") for an employee the account can see: nothing is widened, and a lower role can't file it either.
+  const actor = await getSession();
+  if (!actor || !canApprove(actor, "leaves") || !(await canViewEmployee(actor, parsed.data.employeeId))) {
+    return { error: t.validation.notAllowed };
+  }
+  return applyClassifyExit(parsed.data, actor.name);
+}
+
+export async function applyClassifyExit(input: ClassifyExitInput, actorName: string): Promise<ActionState> {
+  const t = await getT();
+  const parsed = classifySchema.safeParse(input);
+  if (!parsed.success) return { error: t.validation.invalidData };
+  const { employeeId, date, kind, startTime, durationMinutes, untilTime, reason } = parsed.data;
+  if (kind !== "permission") return { error: t.midDay.errClassifyKind };
+
+  const resolved = resolveDuration(t, startTime, durationMinutes, untilTime);
+  if ("error" in resolved) return resolved;
+  // the same checks as filing one: the employee's hours, the day off, no overlap — and a day inside an approved or
+  // closed pay month is refused here, before anything is written, so its rows can never change
+  const error = await timedPermissionError(t, { employeeId, date, startTime, durationMinutes: resolved.minutes }, ["pending", "approved"]);
+  if (error) return { error };
+
+  const employee = await prisma.employee.findFirstOrThrow({ where: { id: employeeId, deletedAt: null } });
+  const back = hhmmPlus(startTime, resolved.minutes);
+  await recordChangeAs(
+    actorName,
+    {
+      module: t.nav.leaves,
+      action: t.auditActions.classifyExit,
+      newValue: `${employee.employeeNumber} — ${date} — ${startTime} → ${back} (${resolved.minutes})`,
+      reason: reason || format(t.midDay.classifyReason, { out: startTime, back }),
+    },
+    (tx) =>
+      tx.leave.create({
+        data: {
+          id: nextId("LV"),
+          employeeId,
+          type: "permission",
+          from: dayDate(date),
+          to: dayDate(date),
+          reason: reason || format(t.midDay.classifyReason, { out: startTime, back }),
+          startTime,
+          durationMinutes: resolved.minutes,
+          status: "approved",
+          approvedBy: actorName,
+        },
+      }),
+  );
+
+  // the same follow-up as approving a leave: that day is worked out again, and the system rows are posted
+  await recalculateRange(employeeId, date, date);
+  revalidatePath("/leaves");
+  revalidatePath("/attendance");
+  revalidatePath("/dashboard");
+  revalidatePath("/audit-log");
+  scheduleAttendanceEffects();
+  return { success: true, message: t.midDay.classifyDone };
 }

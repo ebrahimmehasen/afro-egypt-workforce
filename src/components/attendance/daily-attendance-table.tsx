@@ -18,6 +18,7 @@ import { APP_TIME_ZONE, intlLocale } from "@/lib/i18n/format";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import type { MidDayAnalysis } from "@/lib/mid-day-exits";
 import { MidDayExitsBadge } from "@/components/attendance/mid-day-exits-badge";
+import type { ClassifyContext } from "@/components/attendance/classify-exit-dialog";
 
 export function DailyAttendanceTable({
   records,
@@ -26,6 +27,7 @@ export function DailyAttendanceTable({
   canCorrect,
   initialStatus = "all",
   midDay = {},
+  classify,
 }: {
   records: DailyAttendance[];
   employees: Employee[];
@@ -33,6 +35,8 @@ export function DailyAttendanceTable({
   canCorrect: boolean;
   /** record id → the day's exits in the middle of it / timed permissions, when it had any */
   midDay?: Record<string, MidDayAnalysis>;
+  /** record id → what the classify action needs for that day's exits; only given to who may approve leaves */
+  classify?: Record<string, ClassifyContext>;
   /** Status filter to pre-select, e.g. from a dashboard KPI link (`?status=absent`). */
   initialStatus?: string;
 }) {
@@ -131,7 +135,7 @@ export function DailyAttendanceTable({
                     <div className="flex flex-wrap items-center gap-1">
                       {/* out on a temporary permission that hasn't run out: that, not early leave */}
                       {!midDay[record.id]?.outOnPermission && <AttendanceStatusBadge status={record.status} />}
-                      {midDay[record.id] && <MidDayExitsBadge analysis={midDay[record.id]} />}
+                      {midDay[record.id] && <MidDayExitsBadge analysis={midDay[record.id]} classify={classify?.[record.id]} />}
                     </div>
                   </TableCell>
                   {canCorrect && (

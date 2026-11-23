@@ -1,7 +1,7 @@
 import { getDb, getAttendanceLogsForDate } from "@/lib/data";
 import { requireAccess } from "@/lib/auth";
 import { employeesInScope, viewerScope } from "@/lib/scope";
-import { hasPermission } from "@/lib/permissions";
+import { canApprove, hasPermission } from "@/lib/permissions";
 import { today } from "@/lib/today";
 import { getT } from "@/lib/i18n";
 import { PageHeader } from "@/components/shared/page-header";
@@ -16,6 +16,10 @@ import { UserCheck, UserX, Clock3, Fingerprint, CalendarClock } from "lucide-rea
 import { loadPayContext } from "@/lib/pay-context";
 import { loadMidDayInputs, midDayForDay } from "@/lib/mid-day-view";
 import type { MidDayAnalysis } from "@/lib/mid-day-exits";
+import { exitWindow } from "@/lib/permission-duration";
+import { latestAnnotations } from "@/lib/exit-annotation";
+import type { ClassifyContext } from "@/components/attendance/classify-exit-dialog";
+import { prisma } from "@/lib/prisma";
 
 export default async function AttendancePage({
   searchParams,
@@ -42,6 +46,15 @@ export default async function AttendancePage({
   const ctx = await loadPayContext();
   const midDayInputs = await loadMidDayInputs(ctx, employees, [date]);
   const midDay: Record<string, MidDayAnalysis> = {};
+  const classify: Record<string, ClassifyContext> = {};
+  const canClassify = canApprove(user, "leaves");
+  // the record-only notes HR left on this day's exits (audit entries, see exit-annotation.ts), shown to everyone
+  const notes = latestAnnotations(
+    await prisma.auditLogEntry.findMany({
+      where: { AND: [{ oldValue: { startsWith: "exit-annotation:v1|" } }, { oldValue: { contains: `|${date}|` } }] },
+      select: { oldValue: true, userName: true, timestamp: true, reason: true },
+    }),
+  );
   for (const r of records) {
     const employee = employees.find((e) => e.id === r.employeeId);
     if (!employee) continue;
@@ -51,7 +64,20 @@ export default async function AttendancePage({
       { date, actualIn: r.actualIn ? new Date(r.actualIn) : null, actualOut: r.actualOut ? new Date(r.actualOut) : null, corrected: Boolean(r.correctionReason) },
       midDayInputs(r.employeeId, date),
     );
-    if (a) midDay[r.id] = a;
+    if (a) {
+      midDay[r.id] = a;
+      // classifying an exit is offered only to who may approve leaves (admin, or HR holding "leaves"), on a stretch with
+      // no permission yet and a return to measure it by; the notes already left on a stretch are shown to everyone
+      const windows: ClassifyContext["windows"] = {};
+      const annotations: ClassifyContext["annotations"] = {};
+      for (const i of a.intervals) {
+        const outIso = new Date(i.out).toISOString();
+        const note = notes.get(`${r.employeeId}|${date}|${outIso}`);
+        if (note) annotations[outIso] = { type: note.type, by: note.by, reason: note.reason };
+        if (canClassify && !a.missingPunch && !i.permission && i.back) windows[outIso] = { ...exitWindow(new Date(i.out), new Date(i.back)), back: new Date(i.back).toISOString() };
+      }
+      if (Object.keys(windows).length > 0 || Object.keys(annotations).length > 0) classify[r.id] = { employeeId: r.employeeId, date, canClassify, windows, annotations };
+    }
   }
 
   return (
@@ -87,6 +113,7 @@ export default async function AttendancePage({
             canCorrect={canCorrect}
             initialStatus={initialStatus}
             midDay={midDay}
+            classify={classify}
           />
         </TabsContent>
         <TabsContent value="raw">
