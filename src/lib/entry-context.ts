@@ -1,6 +1,7 @@
 import { EntryContext } from "@/components/shared/entry-details-dialog";
 import { PayContext, rulesFor } from "@/lib/pay-context";
 import { Store } from "@/lib/store";
+import type { MidDayAnalysis } from "@/lib/mid-day-exits";
 
 /**
  * The extras the deductions / overtime lists show when a row is opened: the employee's department and pay
@@ -11,6 +12,8 @@ export function buildEntryContext(
   rows: { id: string; employeeId: string; date: string }[],
   db: Pick<Store, "employees" | "departments" | "dailyAttendance">,
   payContext: PayContext,
+  /** the day's exits in the middle of it and timed permissions, when it had any */
+  midDayOf?: (employeeId: string, date: string) => MidDayAnalysis | null,
 ): Record<string, EntryContext> {
   const byEmployeeDay = new Map(db.dailyAttendance.map((a) => [`${a.employeeId}|${a.date}`, a]));
   const departments = new Map(db.departments.map((d) => [d.id, d.name]));
@@ -35,6 +38,7 @@ export function buildEntryContext(
             scheduledEnd: day.scheduledEnd,
           }
         : undefined,
+      ...(midDayOf ? { midDay: midDayOf(row.employeeId, row.date) ?? undefined } : {}),
     };
   }
   return out;

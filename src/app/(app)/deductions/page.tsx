@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/data";
+import { loadMidDayInputs, midDayForDay } from "@/lib/mid-day-view";
 import { requireAccess } from "@/lib/auth";
 import { currentYearMonth } from "@/lib/today";
 import { hasPermission } from "@/lib/permissions";
@@ -37,7 +38,24 @@ export default async function DeductionsPage({
   const employees = employeesInScope(scope, db.employees);
   const deductions = rowsInScope(scope, db.deductions).sort((a, b) => (a.date < b.date ? 1 : -1));
   // what the details popup shows for each row: department, pay type and that day's attendance
-  const entryContext = buildEntryContext(deductions, db, await loadPayContext());
+  // and, for a permission / leaving-without-permission / time-past-a-permission row, the day's exits and permissions
+  const payContext = await loadPayContext();
+  const midDayRows = deductions.filter((d) => d.type === "permission" || d.type === "unauthorized_exit" || d.type === "permission_overrun");
+  const midDayEmployees = db.employees.filter((e) => midDayRows.some((d) => d.employeeId === e.id));
+  const midDayInputs = await loadMidDayInputs(payContext, midDayEmployees, [...new Set(midDayRows.map((d) => d.date))]);
+  const midDayRowKeys = new Set(midDayRows.map((d) => `${d.employeeId}|${d.date}`));
+  const attendanceOf = new Map(db.dailyAttendance.map((a) => [`${a.employeeId}|${a.date}`, a]));
+  const entryContext = buildEntryContext(deductions, db, payContext, (employeeId, date) => {
+    const employee = midDayEmployees.find((e) => e.id === employeeId);
+    const day = attendanceOf.get(`${employeeId}|${date}`);
+    if (!employee || !day || !midDayRowKeys.has(`${employeeId}|${date}`)) return null;
+    return midDayForDay(
+      payContext,
+      employee,
+      { date, actualIn: day.actualIn ? new Date(day.actualIn) : null, actualOut: day.actualOut ? new Date(day.actualOut) : null, corrected: Boolean(day.correctionReason) },
+      midDayInputs(employeeId, date),
+    );
+  });
   const allowances = rowsInScope(scope, db.allowances);
 
   // default the bonus month to the open (draft) period, else the real month

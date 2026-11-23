@@ -13,6 +13,9 @@ import { ManualAttendanceDialog } from "@/components/attendance/manual-attendanc
 import { attendanceSummary } from "@/lib/attendance-engine";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { UserCheck, UserX, Clock3, Fingerprint, CalendarClock } from "lucide-react";
+import { loadPayContext } from "@/lib/pay-context";
+import { loadMidDayInputs, midDayForDay } from "@/lib/mid-day-view";
+import type { MidDayAnalysis } from "@/lib/mid-day-exits";
 
 export default async function AttendancePage({
   searchParams,
@@ -34,6 +37,22 @@ export default async function AttendancePage({
   const records = db.dailyAttendance.filter((a) => a.date === date && employeeIds.has(a.employeeId));
   const logs = await getAttendanceLogsForDate(date, employeeIds);
   const summary = attendanceSummary(records);
+
+  // the day's exits in the middle of it and timed permissions, read the way the pay rules read them
+  const ctx = await loadPayContext();
+  const midDayInputs = await loadMidDayInputs(ctx, employees, [date]);
+  const midDay: Record<string, MidDayAnalysis> = {};
+  for (const r of records) {
+    const employee = employees.find((e) => e.id === r.employeeId);
+    if (!employee) continue;
+    const a = midDayForDay(
+      ctx,
+      employee,
+      { date, actualIn: r.actualIn ? new Date(r.actualIn) : null, actualOut: r.actualOut ? new Date(r.actualOut) : null, corrected: Boolean(r.correctionReason) },
+      midDayInputs(r.employeeId, date),
+    );
+    if (a) midDay[r.id] = a;
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -67,6 +86,7 @@ export default async function AttendancePage({
             departments={db.departments}
             canCorrect={canCorrect}
             initialStatus={initialStatus}
+            midDay={midDay}
           />
         </TabsContent>
         <TabsContent value="raw">

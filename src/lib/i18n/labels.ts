@@ -67,6 +67,7 @@ export function deductionTypeLabel(type: DeductionType, t: Dictionary): string {
     advance: t.deductionTypes.advance,
     admin_deduction: t.deductionTypes.adminDeduction,
     other: t.deductionTypes.other,
+    permission_overrun: t.deductionTypes.permissionOverrun,
   };
   return map[type];
 }
@@ -141,8 +142,12 @@ export interface BreakdownRow {
 export function payrollBreakdownRows(
   record: PayrollRecord,
   t: Dictionary,
+  /** the period's posted time-past-a-permission deductions, which the stored late deduction includes */
+  permissionOverrun = 0,
 ): { earnings: BreakdownRow[]; total: number; overtime: BreakdownRow; deductions: BreakdownRow[] } {
   const isDaily = record.paidDaysCount != null;
+  // shown on a line of its own, taken out of the late deduction that holds it (never more than it holds)
+  const overrun = Math.max(0, Math.min(permissionOverrun, record.lateDeduction));
   return {
     earnings: [
       isDaily
@@ -158,7 +163,8 @@ export function payrollBreakdownRows(
     total: record.grossSalary - record.overtimeAmount,
     overtime: { label: t.payslip.overtime, amount: record.overtimeAmount },
     deductions: [
-      { label: t.payslip.lateDeduction, amount: record.lateDeduction },
+      { label: t.payslip.lateDeduction, amount: record.lateDeduction - overrun },
+      ...(overrun ? [{ label: t.deductionTypes.permissionOverrun, amount: overrun }] : []),
       // a daily worker has no absence deduction — absent days simply aren't paid
       ...(isDaily ? [] : [{ label: t.payslip.absenceDeduction, amount: record.absenceDeduction }]),
       ...(record.earlyLeaveDeduction ? [{ label: t.payslip.earlyLeaveDeduction, amount: record.earlyLeaveDeduction }] : []),

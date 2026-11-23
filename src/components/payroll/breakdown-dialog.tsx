@@ -13,11 +13,11 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 
-export function BreakdownDialog({ record, employeeName }: { record: PayrollRecord; employeeName: string }) {
+export function BreakdownDialog({ record, employeeName, permissionOverrun = 0 }: { record: PayrollRecord; employeeName: string; permissionOverrun?: number }) {
   const t = useT();
   const locale = useLocale();
   const [open, setOpen] = useState(false);
-  const breakdown = payrollBreakdownRows(record, t);
+  const breakdown = payrollBreakdownRows(record, t, permissionOverrun);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

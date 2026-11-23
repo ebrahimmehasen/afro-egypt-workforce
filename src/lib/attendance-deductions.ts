@@ -3,8 +3,10 @@ import { ABSENCE_TRACKING_FROM } from "@/lib/attendance-engine";
 import { getDictionary } from "@/lib/i18n";
 import { dayStr } from "@/lib/serialize";
 import { addDays, localDay } from "@/lib/today";
-import { LeaveForAbsence, PayItem, PayTypeRules, ScheduleTimes, absenceDaysCharged, computeDayPay, dayRate, DayKind } from "@/lib/pay-engine";
-import { PayContext, PayEmployee, kindOf, loadPayContext, rulesFor, scheduleFor } from "@/lib/pay-context";
+import { DayPay, DayPayInput, LeaveForAbsence, PayItem, PayTypeRules, ScheduleTimes, absenceDaysCharged, computeDayPay, dayRate, DayKind } from "@/lib/pay-engine";
+import { PayContext, PayEmployee, effectiveShift, kindOf, loadPayContext, rulesFor, scheduleFor } from "@/lib/pay-context";
+import { punchWindow } from "@/lib/attendance-ingest";
+import { MidDayAnalysis } from "@/lib/mid-day-exits";
 import { payPeriodOf } from "@/lib/pay-rules";
 import { DayCharge, leaveCharges } from "@/lib/leave-balance";
 import { trackedAbsentDays } from "@/lib/leave-days";
@@ -14,7 +16,7 @@ import { trackedAbsentDays } from "@/lib/leave-days";
 // (overtime, weekly-day-off and holiday work, Thursday's extra time) to the Overtime table — both marked
 // as the system's, with the calculated value kept even after someone edits it.
 
-export type SystemDeductionType = "late" | "absence" | "permission" | "unauthorized_exit";
+export type SystemDeductionType = "late" | "absence" | "permission" | "unauthorized_exit" | "permission_overrun";
 export type SystemAdditionKind = "overtime" | "friday" | "holiday" | "thursday_extra";
 
 export interface SystemDeduction {
@@ -48,16 +50,107 @@ export interface AttendanceDay {
   actualIn: Date | null;
   actualOut: Date | null;
   scheduledStart: Date;
+  /** corrected by HR: their check-in / check-out stand, and the punches in between are not read */
+  corrected?: boolean;
 }
 
 export const systemKey = (employeeId: string, date: string, type: string) => `${employeeId}|${date}|${type}`;
+
+/** A permission filed with a time and a duration (older permissions have neither: they are for the rest of the day). */
+export const isTimedPermission = (l: { type: string; startTime?: string | null; durationMinutes?: number | null }) =>
+  l.type === "permission" && Boolean(l.startTime) && (l.durationMinutes ?? 0) > 0;
+
+/** The approved timed permissions among a day's leaves, as the pay engine reads them. */
+export function timedPermissions(leaves: { id: string; type: string; status?: string; startTime?: string | null; durationMinutes?: number | null }[]) {
+  return leaves
+    .filter((l) => isTimedPermission(l) && (l.status === undefined || l.status === "approved"))
+    .map((l) => ({ id: l.id, startTime: l.startTime!, durationMinutes: l.durationMinutes! }));
+}
 
 const fmt = (n: number) => String(Math.round(n * 100) / 100);
 const minutesText = (m: number) => `${fmt(m)} دقيقة`;
 const hoursText = (m: number) => `${fmt(m / 60)} ساعة`;
 
-/** Reasons are written in Arabic, the company's working language, and say which rule and number applied. */
-function reasonFor(item: PayItem): string {
+const clock = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+const MS_PER_MIN = 60_000;
+
+/** "30 دقيقة × 1.5 = 45 دقيقة خصم" — the charged minutes and what they come to. */
+const charged = (minutes: number, multiplier: number) => `${minutesText(minutes)} × ${fmt(multiplier)} = ${minutesText(minutes * multiplier)} خصم`;
+/** "30 دقيقة" — or, when the grace took some of it, "30 دقيقة، بعد السماح 25 دقيقة". */
+const graced = (minutes: number, counted: number) => (counted === minutes ? minutesText(minutes) : `${minutesText(minutes)}، بعد السماح ${minutesText(counted)}`);
+
+/**
+ * The parts of the permission, leaving-without-permission and past-the-permission items that come from timed
+ * permissions and exits in the middle of the day, one text per stretch. Empty when the day had none — then the
+ * item's reason is exactly what it always was.
+ */
+function midDayParts(kind: PayItem["kind"], multiplier: number, midDay: MidDayAnalysis | null, dayEnd: Date): string[] {
+  if (!midDay) return [];
+  const parts: string[] = [];
+  const intervals = midDay.missingPunch ? [] : midDay.intervals;
+  const final = midDay.finalExit;
+  if (kind === "permission") {
+    for (const i of intervals) {
+      if (!i.permission || i.permissionMinutes <= 0) continue;
+      const head = `إذن ${minutesText(i.permission.durationMinutes)} — خرج ${clock(i.out)} ورجع ${clock(i.back!)}`;
+      parts.push(
+        i.permissionMinutes === i.minutes
+          ? `${head} = ${charged(i.permissionMinutes, multiplier)}`
+          : `${head} = ${minutesText(i.minutes)} — الإذن ${fmt(i.permissionMinutes)} × ${fmt(multiplier)} = ${minutesText(i.permissionMinutes * multiplier)} خصم`,
+      );
+    }
+    if (final && final.permissionMinutes > 0) {
+      parts.push(
+        final.case === 3
+          ? `إذن ${minutesText(final.permission.durationMinutes)} — خرج ${clock(final.out)} ومارجعش — الإذن ${fmt(final.permissionMinutes)} × ${fmt(multiplier)} = ${minutesText(final.permissionMinutes * multiplier)} خصم`
+          : `إذن لباقي اليوم من ${clock(final.permission.start)} — خرج ${clock(final.out)} ونهاية الدوام ${clock(dayEnd)} = ${charged(final.permissionMinutes, multiplier)}`,
+      );
+    }
+  } else if (kind === "unauthorized_exit") {
+    for (const i of intervals) {
+      if (i.unauthorizedCharged <= 0) continue;
+      parts.push(
+        i.permission
+          ? `خروج قبل الإذن — خرج ${clock(i.out)} والإذن من ${clock(i.permission.start)} = ${graced(i.unauthorizedMinutes, i.unauthorizedCharged)} × ${fmt(multiplier)} = ${minutesText(i.unauthorizedCharged * multiplier)} خصم`
+          : `خروج بدون إذن — ${clock(i.out)} ← ${clock(i.back!)} = ${graced(i.unauthorizedMinutes, i.unauthorizedCharged)} × ${fmt(multiplier)} = ${minutesText(i.unauthorizedCharged * multiplier)} خصم`,
+      );
+    }
+    if (final && final.beforeCharged > 0) {
+      parts.push(
+        `خروج قبل الإذن — خرج ${clock(final.out)} والإذن من ${clock(final.permission.start)} = ${graced(final.beforeMinutes, final.beforeCharged)} × ${fmt(multiplier)} = ${minutesText(final.beforeCharged * multiplier)} خصم`,
+      );
+    }
+    if (final && final.afterMinutes > 0) {
+      const permissionEnd = new Date(Math.max(final.out.getTime(), final.permission.start.getTime()) + final.permission.durationMinutes * MS_PER_MIN);
+      parts.push(`خروج بدون إذن بعد نهاية الإذن — ${clock(permissionEnd)} ← ${clock(dayEnd)} = ${charged(final.afterMinutes, multiplier)}`);
+    }
+  } else if (kind === "permission_overrun") {
+    for (const i of intervals) {
+      if (!i.permission || i.overrunCharged <= 0) continue;
+      parts.push(
+        `زيادة عن الإذن ${graced(i.overrunMinutes, i.overrunCharged)} × ${fmt(multiplier)} = ${minutesText(i.overrunCharged * multiplier)} خصم — إذن ${minutesText(i.permission.durationMinutes)}، خرج ${clock(i.out)} ورجع ${clock(i.back!)} = ${minutesText(i.minutes)}`,
+      );
+    }
+  }
+  return parts;
+}
+
+/**
+ * Reasons are written in Arabic, the company's working language, and say which rule and number applied. An item
+ * that also holds timed permissions or exits in the middle of the day spells out each stretch, then the
+ * end-of-day part (if any) as it was always written.
+ */
+function reasonFor(item: PayItem, pay?: DayPay, hasPermission = false): string {
+  if (pay?.midDay && (item.kind === "permission" || item.kind === "unauthorized_exit" || item.kind === "permission_overrun")) {
+    const parts = midDayParts(item.kind, item.multiplier, pay.midDay, pay.times.end);
+    if (parts.length > 0) {
+      // the check-out charged by the rule for the rest of the day, when no timed permission covered it
+      const legacyEnd = pay.midDay.finalExit ? 0 : pay.earlyMinutes;
+      if (item.kind === "permission" && hasPermission && legacyEnd > 0) parts.push(`إذن لباقي اليوم ${hoursText(legacyEnd)} × ${fmt(item.multiplier)}`);
+      if (item.kind === "unauthorized_exit" && !hasPermission && legacyEnd > 0) parts.push(`خروج بدون إذن ${hoursText(legacyEnd)} × ${fmt(item.multiplier)}`);
+      return parts.join(" | ");
+    }
+  }
   switch (item.kind) {
     case "late":
       return `تأخير ${minutesText(item.minutes)} × ${fmt(item.multiplier)} = ${minutesText(item.minutes * item.multiplier)} خصم`;
@@ -65,6 +158,8 @@ function reasonFor(item: PayItem): string {
       return `إذن لباقي اليوم ${hoursText(item.minutes)} × ${fmt(item.multiplier)}`;
     case "unauthorized_exit":
       return `خروج بدون إذن ${hoursText(item.minutes)} × ${fmt(item.multiplier)}`;
+    case "permission_overrun":
+      return `زيادة عن الإذن ${charged(item.minutes, item.multiplier)}`;
     case "overtime":
       return `إضافي ${hoursText(item.minutes)} × ${fmt(item.multiplier)} = ${fmt(item.payHours)} ساعة أجر`;
     case "friday":
@@ -91,8 +186,10 @@ export function systemEntriesFor(
   rules: PayTypeRules,
   schedule: ScheduleTimes,
   kind: DayKind,
-  leave: (LeaveForAbsence & { type: string }) | null,
+  leave: (LeaveForAbsence & { type: string; startTime?: string | null }) | null,
   charge?: DayCharge,
+  /** the day's punches and approved timed permissions, for the exits in the middle of the day */
+  midDay?: Omit<NonNullable<DayPayInput["midDay"]>, "corrected">,
 ): { deductions: SystemDeduction[]; additions: SystemAddition[] } {
   const deductions: SystemDeduction[] = [];
   const additions: SystemAddition[] = [];
@@ -118,6 +215,8 @@ export function systemEntriesFor(
     return { deductions, additions };
   }
 
+  // a permission with a time is charged by its time (mid-day-exits.ts); only one without is for the rest of the day
+  const hasPermission = leave?.type === "permission" && !leave.startTime;
   const pay = computeDayPay({
     date: day.date,
     kind,
@@ -126,7 +225,8 @@ export function systemEntriesFor(
     pay: employee,
     actualIn: day.actualIn,
     actualOut: day.actualOut,
-    hasPermission: leave?.type === "permission",
+    hasPermission,
+    midDay: midDay ? { ...midDay, corrected: day.corrected } : undefined,
   });
   for (const item of pay.items) {
     if (item.amount <= 0) continue;
@@ -137,7 +237,7 @@ export function systemEntriesFor(
         date: day.date,
         type: item.kind as SystemDeductionType,
         amount: item.amount,
-        reason: reasonFor(item),
+        reason: reasonFor(item, pay, hasPermission),
       });
     } else {
       additions.push({
@@ -149,7 +249,7 @@ export function systemEntriesFor(
         multiplier: item.multiplier,
         hourlyRate: Math.round(pay.hourlyRate * item.multiplier),
         amount: item.amount,
-        reason: reasonFor(item),
+        reason: reasonFor(item, pay, hasPermission),
         autoApprove: rules.overtimeAutoApprove,
       });
     }
@@ -205,7 +305,7 @@ export async function postAttendanceDeductions(now: Date = new Date()): Promise<
   // The annual-leave balance is settled from 1 January of the first year in the window: every day of absence
   // since then takes from it in order, so the days in the window know whether the balance still covered them.
   const yearStart = new Date(`${firstDay.slice(0, 4)}-01-01T00:00:00.000Z`);
-  const [days, employees, leaves, periods, existingDeductions, existingAdditions, ctx, absentRows] = await Promise.all([
+  const [days, employees, leaves, periods, existingDeductions, existingAdditions, ctx, absentRows, logs] = await Promise.all([
     prisma.dailyAttendance.findMany({ where: { date: range } }),
     prisma.employee.findMany({ where: { deletedAt: null } }),
     prisma.leave.findMany({ where: { status: "approved", to: { gte: yearStart }, from: { lte: range.lte } } }),
@@ -214,6 +314,13 @@ export async function postAttendanceDeductions(now: Date = new Date()): Promise<
     prisma.overtime.findMany({ where: { autoGenerated: true, systemKey: { not: null }, date: range } }),
     loadPayContext(),
     prisma.dailyAttendance.findMany({ where: { status: "absent", date: { gte: yearStart, lte: range.lte } }, select: { employeeId: true, status: true, date: true } }),
+    // every punch the days' windows can reach (a window runs up to a few hours either side of the shift), for the
+    // exits in the middle of the day
+    prisma.attendanceLog.findMany({
+      where: { timestamp: { gte: new Date(`${addDays(firstDay, -1)}T00:00:00`), lt: new Date(`${addDays(lastDay, 2)}T00:00:00`) } },
+      select: { employeeId: true, timestamp: true, source: true },
+      orderBy: { timestamp: "asc" },
+    }),
   ]);
 
   const isLocked = lockedDayCheck(periods, ctx);
@@ -243,21 +350,37 @@ export async function postAttendanceDeductions(now: Date = new Date()): Promise<
     return charges.get(date);
   };
 
+  const logsByEmployee = new Map<string, typeof logs>();
+  for (const l of logs) {
+    const list = logsByEmployee.get(l.employeeId);
+    if (list) list.push(l);
+    else logsByEmployee.set(l.employeeId, [l]);
+  }
+
   const desiredDeductions: SystemDeduction[] = [];
   const desiredAdditions: SystemAddition[] = [];
   for (const d of days) {
     const date = dayStr(d.date);
     const employee = employeeById.get(d.employeeId);
     if (!employee || isLocked(date)) continue;
-    const leave = leaves.find((l) => l.employeeId === d.employeeId && dayStr(l.from) <= date && dayStr(l.to) >= date) ?? null;
+    const onDay = leaves.filter((l) => l.employeeId === d.employeeId && dayStr(l.from) <= date && dayStr(l.to) >= date);
+    // a permission with a time isn't the day's leave: it is read against the punches (mid-day-exits.ts)
+    const leave = onDay.find((l) => !isTimedPermission(l)) ?? null;
+    const window = punchWindow(date, effectiveShift(ctx, employee, date));
     const entries = systemEntriesFor(
-      { employeeId: d.employeeId, date, status: d.status, actualIn: d.actualIn, actualOut: d.actualOut, scheduledStart: d.scheduledStart },
+      { employeeId: d.employeeId, date, status: d.status, actualIn: d.actualIn, actualOut: d.actualOut, scheduledStart: d.scheduledStart, corrected: Boolean(d.correctionReason) },
       employee,
       rulesFor(ctx, employee),
       scheduleFor(ctx, employee),
       kindOf(ctx, date),
       leave,
       chargeFor(d.employeeId, date),
+      {
+        punches: (logsByEmployee.get(d.employeeId) ?? [])
+          .filter((l) => l.timestamp >= window.gte && l.timestamp <= window.lte)
+          .map((l) => ({ at: l.timestamp, source: l.source })),
+        permissions: timedPermissions(onDay),
+      },
     );
     desiredDeductions.push(...entries.deductions);
     desiredAdditions.push(...entries.additions);

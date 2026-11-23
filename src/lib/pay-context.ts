@@ -68,6 +68,7 @@ export function toPayTypeRules(p: Awaited<ReturnType<typeof prisma.payType.findM
     overtimeAutoApprove: p.overtimeAutoApprove,
     permissionMultiplier: p.permissionMultiplier,
     unauthorizedExitMultiplier: p.unauthorizedExitMultiplier,
+    permissionOverrunMultiplier: p.permissionOverrunMultiplier,
     fridayMultiplier: p.fridayMultiplier,
     holidayMultiplier: p.holidayMultiplier,
     thursdayRuleEnabled: p.thursdayRuleEnabled,

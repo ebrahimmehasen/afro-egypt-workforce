@@ -166,6 +166,8 @@ export function toLeave(l: PLeave): Leave {
     from: dayStr(l.from),
     to: dayStr(l.to),
     reason: l.reason,
+    startTime: l.startTime ?? undefined,
+    durationMinutes: l.durationMinutes ?? undefined,
     status: l.status,
     approvedBy: l.approvedBy ?? undefined,
     createdAt: iso(l.createdAt),

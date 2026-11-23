@@ -4,6 +4,7 @@
 // /settings. So changing overtime to 2×, or adding a new pay type, never needs a code change.
 
 import { addDays } from "@/lib/today";
+import { DayPunch, MidDayAnalysis, analyzeMidDay } from "@/lib/mid-day-exits";
 
 export type PayBasis = "monthly" | "daily";
 
@@ -26,6 +27,8 @@ export interface PayTypeRules {
   overtimeAutoApprove: boolean;
   permissionMultiplier: number;
   unauthorizedExitMultiplier: number;
+  /** Each minute past a temporary permission's duration costs this many minutes of pay. */
+  permissionOverrunMultiplier: number;
   fridayMultiplier: number;
   holidayMultiplier: number;
   thursdayRuleEnabled: boolean;
@@ -84,7 +87,7 @@ const minutesOf = (hhmm: string) => {
 };
 
 /** A time of day on a given date, as a local Date; `after` makes it roll to the next day if it's earlier. */
-function at(date: string, hhmm: string, after?: string): Date {
+export function at(date: string, hhmm: string, after?: string): Date {
   const day = after && minutesOf(hhmm) <= minutesOf(after) && hhmm !== after ? addDays(date, 1) : date;
   return new Date(`${day}T${hhmm.padStart(5, "0")}:00`);
 }
@@ -142,7 +145,7 @@ export function countedOvertimeMinutes(rawMinutes: number, rules: Pick<PayTypeRu
 
 export type DayKind = "workday" | "weekly_off" | "holiday";
 
-export type PayItemKind = "late" | "permission" | "unauthorized_exit" | "overtime" | "friday" | "holiday" | "thursday_extra";
+export type PayItemKind = "late" | "permission" | "unauthorized_exit" | "permission_overrun" | "overtime" | "friday" | "holiday" | "thursday_extra";
 
 export interface PayItem {
   kind: PayItemKind;
@@ -167,6 +170,16 @@ export interface DayPayInput {
   actualOut: Date | null;
   /** An approved permission to leave for the rest of the day. */
   hasPermission: boolean;
+  /**
+   * The day's punches and its approved permissions that have a time, for the exits in the middle of the day
+   * (see mid-day-exits.ts). Left out, the day is charged exactly as before.
+   */
+  midDay?: {
+    punches: DayPunch[];
+    permissions: { id: string; startTime: string; durationMinutes: number }[];
+    /** corrected by HR: their check-in / check-out stand and the punches in between aren't read */
+    corrected?: boolean;
+  };
 }
 
 export interface DayPay {
@@ -182,6 +195,8 @@ export interface DayPay {
   overtimeRawMinutes: number;
   overtimeCountedMinutes: number;
   items: PayItem[];
+  /** The exits in the middle of the day and how the check-out was charged against a timed permission. */
+  midDay: MidDayAnalysis | null;
 }
 
 const MS_PER_MIN = 60_000;
@@ -204,7 +219,7 @@ export function computeDayPay(input: DayPayInput): DayPay {
     items.push({ kind, direction, minutes, multiplier, payHours, amount: Math.round(payHours * hourly) });
   };
 
-  const empty: DayPay = { times, hourlyRate: hourly, workedMinutes: 0, lateMinutes: 0, earlyMinutes: 0, overtimeRawMinutes: 0, overtimeCountedMinutes: 0, items };
+  const empty: DayPay = { times, hourlyRate: hourly, workedMinutes: 0, lateMinutes: 0, earlyMinutes: 0, overtimeRawMinutes: 0, overtimeCountedMinutes: 0, items, midDay: null };
   if (!actualIn || !actualOut || actualOut <= actualIn) return empty;
 
   const workedMinutes = (actualOut.getTime() - actualIn.getTime()) / MS_PER_MIN;
@@ -221,8 +236,27 @@ export function computeDayPay(input: DayPayInput): DayPay {
   item("late", "deduction", lateMinutes, rules.lateMultiplier);
 
   const earlyMinutes = Math.max(0, (times.end.getTime() - actualOut.getTime()) / MS_PER_MIN);
-  if (input.hasPermission) item("permission", "deduction", earlyMinutes, rules.permissionMultiplier);
-  else item("unauthorized_exit", "deduction", earlyMinutes, rules.unauthorizedExitMultiplier);
+  // The exits in the middle of the day, and the check-out when a timed permission covers it. Every minute out
+  // lands in exactly one item: on a permission, past a temporary one, or without permission. The time out is
+  // never overtime, and staying late never makes up for it — overtime below reads only the check-out.
+  const midDay = input.midDay
+    ? analyzeMidDay({
+        punches: input.midDay.punches,
+        actualIn,
+        actualOut,
+        dayEnd: times.end,
+        permissions: input.midDay.permissions.map((p) => ({ id: p.id, start: at(input.date, p.startTime, schedule.start), durationMinutes: p.durationMinutes })),
+        graceMinutes: rules.graceMinutes,
+        corrected: input.midDay.corrected,
+      })
+    : null;
+  const final = midDay?.finalExit;
+  // the check-out: by the timed permission that covers it, else the rule for the rest of the day as before
+  const endPermission = final ? final.permissionMinutes : input.hasPermission ? earlyMinutes : 0;
+  const endUnauthorized = final ? final.beforeCharged + final.afterMinutes : input.hasPermission ? 0 : earlyMinutes;
+  item("permission", "deduction", endPermission + (midDay?.totals.permissionMinutes ?? 0), rules.permissionMultiplier);
+  item("unauthorized_exit", "deduction", endUnauthorized + (midDay?.totals.unauthorizedCharged ?? 0), rules.unauthorizedExitMultiplier);
+  item("permission_overrun", "deduction", midDay?.totals.overrunCharged ?? 0, rules.permissionOverrunMultiplier);
 
   if (times.thursdayExtra && additions) {
     const from = Math.max(times.thursdayExtra.from.getTime(), actualIn.getTime());
@@ -238,7 +272,7 @@ export function computeDayPay(input: DayPayInput): DayPay {
   // entirely (src/lib/actions/overtime.ts) and is never touched by this flag.
   if (additions) item("overtime", "addition", overtimeCountedMinutes, rules.overtimeMultiplier);
 
-  return { times, hourlyRate: hourly, workedMinutes, lateMinutes, earlyMinutes, overtimeRawMinutes, overtimeCountedMinutes, items };
+  return { times, hourlyRate: hourly, workedMinutes, lateMinutes, earlyMinutes, overtimeRawMinutes, overtimeCountedMinutes, items, midDay };
 }
 
 export interface LeaveForAbsence {

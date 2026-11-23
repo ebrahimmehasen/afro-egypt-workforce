@@ -14,7 +14,7 @@ import { AttendanceStatusBadge, RequestStatusBadge } from "@/components/shared/s
 
 type Locale = "ar" | "en";
 
-const DEDUCTION_TYPES: DeductionType[] = ["late", "absence", "early_leave", "permission", "unauthorized_exit", "penalty", "advance", "admin_deduction", "other"];
+const DEDUCTION_TYPES: DeductionType[] = ["late", "permission_overrun", "absence", "early_leave", "permission", "unauthorized_exit", "penalty", "advance", "admin_deduction", "other"];
 const ALLOWANCE_TYPES: AllowanceType[] = ["transport", "meal", "fixed", "incentive", "bonus"];
 const LEAVE_TYPES: LeaveType[] = ["annual", "casual", "sick", "unpaid", "mission", "permission", "excused_absence"];
 

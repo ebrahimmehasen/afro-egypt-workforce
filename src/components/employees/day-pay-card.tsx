@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AttendanceStatusBadge } from "@/components/shared/status-badge";
+import { MidDayExitsBadge } from "@/components/attendance/mid-day-exits-badge";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -123,6 +124,7 @@ export function DayPayCard({
                       {r.kind === "holiday" && <Badge variant="outline">{t.dayPay.holiday}</Badge>}
                       {r.kind === "workday" && r.thursday && <Badge variant="outline">{t.dayPay.thursday}</Badge>}
                       <AttendanceStatusBadge status={r.status as AttendanceStatus} />
+                      {r.midDay && <MidDayExitsBadge analysis={r.midDay} />}
                     </div>
                   </TableCell>
                   <TableCell className="tabular-nums">{timeFmt(r.actualIn)}</TableCell>

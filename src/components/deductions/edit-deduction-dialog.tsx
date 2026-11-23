@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Deduction, DeductionType } from "@/lib/types";
 
-const DEDUCTION_TYPES: DeductionType[] = ["late", "absence", "early_leave", "permission", "unauthorized_exit", "penalty", "advance", "admin_deduction", "other"];
+const DEDUCTION_TYPES: DeductionType[] = ["late", "permission_overrun", "absence", "early_leave", "permission", "unauthorized_exit", "penalty", "advance", "admin_deduction", "other"];
 
 function SaveButton() {
   const { pending } = useFormStatus();

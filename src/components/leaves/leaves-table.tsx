@@ -14,17 +14,22 @@ import {
 } from "@/components/ui/table";
 import { DeleteLeaveButton } from "@/components/leaves/delete-leave-button";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Badge } from "@/components/ui/badge";
+import { format } from "@/lib/i18n/format";
 
 export function LeavesTable({
   leaves,
   employees,
   canApprove,
   canDelete,
+  permissionKinds = {},
 }: {
   leaves: Leave[];
   employees: Employee[];
   canApprove: boolean;
   canDelete: boolean;
+  /** leave id → how a timed permission is treated */
+  permissionKinds?: Record<string, "temporary" | "early_leave">;
 }) {
   const t = useT();
   const empMap = new Map(employees.map((e) => [e.id, e]));
@@ -51,6 +56,7 @@ export function LeavesTable({
             <TableHead>{t.leaves.colType}</TableHead>
             <TableHead>{t.leaves.colFrom}</TableHead>
             <TableHead>{t.leaves.colTo}</TableHead>
+            <TableHead>{t.leaves.colTime}</TableHead>
             <TableHead>{t.leaves.colReason}</TableHead>
             <TableHead>{t.leaves.colStatus}</TableHead>
             <TableHead>{t.leaves.colApprovedBy}</TableHead>
@@ -69,6 +75,18 @@ export function LeavesTable({
                 <TableCell>{leaveTypeLabel(l.type, t)}</TableCell>
                 <TableCell>{l.from}</TableCell>
                 <TableCell>{l.to}</TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {l.startTime && l.durationMinutes ? (
+                    <div className="flex flex-col gap-1">
+                      <span dir="ltr" className="tabular-nums">{format(t.leaves.timeAndDuration, { start: l.startTime, duration: l.durationMinutes })}</span>
+                      {permissionKinds[l.id] && (
+                        <Badge variant="outline" className="w-fit">{permissionKinds[l.id] === "early_leave" ? t.leaves.typeEarlyLeave : t.leaves.typeTemporary}</Badge>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 <TableCell className="max-w-[220px] truncate text-muted-foreground">{l.reason}</TableCell>
                 <TableCell><RequestStatusBadge status={l.status} /></TableCell>
                 <TableCell className="text-muted-foreground">{l.approvedBy ?? "—"}</TableCell>
