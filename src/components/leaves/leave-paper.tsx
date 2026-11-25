@@ -101,7 +101,7 @@ function Field({ label, value, ltr }: { label: string; value: string; ltr?: bool
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-xs text-muted-foreground">{label}</span>
-      <span dir={ltr ? "ltr" : undefined} className={`font-medium text-foreground ${ltr ? "text-start" : ""}`}>{value}</span>
+      <span className="font-medium text-foreground">{ltr ? <bdi>{value}</bdi> : value}</span>
     </div>
   );
 }
