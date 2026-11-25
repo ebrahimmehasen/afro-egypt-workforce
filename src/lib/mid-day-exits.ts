@@ -113,8 +113,9 @@ export interface MidDayInput {
   permissions: TimedPermission[];
   graceMinutes: number;
   /**
-   * Corrected by HR: their check-in and check-out stand, and the device's punches in between are not read. Only the
-   * punches HR entered after reviewing the day (source HR_REVIEW_SOURCE) are.
+   * Corrected by HR: their check-in and check-out stand, and the device's punches in between are not read — unless HR
+   * has entered a punch after reviewing the day (source HR_REVIEW_SOURCE), in which case those and the device's middle
+   * punches inside the corrected in/out are read together.
    */
   corrected?: boolean;
   /** For "out on permission" on a day still running. */
@@ -157,8 +158,21 @@ export function analyzeMidDay(input: MidDayInput): MidDayAnalysis {
   const empty: MidDayAnalysis = { intervals: [], missingPunch: false, finalExit: null, outOnPermission: false, totals: { permissionMinutes: 0, overrunCharged: 0, unauthorizedCharged: 0 } };
   if (!actualIn) return empty;
 
-  // a corrected day reads no device middle punch, only the ones HR entered after reviewing it; every other day, all punches
-  const punches = dedupePunches(input.corrected ? input.punches.filter((p) => p.source === HR_REVIEW_SOURCE) : input.punches);
+  // A corrected day with no punch HR entered after reviewing it reads no middle punch at all. Once HR has entered one, the
+  // device's middle punches are read with it (the middle filter below keeps them strictly inside the corrected in/out), so a
+  // reviewed return completes a device exit and a reviewed exit a device return. A device punch pressed right beside a
+  // reviewed one gives way to it. Every other day reads all punches.
+  const reviewedPunches = input.punches.filter((p) => p.source === HR_REVIEW_SOURCE);
+  const punches = dedupePunches(
+    !input.corrected
+      ? input.punches
+      : reviewedPunches.length === 0
+        ? []
+        : [
+            ...reviewedPunches,
+            ...input.punches.filter((p) => p.source !== HR_REVIEW_SOURCE && reviewedPunches.every((r) => Math.abs(p.at.getTime() - r.at.getTime()) >= DUPLICATE_PUNCH_MS)),
+          ],
+  );
   const permissions = [...input.permissions].filter((p) => p.durationMinutes > 0).sort((a, b) => a.start.getTime() - b.start.getTime());
   const used = new Set<string>();
 

@@ -102,10 +102,52 @@ describe("a day HR corrected", () => {
     expect(a.intervals).toEqual([]);
   });
 
-  it("reads the reviewed punches, and only those, among device punches it ignores", () => {
-    const a = analyzeMidDay(base({ ...corrected, punches: [...device("08:00", "11:00", "11:30", "17:00"), ...reviewed("12:10", "12:50")], permissions: [permission("12:00", 60)] }));
+  it("a complete device pair and no reviewed punch: unchanged, nothing charged", () => {
+    const a = analyzeMidDay(base({ ...corrected, punches: device("08:00", "12:00", "12:40", "17:00") }));
+    expect(a.intervals).toEqual([]);
+    expect(a.missingPunch).toBe(false);
+    expect(a.totals).toEqual({ permissionMinutes: 0, overrunCharged: 0, unauthorizedCharged: 0 });
+  });
+
+  it("a reviewed pair only: the same result as before", () => {
+    const a = analyzeMidDay(base({ ...corrected, punches: [...device("08:00", "17:00"), ...reviewed("12:10", "12:50")], permissions: [permission("12:00", 60)] }));
     expect(a.intervals).toHaveLength(1);
     expect(a.intervals[0]).toMatchObject({ case: 1, minutes: 40, permissionMinutes: 40 });
+  });
+
+  it("a device exit and a reviewed return only: the return completes the device exit", () => {
+    const a = analyzeMidDay(base({ ...corrected, punches: [...device("08:00", "12:00", "17:00"), ...reviewed("12:40")], permissions: [permission("12:00", 60)] }));
+    expect(a.missingPunch).toBe(false);
+    expect(a.intervals).toHaveLength(1);
+    expect(a.intervals[0]).toMatchObject({ case: 1, minutes: 40, permissionMinutes: 40 });
+    // the same day uncorrected gives the same stretch
+    const plain = analyzeMidDay(base({ punches: [...device("08:00", "12:00", "12:40", "17:00")], permissions: [permission("12:00", 60)] }));
+    expect(a.intervals[0]).toMatchObject({ minutes: plain.intervals[0].minutes, permissionMinutes: plain.intervals[0].permissionMinutes });
+  });
+
+  it("a device return and a reviewed exit only: the exit completes the device return", () => {
+    const a = analyzeMidDay(base({ ...corrected, punches: [...device("08:00", "12:40", "17:00"), ...reviewed("12:00")], permissions: [permission("12:00", 60)] }));
+    expect(a.missingPunch).toBe(false);
+    expect(a.intervals).toHaveLength(1);
+    expect(a.intervals[0]).toMatchObject({ case: 1, minutes: 40, permissionMinutes: 40 });
+  });
+
+  it("device punches outside the corrected in/out are not read", () => {
+    const a = analyzeMidDay(base({ ...corrected, actualIn: at("09:00"), actualOut: at("16:00"), punches: [...device("08:00", "08:30", "17:00"), ...reviewed("12:10", "12:50")] }));
+    expect(a.intervals).toHaveLength(1);
+    expect(a.intervals[0].minutes).toBe(40);
+  });
+
+  it("a lone reviewed punch with no device counterpart is still an odd day", () => {
+    const a = analyzeMidDay(base({ ...corrected, punches: [...device("08:00", "17:00"), ...reviewed("12:40")] }));
+    expect(a.missingPunch).toBe(true);
+    expect(a.totals).toEqual({ permissionMinutes: 0, overrunCharged: 0, unauthorizedCharged: 0 });
+  });
+
+  it("reads the device's middle punches together with the reviewed ones once HR has entered any", () => {
+    const a = analyzeMidDay(base({ ...corrected, punches: [...device("08:00", "11:00", "11:30", "17:00"), ...reviewed("12:10", "12:50")], permissions: [permission("12:00", 60)] }));
+    expect(a.intervals).toHaveLength(2);
+    expect(a.intervals[1]).toMatchObject({ case: 1, minutes: 40, permissionMinutes: 40 });
   });
 
   it("a device punch right beside a reviewed one does not swallow it", () => {
@@ -136,8 +178,8 @@ describe("the charge comes out of the existing calculation (Settings), with no n
     expect(item(pay, "permission_overrun")).toMatchObject({ minutes: 20, multiplier: rules.permissionOverrunMultiplier });
   });
 
-  it("the same on a corrected day, where the device's own middle punches change nothing", () => {
-    const pay = day({ corrected: true, punches: [...device("08:00", "11:00", "11:40", "16:30"), ...reviewed("12:10", "12:50")], permissions });
+  it("the same on a corrected day with a reviewed pair and no other middle punch", () => {
+    const pay = day({ corrected: true, punches: [...device("08:00", "16:30"), ...reviewed("12:10", "12:50")], permissions });
     expect(item(pay, "permission")).toMatchObject({ minutes: 40, multiplier: rules.permissionMultiplier });
     expect(item(pay, "unauthorized_exit")).toBeUndefined();
   });
