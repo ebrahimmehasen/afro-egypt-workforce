@@ -155,6 +155,7 @@ export interface Dictionary {
     punchReviewMissing: string;
     punchReviewOdd: string;
     punchReviewPermission: string;
+    punchReviewNoReturn: string;
     overdueReturn: string;
     overdueReturnUntil: string;
     hours: string;

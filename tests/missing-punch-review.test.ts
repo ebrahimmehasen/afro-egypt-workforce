@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { overdueReturns } from "@/lib/overdue-return";
 import { canSeeMissingPunchReview, missingPunchReviewDays, type ReviewEmployee, type ReviewRow } from "@/lib/missing-punch-review";
 import { lockedDayCheck } from "@/lib/attendance-deductions";
 import { FALLBACK_PAY_TYPES } from "@/lib/pay-defaults";
@@ -191,10 +192,82 @@ describe("who is shown it", () => {
 describe("the labels", () => {
   it("exist in Arabic and English, with no numbers", () => {
     for (const dict of [ar, en]) {
-      for (const text of [dict.notifications.punchReview, dict.notifications.punchReviewMissing, dict.notifications.punchReviewOdd, dict.notifications.punchReviewPermission]) {
+      for (const text of [dict.notifications.punchReview, dict.notifications.punchReviewMissing, dict.notifications.punchReviewOdd, dict.notifications.punchReviewPermission, dict.notifications.punchReviewNoReturn]) {
         expect(text.length).toBeGreaterThan(3);
         expect(text).not.toMatch(/[0-9٠-٩]/);
       }
+    }
+  });
+});
+
+describe("(d) an exit on a temporary permission and no return, the day finished", () => {
+  // written end 13:00; the exit is the day's last punch, so the day looks like an ordinary finished day
+  const perm = (startTime = "12:00", durationMinutes = 60) => [{ id: "P1", startTime, durationMinutes }];
+  const exitDay = (d = DAY, out = "12:00") => row({ date: d, actualOut: at(d, out) });
+  const withPunches = (d: string, times: string[], permissions = perm(), sources?: string[]) => (_: string) =>
+    ({ punches: times.map((t, i) => ({ at: at(d, t), source: sources?.[i] ?? "biometric" })), permissions }) as MidDayInputs;
+
+  it("is listed as permission_no_return", () => {
+    const days = run([exitDay()], {}, withPunches(DAY, ["08:00", "12:00"]));
+    expect(days).toEqual([{ employeeId: "E1", name: "Hossam", date: DAY, reason: "permission_no_return" }]);
+  });
+
+  it("is not listed once a return punch exists, including one HR entered after reviewing", () => {
+    expect(run([row()], {}, withPunches(DAY, ["08:00", "12:00", "12:40", "18:00"]))).toEqual([]);
+    const reviewedReturn = [exitDay(DAY, "18:00")];
+    expect(run(reviewedReturn, {}, withPunches(DAY, ["08:00", "12:00", "12:40", "18:00"], perm(), ["biometric", "biometric", "hr_review", "biometric"]))).toEqual([]);
+  });
+
+  it("is not listed: a normal final check-out on a day with no temporary permission", () => {
+    expect(run([row()], {}, withPunches(DAY, ["08:00", "18:00"], []))).toEqual([]);
+  });
+
+  it("is not listed: a permission that runs to the end of the day", () => {
+    const early = [{ id: "P1", startTime: "15:00", durationMinutes: 240 }];
+    expect(run([exitDay(DAY, "15:00")], {}, withPunches(DAY, ["08:00", "15:00"], early))).toEqual([]);
+  });
+
+  it("is not listed: a check-out at or after the permission's written end", () => {
+    // (the existing case (c) may still list an exit exactly at the end as an unused permission; this reason never does)
+    const reasons = (out: string) => run([exitDay(DAY, out)], {}, withPunches(DAY, ["08:00", out])).map((d) => d.reason);
+    expect(reasons("13:00")).not.toContain("permission_no_return");
+    expect(reasons("14:00")).not.toContain("permission_no_return");
+  });
+
+  it("is not listed on the weekly day off or a public holiday", () => {
+    const FRIDAY = "2026-11-20";
+    expect(run([exitDay(FRIDAY)], {}, withPunches(FRIDAY, ["08:00", "12:00"]))).toEqual([]);
+    const holiday = { ...ctx, holidays: [{ from: DAY, to: DAY }] };
+    expect(run([exitDay()], { ctx: holiday }, withPunches(DAY, ["08:00", "12:00"]))).toEqual([]);
+  });
+
+  it("is not listed on a day HR corrected (HR already settled it)", () => {
+    expect(run([{ ...exitDay(), correctionReason: "fixed" }], {}, withPunches(DAY, ["08:00", "12:00"]))).toEqual([]);
+  });
+
+  it("is not listed before the day is over, in an approved pay month, or outside the viewer's scope", () => {
+    expect(run([exitDay()], { now: at(DAY, "13:30") }, withPunches(DAY, ["08:00", "12:00"]))).toEqual([]);
+    expect(run([exitDay()], { isLocked: () => true }, withPunches(DAY, ["08:00", "12:00"]))).toEqual([]);
+    expect(run([exitDay()], { scope: { all: false, ids: new Set(["E2"]) } }, withPunches(DAY, ["08:00", "12:00"]))).toEqual([]);
+  });
+
+  it("keeps first-reason-wins: a day already listed is not listed twice", () => {
+    const days = run([exitDay()], {}, withPunches(DAY, ["08:00", "10:00", "12:00"]));
+    expect(days).toHaveLength(1);
+    expect(days[0].reason).toBe("odd_punches");
+  });
+});
+
+describe("the bell alert and the review list share one predicate", () => {
+  const perm = [{ id: "P1", startTime: "12:00", durationMinutes: 60 }];
+  const cases: Record<string, string[]> = { exitNoReturn: ["08:00", "12:00"], withReturn: ["08:00", "12:00", "12:40"], onlyIn: ["08:00"], afterEnd: ["08:00", "14:00"], threePunches: ["08:00", "10:00", "12:00"] };
+  it("agree on every case: alert at the end of the permission iff listed (as that reason) once the day is over", () => {
+    for (const [name, times] of Object.entries(cases)) {
+      const inputs = { punches: times.map((t) => ({ at: at(DAY, t), source: "biometric" })), permissions: perm } as MidDayInputs;
+      const alert = overdueReturns({ date: DAY, employees, ctx, scope: allScope, inputsFor: (id) => (id === "E1" ? inputs : undefined), now: at(DAY, "13:30") }).length > 0;
+      const last = times[times.length - 1];
+      const listed = run([row({ actualOut: at(DAY, last) })], {}, () => inputs).some((d) => d.reason === "permission_no_return");
+      expect(listed, name).toBe(alert);
     }
   });
 });

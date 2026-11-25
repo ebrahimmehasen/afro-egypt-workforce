@@ -70,7 +70,7 @@ export async function getNotifications(user: User): Promise<NotificationFeed> {
   if (canSeeMissingPunchReview(user)) {
     const days = await loadMissingPunchReview(user);
     pendingCount += days.length;
-    const reasonLabel = { missing_punch: t.notifications.punchReviewMissing, odd_punches: t.notifications.punchReviewOdd, permission_unused: t.notifications.punchReviewPermission };
+    const reasonLabel = { missing_punch: t.notifications.punchReviewMissing, odd_punches: t.notifications.punchReviewOdd, permission_unused: t.notifications.punchReviewPermission, permission_no_return: t.notifications.punchReviewNoReturn };
     for (const d of days.slice(0, PER_KIND)) {
       items.push({
         id: `punch-review-${d.employeeId}-${d.date}`,

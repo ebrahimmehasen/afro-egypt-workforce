@@ -154,6 +154,7 @@ export const en: Dictionary = {
     punchReviewMissing: "A punch is missing",
     punchReviewOdd: "Exit and return punches don't pair up",
     punchReviewPermission: "Approved permission with no exit punch",
+    punchReviewNoReturn: "Left on a permission and did not punch back in",
     overdueReturn: "Permission ended, no return punch yet",
     overdueReturnUntil: "The permission ran until",
     hours: "h",

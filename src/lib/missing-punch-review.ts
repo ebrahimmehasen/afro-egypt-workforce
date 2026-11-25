@@ -6,6 +6,7 @@ import { dayStr } from "@/lib/serialize";
 import { PayContext, PayEmployee, kindOf, loadPayContext, rulesFor, scheduleFor } from "@/lib/pay-context";
 import { at, dayTimes } from "@/lib/pay-engine";
 import { permissionKind } from "@/lib/mid-day-exits";
+import { pendingReturn } from "@/lib/pending-return";
 import { MidDayInputs, loadMidDayInputs, midDayForDay } from "@/lib/mid-day-view";
 import { lockedDayCheck } from "@/lib/attendance-deductions";
 import type { User } from "@/lib/types";
@@ -25,7 +26,13 @@ export type ReviewReason =
    * An approved temporary timed permission and no exit at all — no stretch out in the middle of the day and no reviewed
    * punch from HR. On a day HR corrected the engine ignores the device's middle punches, so only a reviewed stretch clears it.
    */
-  | "permission_unused";
+  | "permission_unused"
+  /**
+   * Left on an approved temporary timed permission and never came back: the exit is the day's last punch, so the day looks like
+   * an ordinary finished day. The same predicate as the bell alert (pending-return.ts). Cleared by a return punch, an HR reviewed
+   * one included.
+   */
+  | "permission_no_return";
 
 export interface ReviewDay {
   employeeId: string;
@@ -53,7 +60,7 @@ export type ReviewEmployee = PayEmployee & { name: string };
  * The days to review, newest first. Pure: everything comes in as an argument.
  *  - only a finished day (the employee's own working day, from their pay type / schedule, is over at `now`);
  *  - only an employee in `scope`, and only a day whose pay month is not approved or closed (`isLocked`);
- *  - one entry per employee-day, with the first reason that applies: a, then b, then c.
+ *  - one entry per employee-day, with the first reason that applies: a, then b, then d, then c.
  */
 export function missingPunchReviewDays(input: {
   rows: ReviewRow[];
@@ -94,6 +101,13 @@ export function missingPunchReviewDays(input: {
     // (b) an odd number of punches in the middle of the day: an exit without its return, or the other way round
     if (analysis?.missingPunch) {
       found("odd_punches");
+      continue;
+    }
+
+    // (d) left on a temporary permission and never back (the exit is the day's last punch). Not on a day HR corrected: HR has
+    // settled its in and out, and a reviewed stretch is read by (b) and (c).
+    if (!corrected && inputs && workday && pendingReturn({ date: row.date, punches: inputs.punches, permissions: inputs.permissions, scheduleStart: schedule.start, dayEnd, now })) {
+      found("permission_no_return");
       continue;
     }
 

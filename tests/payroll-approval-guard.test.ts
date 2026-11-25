@@ -34,7 +34,7 @@ try {
 const EMP = "ZZ-GRD-001";
 const ACTOR = "ZZ-guard-test";
 const YEAR = 2019;
-const MONTHS = { odd: 6, corrected: 7, locked: 8, clear: 9, status: 10 };
+const MONTHS = { odd: 6, corrected: 7, locked: 8, clear: 9, status: 10, noReturn: 11 };
 const admin = (): User => ({ id: "U-grd", name: ACTOR, email: "a@x", role: "admin", permissions: [] });
 
 let employeeShiftId = "";
@@ -163,6 +163,30 @@ describe.skipIf(!sampleDb)("approving a pay period with a day that still needs r
 
     expect(await applyAddReviewedPunches({ employeeId: EMP, date: day, outTime: "12:10", backTime: "12:50", reason: "confirmed by the manager" }, ACTOR)).toHaveProperty("success", true);
     expect(await approve(p.id)).toEqual({ success: true });
+  });
+
+  it("a day that ends on an exit inside a temporary permission blocks until HR has settled it, then allows", async () => {
+    const day = await workingDay(MONTHS.noReturn);
+    // the exit at 12:00 inside the permission (written end 13:00) is the day's last punch, so the day looks finished
+    await makeDay(day, { punches: ["08:00", "12:00"], outTime: "12:00" });
+    await prisma.leave.create({ data: { employeeId: EMP, type: "permission", from: new Date(`${day}T00:00:00.000Z`), to: new Date(`${day}T00:00:00.000Z`), reason: "x", startTime: "12:00", durationMinutes: 60, status: "approved", approvedBy: ACTOR } });
+    const p = await period(MONTHS.noReturn, "calculated");
+    const before = await logs();
+
+    const listed = await loadReviewDays({ scope: { all: true }, from: day, to: day });
+    expect(listed.map((d) => [d.employeeId, d.reason])).toEqual([[EMP, "permission_no_return"]]);
+    expect(await approve(p.id)).toEqual({ error: format(ar.reviewPunch.approveBlocked, { count: 1 }) });
+    expect(await status(p.id)).toBe("calculated");
+    expect(await logs()).toEqual(before); // neither the list nor the guard created a punch
+
+    // HR settles the day: the check-out is corrected (the existing correction), which alone does not clear a permission with no exit stretch…
+    await prisma.dailyAttendance.update({ where: { employeeId_date: { employeeId: EMP, date: new Date(`${day}T00:00:00.000Z`) } }, data: { actualOut: at(day, "16:30"), correctionReason: "HR set the check-out", correctedBy: ACTOR } });
+    expect(await approve(p.id)).toEqual({ error: format(ar.reviewPunch.approveBlocked, { count: 1 }) });
+    // …and the return punch added by review (read together with the device's exit) does
+    expect(await applyAddReviewedPunches({ employeeId: EMP, date: day, backTime: "12:40", reason: "the manager confirmed he was back" }, ACTOR)).toHaveProperty("success", true);
+    expect(await loadReviewDays({ scope: { all: true }, from: day, to: day })).toEqual([]);
+    expect(await approve(p.id)).toEqual({ success: true });
+    expect((await logs()).filter((l) => l.timestamp.getTime() === at(day, "08:00").getTime() || l.timestamp.getTime() === at(day, "12:00").getTime())).toHaveLength(2); // the device's punches stand
   });
 
   it("a period whose days are all clear approves as before", async () => {

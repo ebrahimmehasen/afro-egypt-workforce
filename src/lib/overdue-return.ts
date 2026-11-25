@@ -2,8 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { inScope, viewerScope, type Scope } from "@/lib/scope";
 import { today } from "@/lib/today";
 import { PayContext, PayEmployee, kindOf, loadPayContext, rulesFor, scheduleFor } from "@/lib/pay-context";
-import { at, dayTimes } from "@/lib/pay-engine";
-import { dedupePunches, permissionKind } from "@/lib/mid-day-exits";
+import { dayTimes } from "@/lib/pay-engine";
+import { pendingReturn } from "@/lib/pending-return";
 import { MidDayInputs, loadMidDayInputs } from "@/lib/mid-day-view";
 import { canSeeMissingPunchReview } from "@/lib/missing-punch-review";
 import type { User } from "@/lib/types";
@@ -57,21 +57,9 @@ export function overdueReturns(input: {
     const schedule = scheduleFor(ctx, employee);
     const dayEnd = dayTimes(date, schedule, rules).end;
 
-    // the first punch is the check-in, then they alternate: an even count means the last one is an exit. A hand-added pair
-    // is not read (as everywhere in the engine); a punch HR entered after reviewing (source hr_review) is.
-    const punches = dedupePunches(inputs.punches.filter((p) => p.source !== "manual_correction"));
-    if (punches.length < 2 || punches.length % 2 !== 0) continue;
-    const exitAt = punches[punches.length - 1].at;
-
-    const waiting = inputs.permissions
-      .map((p) => {
-        const start = at(date, p.startTime, schedule.start);
-        return { id: p.id, start, end: new Date(start.getTime() + p.durationMinutes * 60_000), kind: permissionKind(start, p.durationMinutes, dayEnd) };
-      })
-      .filter((p) => p.kind === "temporary" && exitAt < p.end && now > p.end)
-      .sort((a, b) => b.end.getTime() - a.end.getTime())[0];
+    const waiting = pendingReturn({ date, punches: inputs.punches, permissions: inputs.permissions, scheduleStart: schedule.start, dayEnd, now });
     if (!waiting) continue;
-    out.push({ employeeId: employee.id, name: employee.name, date, permissionId: waiting.id, permissionEnd: clock(waiting.end), exitAt });
+    out.push({ employeeId: employee.id, name: employee.name, date, permissionId: waiting.permissionId, permissionEnd: clock(waiting.end), exitAt: waiting.exitAt });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
