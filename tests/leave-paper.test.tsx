@@ -19,7 +19,7 @@ const dictionaries = { ar, en } as const;
 const paper = (locale: "ar" | "en", leave: Leave, days = { calendar: 3, charged: 2 as number | null }) =>
   renderToStaticMarkup(
     <LocaleProvider locale={locale} dictionary={dictionaries[locale]}>
-      <LeavePaper t={dictionaries[locale]} leave={leave} employee={{ name: "حسام رجب غريب", employeeNumber: "PROD-011" }} days={days} />
+      <LeavePaper t={dictionaries[locale]} leave={leave} employee={{ name: "حسام رجب غريب", employeeNumber: "PROD-011" }} days={days} company={{ name: "Afro Egypt", logoUrl: "/brand/afro-egypt-logo.jpg" }} />
     </LocaleProvider>,
   );
 
@@ -68,8 +68,12 @@ describe("what the paper shows", () => {
     expect(html).toContain("—");
   });
 
-  it("carries no company branding: no image, no logo", () => {
-    for (const locale of ["ar", "en"] as const) expect(paper(locale, leave())).not.toMatch(/<img|logo/i);
+  it("is headed by the company name and logo, in both languages", () => {
+    for (const locale of ["ar", "en"] as const) {
+      const html = paper(locale, leave());
+      expect(html).toContain("Afro Egypt");
+      expect(html).toMatch(/<img[^>]*afro-egypt-logo/);
+    }
   });
 });
 

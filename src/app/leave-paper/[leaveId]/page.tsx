@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * A printable leave paper for one leave request, on a plain sheet with no company branding (like the payslip). Who may
+ * A printable leave paper for one leave request, on a plain sheet headed by the company's logo and name (from the company settings). Who may
  * open it is who can see that leave in the leaves list: an account that can open the leaves page, for an employee in
  * its scope (a self-service employee: their own). Anyone else gets "not found", as for a payslip. It only shows the
  * request's existing status — a pending or rejected request is marked "not approved" on the page and when printed.
@@ -36,5 +36,5 @@ export default async function LeavePaperPage({ params }: { params: Promise<{ lea
   if (!employee) notFound();
 
   const days = leavePaperDays(leave, await loadDayKindRule());
-  return <LeavePaper t={t} leave={leave} employee={{ name: employee.name, employeeNumber: employee.employeeNumber }} days={days} />;
+  return <LeavePaper t={t} leave={leave} employee={{ name: employee.name, employeeNumber: employee.employeeNumber }} days={days} company={{ name: db.companySettings.companyName, logoUrl: db.companySettings.logoUrl }} />;
 }

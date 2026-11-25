@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { Leave } from "@/lib/types";
@@ -13,7 +14,7 @@ const requestDay = (createdAt: string) =>
 
 /**
  * One leave request on a plain sheet to print and sign: the employee, the leave, its status, and a signature line for
- * the employee and one for management. No company branding, on screen or printed (like the payslip). A request that
+ * the employee and one for management. It has the company's logo and name at the top, on screen and printed. A request that
  * is not approved carries a bold "not approved" banner that stays on the printed page, so it can't pass for a leave.
  */
 export function LeavePaper({
@@ -21,11 +22,13 @@ export function LeavePaper({
   leave,
   employee,
   days,
+  company,
 }: {
   t: Dictionary;
   leave: Leave;
   employee: { name: string; employeeNumber: string };
   days: { calendar: number; charged: number | null };
+  company: { name: string; logoUrl: string };
 }) {
   const p = t.leavePaper;
   const approved = isApprovedLeave(leave);
@@ -44,8 +47,14 @@ export function LeavePaper({
         </div>
 
         <div className="rounded-lg border border-border bg-white p-8 print:border-none print:p-0">
-          <div className="border-b border-border pb-6">
-            <p className="text-lg font-bold text-foreground">{p.title}</p>
+          <div className="flex items-center gap-4 border-b border-border pb-6">
+            <div className="relative h-16 w-16 shrink-0">
+              <Image src={company.logoUrl} alt={company.name} fill sizes="64px" className="object-contain" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <p data-testid="leave-paper-company" className="text-xl font-extrabold text-foreground">{company.name}</p>
+              <p className="text-lg font-bold text-foreground">{p.title}</p>
+            </div>
           </div>
 
           {/* not an approved leave: bold, bordered (a border prints where a background colour may not), never hidden in print */}
