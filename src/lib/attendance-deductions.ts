@@ -11,6 +11,7 @@ import { payPeriodOf } from "@/lib/pay-rules";
 import { DayCharge, leaveCharges } from "@/lib/leave-balance";
 import { trackedAbsentDays } from "@/lib/leave-days";
 import { withoutQuarantined } from "@/lib/punch-quarantine";
+import { punchEngineSource } from "@/lib/hr-review-punch";
 
 // Posts what each finished day of attendance costs and earns, by the employee's pay-type rules: deductions
 // (absence, lateness, permission, leaving without permission) to the Deduction table and additions
@@ -379,7 +380,7 @@ export async function postAttendanceDeductions(now: Date = new Date()): Promise<
       {
         punches: (logsByEmployee.get(d.employeeId) ?? [])
           .filter((l) => l.timestamp >= window.gte && l.timestamp <= window.lte)
-          .map((l) => ({ at: l.timestamp, source: l.source })),
+          .map((l) => ({ at: l.timestamp, source: punchEngineSource(l) })),
         permissions: timedPermissions(onDay),
       },
     );

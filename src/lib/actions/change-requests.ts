@@ -17,6 +17,7 @@ import { applyLinkDeviceUser, applyUnlinkDeviceUser } from "@/lib/actions/biomet
 import { applyCreateDeduction, applyDeleteDeduction, applyUpdateDeduction } from "@/lib/actions/deductions";
 import { applyCreateAllowance, applyDeleteAllowance } from "@/lib/actions/allowances";
 import { applyAddManualAttendance, applyCorrectAttendance } from "@/lib/actions/attendance";
+import { applyAddReviewedPunches } from "@/lib/actions/review-punches";
 import { applyDecideLeave } from "@/lib/actions/leaves";
 import { applyDecideOvertime, applyDeleteOvertime, applyUpdateOvertime } from "@/lib/actions/overtime";
 import { applyAddHoliday, applyDeleteHoliday } from "@/lib/actions/holidays";
@@ -52,6 +53,7 @@ const APPLIERS: Record<string, (payload: unknown, actorName: string) => Promise<
   "allowances.delete": (p, a) => applyDeleteAllowance(p as never, a),
   "attendance.correct": (p, a) => applyCorrectAttendance(p as never, a),
   "attendance.addManual": (p, a) => applyAddManualAttendance(p as never, a),
+  "attendance.reviewPunches": (p, a) => applyAddReviewedPunches(p as never, a),
   "leaves.decide": (p, a) => applyDecideLeave(p as never, a),
   "overtime.decide": (p, a) => applyDecideOvertime(p as never, a),
   "overtime.update": (p, a) => applyUpdateOvertime(p as never, a),

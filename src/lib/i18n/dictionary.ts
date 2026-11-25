@@ -717,6 +717,26 @@ export interface Dictionary {
     year: string;
     month: string;
   };
+  reviewPunch: {
+    action: string;
+    title: string;
+    button: string;
+    intro: string;
+    outLabel: string;
+    backLabel: string;
+    reasonLabel: string;
+    reasonHint: string;
+    submit: string;
+    done: string;
+    errNeedOne: string;
+    errBadTime: string;
+    errBackBeforeOut: string;
+    errOutsideDay: string;
+    errDuplicate: string;
+    errNoDay: string;
+    errReason: string;
+    approveBlocked: string;
+  };
   leavePaper: {
     title: string;
     back: string;
@@ -1327,6 +1347,7 @@ export interface Dictionary {
     rejectLeave: string;
     classifyExit: string;
     annotateExit: string;
+    reviewPunches: string;
     approveOvertime: string;
     rejectOvertime: string;
     addDeduction: string;

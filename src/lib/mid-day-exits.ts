@@ -112,7 +112,10 @@ export interface MidDayInput {
   dayEnd: Date;
   permissions: TimedPermission[];
   graceMinutes: number;
-  /** Corrected by HR: their check-in and check-out stand, and the punches in between are not read. */
+  /**
+   * Corrected by HR: their check-in and check-out stand, and the device's punches in between are not read. Only the
+   * punches HR entered after reviewing the day (source HR_REVIEW_SOURCE) are.
+   */
   corrected?: boolean;
   /** For "out on permission" on a day still running. */
   now?: Date;
@@ -154,7 +157,8 @@ export function analyzeMidDay(input: MidDayInput): MidDayAnalysis {
   const empty: MidDayAnalysis = { intervals: [], missingPunch: false, finalExit: null, outOnPermission: false, totals: { permissionMinutes: 0, overrunCharged: 0, unauthorizedCharged: 0 } };
   if (!actualIn) return empty;
 
-  const punches = dedupePunches(input.punches);
+  // a corrected day reads no device middle punch, only the ones HR entered after reviewing it; every other day, all punches
+  const punches = dedupePunches(input.corrected ? input.punches.filter((p) => p.source === HR_REVIEW_SOURCE) : input.punches);
   const permissions = [...input.permissions].filter((p) => p.durationMinutes > 0).sort((a, b) => a.start.getTime() - b.start.getTime());
   const used = new Set<string>();
 
@@ -165,7 +169,7 @@ export function analyzeMidDay(input: MidDayInput): MidDayAnalysis {
   // leaving for the day — so it closes the stretch out before it and there is no check-out yet.
   const running = Boolean(input.now && input.now < dayEnd);
   let lastOut: Date | null = actualOut;
-  if (actualOut && !input.corrected) {
+  if (actualOut && (!input.corrected || punches.length > 0)) {
     const inMs = actualIn.getTime();
     const outMs = actualOut.getTime();
     const middle = punches.filter(

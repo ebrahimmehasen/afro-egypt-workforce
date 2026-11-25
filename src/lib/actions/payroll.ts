@@ -9,6 +9,10 @@ import { getSession } from "@/lib/auth";
 import { gate } from "@/lib/change-requests";
 import { getT } from "@/lib/i18n";
 import { ActionState } from "@/hooks/use-action-feedback";
+import { format } from "@/lib/i18n/format";
+import { loadPayContext } from "@/lib/pay-context";
+import { payPeriodRange } from "@/lib/pay-rules";
+import { loadReviewDays } from "@/lib/missing-punch-review";
 
 const MONTHS_AR = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
@@ -125,6 +129,14 @@ export async function applyApprovePayrollPeriod(payload: PeriodIdPayload, actorN
   const period = await prisma.payrollPeriod.findUnique({ where: { id: payload.periodId } });
   if (!period) return { error: t.validation.periodNotFound };
   if (period.status !== "calculated") return { error: t.validation.payrollNotCalculatedFirst };
+
+  // A day with a forgotten punch must be reviewed before the period's calculation is approved. Checked here, in the apply
+  // function, so it holds whether the approval is direct or comes through a change request. There is no override: a day
+  // stops matching once its punches are complete (the attendance correction, or the punches HR enters after review).
+  const ctx = await loadPayContext();
+  const { from, to } = payPeriodRange(period.year, period.month, ctx.payPeriodStartDay);
+  const pending = await loadReviewDays({ scope: { all: true }, from, to });
+  if (pending.length > 0) return { error: format(t.reviewPunch.approveBlocked, { count: pending.length }) };
 
   await recordChangeAs(
     actorName,

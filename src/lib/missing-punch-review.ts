@@ -5,7 +5,7 @@ import { today, addDays } from "@/lib/today";
 import { dayStr } from "@/lib/serialize";
 import { PayContext, PayEmployee, kindOf, loadPayContext, rulesFor, scheduleFor } from "@/lib/pay-context";
 import { at, dayTimes } from "@/lib/pay-engine";
-import { HR_REVIEW_SOURCE, permissionKind } from "@/lib/mid-day-exits";
+import { permissionKind } from "@/lib/mid-day-exits";
 import { MidDayInputs, loadMidDayInputs, midDayForDay } from "@/lib/mid-day-view";
 import { lockedDayCheck } from "@/lib/attendance-deductions";
 import type { User } from "@/lib/types";
@@ -98,9 +98,10 @@ export function missingPunchReviewDays(input: {
     }
 
     // (c) a temporary timed permission was approved, but there is no exit in the middle of the day at all (no stretch
-    // out, the check-out is not the one the permission covers, and no punch HR entered after reviewing). A corrected
+    // out, and the check-out is not the one the permission covers). A punch HR entered after reviewing is read by the engine
+    // as an ordinary exit, so it clears this like any other. A corrected
     // day reads no device middle punch, so it stays here until a reviewed stretch exists.
-    if (!analysis && inputs && workday && !inputs.punches.some((p) => p.source === HR_REVIEW_SOURCE)) {
+    if (!analysis && inputs && workday) {
       const temporary = inputs.permissions.some(
         (p) => permissionKind(at(row.date, p.startTime, schedule.start), p.durationMinutes, dayEnd) === "temporary",
       );
@@ -146,16 +147,21 @@ export async function loadReviewDays(opts: {
   return missingPunchReviewDays({ rows, employees, ctx, scope, isLocked, inputsFor, now: opts.now ?? new Date() });
 }
 
-/** The days waiting for review that this user may see (inside their departments), read from live data. */
-export async function loadMissingPunchReview(user: User, now: Date = new Date()): Promise<ReviewDay[]> {
+/** The days in a range that need review and that this user may see (inside their departments), outside approved or closed pay months. */
+export async function loadReviewForViewer(user: User, from: string, to: string, now: Date = new Date()): Promise<ReviewDay[]> {
   if (!canSeeMissingPunchReview(user)) return [];
-  const last = today();
   const periods = await prisma.payrollPeriod.findMany({ where: { status: { in: ["approved", "closed"] } }, select: { year: true, month: true } });
   return loadReviewDays({
     scope: (employees) => viewerScope(user, employees),
-    from: addDays(last, -REVIEW_WINDOW_DAYS),
-    to: last,
+    from,
+    to,
     isLocked: (day, ctx) => lockedDayCheck(periods, ctx)(day),
     now,
   });
+}
+
+/** The days waiting for review that this user may see, over the last REVIEW_WINDOW_DAYS days. */
+export async function loadMissingPunchReview(user: User, now: Date = new Date()): Promise<ReviewDay[]> {
+  const last = today();
+  return loadReviewForViewer(user, addDays(last, -REVIEW_WINDOW_DAYS), last, now);
 }

@@ -5,6 +5,7 @@ import { MidDayAnalysis, analyzeMidDay } from "@/lib/mid-day-exits";
 import { DayPayInput, at, dayTimes } from "@/lib/pay-engine";
 import { PayContext, PayEmployee, effectiveShift, kindOf, rulesFor, scheduleFor } from "@/lib/pay-context";
 import { withoutQuarantined } from "@/lib/punch-quarantine";
+import { punchEngineSource } from "@/lib/hr-review-punch";
 import { dayStr } from "@/lib/serialize";
 import { addDays } from "@/lib/today";
 
@@ -42,7 +43,7 @@ export async function loadMidDayInputs(
     return {
       punches: withoutQuarantined(logs)
         .filter((l) => l.employeeId === employeeId && l.timestamp >= window.gte && l.timestamp <= window.lte)
-        .map((l) => ({ at: l.timestamp, source: l.source })),
+        .map((l) => ({ at: l.timestamp, source: punchEngineSource(l) })),
       permissions: timedPermissions(leaves.filter((l) => l.employeeId === employeeId && dayStr(l.from) <= date && dayStr(l.to) >= date)),
     };
   };
