@@ -57,8 +57,16 @@ const run = (rows: ReviewRow[], over: Partial<Parameters<typeof missingPunchRevi
   });
 
 describe("(a) a day whose status is missing_punch", () => {
-  it("is listed", () => {
+  it("is listed on a normal working day", () => {
     expect(run([row({ status: "missing_punch", actualOut: null })])).toEqual([{ employeeId: "E1", name: "Hossam", date: DAY, reason: "missing_punch" }]);
+  });
+
+  it("is not listed on the weekly day off or a public holiday (2026-11-20 is a Friday)", () => {
+    const FRIDAY = "2026-11-20";
+    const friday = row({ date: FRIDAY, status: "missing_punch", actualIn: at(FRIDAY, "08:00"), actualOut: null });
+    expect(run([friday])).toEqual([]);
+    const holiday = { ...ctx, holidays: [{ from: DAY, to: DAY }] };
+    expect(run([row({ status: "missing_punch", actualOut: null })], { ctx: holiday })).toEqual([]);
   });
 });
 
@@ -126,9 +134,37 @@ describe("what must not appear", () => {
     expect(run(rows, { now: afterEnd })).toHaveLength(1);
   });
 
-  it("a day HR has already corrected, and an ordinary day", () => {
-    expect(run([row({ correctionReason: "forgot to punch out" })], {}, odd)).toEqual([]);
+  it("an ordinary day", () => {
     expect(run([row()], {}, (d) => ({ punches: punches(d, "08:00", "18:00"), permissions: [] }))).toEqual([]);
+  });
+});
+
+describe("a day HR has corrected", () => {
+  const corrected = row({ correctionReason: "forgot to punch out" });
+  const permission = { id: "L1", startTime: "12:00", durationMinutes: 60 };
+
+  it("without a temporary permission stays clear (the engine ignores its middle punches, nothing is lost)", () => {
+    expect(run([corrected], {}, (d) => ({ punches: punches(d, "08:00", "12:00", "18:00"), permissions: [] }))).toEqual([]);
+    expect(run([corrected], {}, (d) => ({ punches: punches(d, "08:00", "18:00"), permissions: [] }))).toEqual([]);
+  });
+
+  it("with an approved temporary permission and no reviewed punches stays on the list, even if the device punched an exit and a return", () => {
+    expect(run([corrected], {}, (d) => ({ punches: punches(d, "08:00", "18:00"), permissions: [permission] })).map((d) => d.reason)).toEqual(["permission_unused"]);
+    // the device's middle punches are not read on a corrected day: they do not clear it
+    expect(run([corrected], {}, (d) => ({ punches: punches(d, "08:00", "12:05", "13:00", "18:00"), permissions: [permission] })).map((d) => d.reason)).toEqual(["permission_unused"]);
+  });
+
+  it("an early-leave permission on a corrected day is still not listed", () => {
+    const end = dayEndOf(DAY);
+    const startMinutes = end.getHours() * 60 + end.getMinutes() - 60;
+    const startTime = `${String(Math.floor(startMinutes / 60)).padStart(2, "0")}:${String(startMinutes % 60).padStart(2, "0")}`;
+    expect(run([corrected], {}, (d) => ({ punches: punches(d, "08:00", "18:00"), permissions: [{ id: "L2", startTime, durationMinutes: 120 }] }))).toEqual([]);
+  });
+
+  it("a corrected day in a locked pay month, or outside the scope, stays off the list", () => {
+    const inputs = (d: string) => ({ punches: punches(d, "08:00", "18:00"), permissions: [permission] });
+    expect(run([corrected], { isLocked: lockedDayCheck([{ year: 2026, month: 11 }], ctx) }, inputs)).toEqual([]);
+    expect(run([corrected], { scope: { all: false, ids: new Set(["E2"]) } }, inputs)).toEqual([]);
   });
 });
 

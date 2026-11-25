@@ -9,6 +9,12 @@
 /** Punches this close to the one before them are the same punch pressed twice: they count once. */
 export const DUPLICATE_PUNCH_MS = 2 * 60_000;
 
+/**
+ * The `source` an engine punch carries when HR entered it after reviewing a day (hr-review-punch.ts). On a day HR has
+ * corrected, only these middle punches are read; every other middle punch is still ignored there.
+ */
+export const HR_REVIEW_SOURCE = "hr_review";
+
 const MS_PER_MIN = 60_000;
 
 export interface DayPunch {
