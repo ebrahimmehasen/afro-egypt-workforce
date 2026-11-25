@@ -4,6 +4,7 @@ import { getT } from "@/lib/i18n";
 import { leaveTypeLabel } from "@/lib/i18n/labels";
 import { User } from "@/lib/types";
 import { canSeeMissingPunchReview, loadMissingPunchReview } from "@/lib/missing-punch-review";
+import { canSeeOverdueReturn, loadOverdueReturns } from "@/lib/overdue-return";
 
 export interface AppNotification {
   id: string;
@@ -78,6 +79,22 @@ export async function getNotifications(user: User): Promise<NotificationFeed> {
         at: new Date(`${d.date}T12:00:00.000Z`).toISOString(),
         href: `/attendance?date=${d.date}`,
         actionable: true,
+        tone: "info",
+      });
+    }
+  }
+
+  // an approved timed permission has ended and the employee has not punched back in: informational, a separate group
+  // (never counted as pending work, never blocks anything)
+  if (canSeeOverdueReturn(user)) {
+    for (const o of (await loadOverdueReturns(user)).slice(0, PER_KIND)) {
+      items.push({
+        id: `overdue-return-${o.employeeId}-${o.date}`,
+        title: t.notifications.overdueReturn,
+        body: `${o.name} — ${t.notifications.overdueReturnUntil} ${o.permissionEnd}`,
+        at: o.exitAt.toISOString(),
+        href: `/attendance?date=${o.date}`,
+        actionable: false,
         tone: "info",
       });
     }

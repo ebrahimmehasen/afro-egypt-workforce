@@ -154,6 +154,8 @@ export const ar: Dictionary = {
     punchReviewMissing: "بصمة ناقصة",
     punchReviewOdd: "بصمات الخروج والرجوع مش متزوّجة",
     punchReviewPermission: "إذن معتمد من غير بصمة خروج",
+    overdueReturn: "إذن انتهى ولسه مفيش بصمة رجوع",
+    overdueReturnUntil: "الإذن كان لحد",
     hours: "ساعة",
   },
   dashboard: {
