@@ -118,3 +118,26 @@ describe("the mission / excused absence options say they change nothing, in both
     }
   });
 });
+
+describe("what the permission classification tells the user before it is submitted", () => {
+  // Filing the permission is not free: its minutes are charged at the employee's configured permission rate, which
+  // is set per pay type (pay-engine: item("permission", ..., rules.permissionMultiplier)). The intro says so in both
+  // languages, says it is no exemption, says the day is worked out again — and names no fixed multiplier.
+  it("says: charged at the configured permission rate, not excused and not free, the day is worked out again", () => {
+    for (const phrase of ["بسعر الإذن المضبوط", "مضاعف الإذن", "مش إعفاء", "مش ببلاش", "واليوم بيتحسب من جديد"]) expect(ar.midDay.classifyIntro).toContain(phrase);
+    for (const phrase of ["configured permission rate", "permission multiplier", "not excused", "not free", "worked out again"]) expect(en.midDay.classifyIntro).toContain(phrase);
+  });
+
+  it("names no multiplier (they differ by pay type) and keeps the stretch's own numbers as placeholders", () => {
+    for (const text of [ar.midDay.classifyIntro, en.midDay.classifyIntro]) {
+      expect(text).not.toMatch(/\d+(\.\d+)?\s*(x|×|مرة)/i);
+      expect(text).not.toMatch(/\bx\s*\d/i);
+      for (const placeholder of ["{out}", "{back}", "{minutes}"]) expect(text).toContain(placeholder);
+    }
+  });
+
+  it("leaves the record-only labels of a mission and an excused absence as they were", () => {
+    expect(ar.midDay.classifyRecordOnlyLabel).toBe("للتوثيق فقط — لا يغيّر أي خصم أو أجر · المعالجة المالية بانتظار القرار");
+    expect(en.midDay.classifyRecordOnlyLabel).toBe("Record only — does not change any charge or pay · pay treatment pending decision");
+  });
+});

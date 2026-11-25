@@ -1514,7 +1514,7 @@ export const en: Dictionary = {
     returnOnTime: "Back within the permission",
     classify: "Classify exit",
     classifyTitle: "Classify the exit",
-    classifyIntro: "Out {out}, back {back} ({minutes} min). Classifying records an approved permission for that stretch and the day is worked out again; left alone, the exit stays as it is.",
+    classifyIntro: "Out {out}, back {back} ({minutes} min). This files an approved permission for the stretch: those minutes are charged at the employee's configured permission rate (their pay type's permission multiplier) — not excused, not free — and the day is worked out again under the existing rules. Left unclassified, the exit stays as it is.",
     classifyPermission: "Permission for a duration",
     classifyDuration: "Permission duration",
     classifyKindLabel: "Classification",
