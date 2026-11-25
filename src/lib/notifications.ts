@@ -3,6 +3,7 @@ import { HR_APPROVALS, canApprove, canReviewRequest, hasPermission, reviewsReque
 import { getT } from "@/lib/i18n";
 import { leaveTypeLabel } from "@/lib/i18n/labels";
 import { User } from "@/lib/types";
+import { canSeeMissingPunchReview, loadMissingPunchReview } from "@/lib/missing-punch-review";
 
 export interface AppNotification {
   id: string;
@@ -58,6 +59,24 @@ export async function getNotifications(user: User): Promise<NotificationFeed> {
         body: `${l.employee.name} — ${leaveTypeLabel(l.type, t)} — ${isoDay(l.from)} → ${isoDay(l.to)}`,
         at: l.createdAt.toISOString(),
         href: "/leaves",
+        actionable: true,
+        tone: "info",
+      });
+    }
+  }
+
+  // a day a punch was forgotten on waits for a person to look at it (a list only: nothing is charged by guessing)
+  if (canSeeMissingPunchReview(user)) {
+    const days = await loadMissingPunchReview(user);
+    pendingCount += days.length;
+    const reasonLabel = { missing_punch: t.notifications.punchReviewMissing, odd_punches: t.notifications.punchReviewOdd, permission_unused: t.notifications.punchReviewPermission };
+    for (const d of days.slice(0, PER_KIND)) {
+      items.push({
+        id: `punch-review-${d.employeeId}-${d.date}`,
+        title: t.notifications.punchReview,
+        body: `${d.name} — ${d.date} — ${reasonLabel[d.reason]}`,
+        at: new Date(`${d.date}T12:00:00.000Z`).toISOString(),
+        href: `/attendance?date=${d.date}`,
         actionable: true,
         tone: "info",
       });

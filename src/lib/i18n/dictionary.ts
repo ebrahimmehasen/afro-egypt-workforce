@@ -151,6 +151,10 @@ export interface Dictionary {
     workRequestPending: string;
     workRequestApproved: string;
     workRequestRejected: string;
+    punchReview: string;
+    punchReviewMissing: string;
+    punchReviewOdd: string;
+    punchReviewPermission: string;
     hours: string;
   };
   dashboard: {

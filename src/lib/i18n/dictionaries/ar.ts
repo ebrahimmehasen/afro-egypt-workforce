@@ -150,6 +150,10 @@ export const ar: Dictionary = {
     workRequestPending: "طلب جديد مستني موافقتك",
     workRequestApproved: "اتوافق على طلبك",
     workRequestRejected: "اترفض طلبك",
+    punchReview: "يوم محتاج مراجعة بصمة",
+    punchReviewMissing: "بصمة ناقصة",
+    punchReviewOdd: "بصمات الخروج والرجوع مش متزوّجة",
+    punchReviewPermission: "إذن معتمد من غير بصمة خروج",
     hours: "ساعة",
   },
   dashboard: {

@@ -150,6 +150,10 @@ export const en: Dictionary = {
     workRequestPending: "A new request is waiting for you",
     workRequestApproved: "Your request was approved",
     workRequestRejected: "Your request was rejected",
+    punchReview: "A day needs a punch review",
+    punchReviewMissing: "A punch is missing",
+    punchReviewOdd: "Exit and return punches don't pair up",
+    punchReviewPermission: "Approved permission with no exit punch",
     hours: "h",
   },
   dashboard: {
