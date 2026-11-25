@@ -518,6 +518,7 @@ export interface Dictionary {
     kindTemporary: string;
     kindEarlyLeave: string;
     kindHint: string;
+    punchReminder: string;
     kindUnknown: string;
     colTime: string;
     timeAndDuration: string;

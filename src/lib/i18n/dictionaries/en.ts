@@ -515,6 +515,7 @@ export const en: Dictionary = {
     formDuration: "Duration (minutes)",
     kindTemporary: "Temporary permission — expected back at {back}",
     kindEarlyLeave: "This permission will be treated as leaving early — no return punch is expected",
+    punchReminder: "Remind the employee to punch the fingerprint device when leaving and again when coming back. The permission is counted from the actual out and in punches, not only the written time, and time past the permission is charged according to the account settings.",
     kindHint: "The permission's time is deducted minute for minute at the permission multiplier; time past it, or out without permission, at their own multipliers",
     kindUnknown: "Enter the time and duration to see how this permission will be treated",
     colTime: "Time & duration",

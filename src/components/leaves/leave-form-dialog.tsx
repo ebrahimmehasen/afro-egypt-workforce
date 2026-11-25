@@ -20,6 +20,7 @@ import { Employee, LeaveType } from "@/lib/types";
 import type { LeaveBalance } from "@/lib/leave-balance";
 import { LeaveBalanceCard } from "@/components/leaves/leave-balance-card";
 import { PermissionDurationPicker } from "@/components/leaves/permission-duration-picker";
+import { PunchReminder } from "@/components/leaves/punch-reminder";
 import { today } from "@/lib/today";
 import { format } from "@/lib/i18n/format";
 import { PayTypeRules, ScheduleTimes, at, dayTimes, isTime } from "@/lib/pay-engine";
@@ -149,6 +150,7 @@ export function LeaveFormDialog({
                 </div>
               </div>
               <PermissionDurationPicker startTime={startTime} onMinutesChange={setDuration} />
+              <PunchReminder />
               <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
                 <p className="font-medium text-foreground">{kindLine}</p>
                 <p className="mt-1 text-muted-foreground">{t.leaves.kindHint}</p>
