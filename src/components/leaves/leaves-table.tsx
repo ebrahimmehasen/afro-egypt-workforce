@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { toast } from "sonner";
-import { Check, X, CalendarDays } from "lucide-react";
+import { Check, X, CalendarDays, Printer } from "lucide-react";
 import { Leave, Employee } from "@/lib/types";
 import { decideLeave } from "@/lib/actions/leaves";
 import { leaveTypeLabel } from "@/lib/i18n/labels";
@@ -60,6 +60,7 @@ export function LeavesTable({
             <TableHead>{t.leaves.colReason}</TableHead>
             <TableHead>{t.leaves.colStatus}</TableHead>
             <TableHead>{t.leaves.colApprovedBy}</TableHead>
+            <TableHead>{t.leaves.colPaper}</TableHead>
             {(canApprove || canDelete) && <TableHead className="text-end">{t.leaves.colActions}</TableHead>}
           </TableRow>
         </TableHeader>
@@ -90,6 +91,14 @@ export function LeavesTable({
                 <TableCell className="max-w-[220px] truncate text-muted-foreground">{l.reason}</TableCell>
                 <TableCell><RequestStatusBadge status={l.status} /></TableCell>
                 <TableCell className="text-muted-foreground">{l.approvedBy ?? "—"}</TableCell>
+                <TableCell>
+                  {/* the printable paper of this request: the same rows the list shows, so the same people can open it */}
+                  <Button asChild size="icon" variant="ghost" title={t.leaves.printPaper}>
+                    <a href={`/leave-paper/${l.id}`} target="_blank" rel="noopener noreferrer" aria-label={t.leaves.printPaper}>
+                      <Printer className="h-4 w-4" />
+                    </a>
+                  </Button>
+                </TableCell>
                 {(canApprove || canDelete) && (
                   <TableCell className="text-end">
                     {l.status === "pending" ? (canApprove ? (

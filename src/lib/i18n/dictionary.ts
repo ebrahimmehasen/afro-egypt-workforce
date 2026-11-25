@@ -533,6 +533,8 @@ export interface Dictionary {
     untilResult: string;
     errUntilNotLater: string;
     errUntilInvalid: string;
+    colPaper: string;
+    printPaper: string;
     errOutsideHours: string;
     errOverlap: string;
     errDayOff: string;
@@ -710,6 +712,32 @@ export interface Dictionary {
     selectPeriod: string;
     year: string;
     month: string;
+  };
+  leavePaper: {
+    title: string;
+    back: string;
+    print: string;
+    employeeName: string;
+    employeeId: string;
+    leaveType: string;
+    requestDate: string;
+    from: string;
+    to: string;
+    days: string;
+    chargedDays: string;
+    chargedDaysNote: string;
+    time: string;
+    reason: string;
+    status: string;
+    statusPending: string;
+    statusApproved: string;
+    statusRejected: string;
+    approvedBy: string;
+    bannerPending: string;
+    bannerRejected: string;
+    signatureEmployee: string;
+    signatureManagement: string;
+    signatureDate: string;
   };
   payslip: {
     back: string;

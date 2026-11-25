@@ -4,7 +4,7 @@ import { Role } from "@/lib/types";
 
 const SESSION_COOKIE = "afro_egypt_session";
 const PUBLIC_PATHS = ["/login"];
-const ALWAYS_ALLOWED = ["/dashboard", "/payslip"];
+const ALWAYS_ALLOWED = ["/dashboard", "/payslip", "/leave-paper"];
 
 /**
  * Reads role + permissions out of the signed session cookie WITHOUT verifying
