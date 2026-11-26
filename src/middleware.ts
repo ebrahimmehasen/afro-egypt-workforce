@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canAccess } from "@/lib/permissions";
+import { isPublicPath } from "@/lib/public-paths";
 import { Role } from "@/lib/types";
 
 const SESSION_COOKIE = "afro_egypt_session";
-const PUBLIC_PATHS = ["/login"];
 const ALWAYS_ALLOWED = ["/dashboard", "/payslip", "/leave-paper"];
 
 /**
@@ -31,7 +31,7 @@ export function middleware(request: NextRequest) {
   const sessionRaw = request.cookies.get(SESSION_COOKIE)?.value;
   const hasSession = Boolean(sessionRaw);
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  const isPublic = isPublicPath(pathname);
 
   if (!hasSession && !isPublic) {
     const url = request.nextUrl.clone();

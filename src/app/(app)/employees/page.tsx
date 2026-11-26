@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Clock3 } from "lucide-react";
+import { Clock3, UserPlus } from "lucide-react";
 import { getDb } from "@/lib/data";
 import { getT } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,8 @@ import { requireAccess } from "@/lib/auth";
 import { employeesInScope, viewerScope } from "@/lib/scope";
 import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
 import { missingAcknowledgmentKeys, requiredAcknowledgmentKeys } from "@/lib/acknowledgments";
-import { hasPermission } from "@/lib/permissions";
+import { canManageApplications, hasPermission } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
 import { isArchived } from "@/lib/employee-order";
 import { EmployeesView } from "@/components/employees/employees-view";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
@@ -20,6 +21,9 @@ export default async function EmployeesPage() {
   // "كشف الإضافي" is the overtime page's statement: shown only to who may open it
   const canSeeOvertime = hasPermission(user, "overtime");
   const t = await getT();
+  // job applications: admin, or HR with the employees grant (never a department head)
+  const canSeeApplications = canManageApplications(user);
+  const newApplications = canSeeApplications ? await prisma.jobApplication.count({ where: { status: "new" } }) : 0;
 
   const employees = employeesInScope(viewerScope(user, db.employees), db.employees);
   const formOptions = employeeFormOptions(await loadPayContext());
@@ -59,8 +63,17 @@ export default async function EmployeesPage() {
         incompleteDocIds={incompleteDocIds}
         photoUrls={photoUrls}
         headerActions={
-          canEdit || canSeeOvertime ? (
+          canEdit || canSeeOvertime || canSeeApplications ? (
             <>
+              {canSeeApplications && (
+                <Button asChild variant="outline" className="gap-2">
+                  <Link href="/employees/applications">
+                    <UserPlus className="h-4 w-4" />
+                    {t.recruitment.admin.applicationsButton}
+                    {newApplications > 0 && <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{newApplications}</span>}
+                  </Link>
+                </Button>
+              )}
               {canSeeOvertime && (
                 <Button asChild variant="outline" className="gap-2">
                   <Link href="/overtime/statement">

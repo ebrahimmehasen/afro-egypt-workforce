@@ -158,3 +158,12 @@ export function canManageEmployeeFiles(user: SessionLike): boolean {
 export function canUseAssistant(user: SessionLike): boolean {
   return user.role === "admin";
 }
+
+/**
+ * Job applications, the jobs they are for and the public form's configuration: the system admin, or an HR account holding the
+ * "employees" grant. The same audience as the employee files, deliberately no wider: a supervisor or department head
+ * never sees applicants, and no new permission exists for it.
+ */
+export function canManageApplications(user: SessionLike): boolean {
+  return canManageEmployeeFiles(user);
+}
