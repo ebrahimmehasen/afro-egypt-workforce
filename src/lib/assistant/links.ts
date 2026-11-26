@@ -13,6 +13,7 @@ export const ASSISTANT_LINK_ROOTS = [
   "departments",
   "employees",
   "leaves",
+  "missions",
   "overtime",
   "payroll",
   "permissions",

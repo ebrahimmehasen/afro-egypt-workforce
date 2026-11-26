@@ -5,6 +5,7 @@ import { dayStr, toDailyAttendance } from "@/lib/serialize";
 import { DailyAttendance } from "@/lib/types";
 import { PayContext, effectiveShift, kindOf, loadPayContext } from "@/lib/pay-context";
 import { withoutQuarantined } from "@/lib/punch-quarantine";
+import { isFullDayMission, missionWindowForDay } from "@/lib/missions";
 
 /** yyyy-MM-dd for each calendar day in [from, to] inclusive. */
 export function datesInRange(from: string, to: string): string[] {
@@ -59,17 +60,26 @@ export async function recalculateDailyAttendance(
   );
 
   const dateOnly = new Date(`${date}T00:00:00.000Z`);
-  const leave = await prisma.leave.findFirst({
-    where: {
-      employeeId,
-      status: "approved",
-      from: { lte: dateOnly },
-      to: { gte: dateOnly },
-    },
-  });
+  const [leave, mission] = await Promise.all([
+    prisma.leave.findFirst({
+      where: {
+        employeeId,
+        status: "approved",
+        from: { lte: dateOnly },
+        to: { gte: dateOnly },
+      },
+    }),
+    prisma.mission.findFirst({
+      where: { employeeId, status: "approved", from: { lte: dateOnly }, to: { gte: dateOnly } },
+    }),
+  ]);
   // A permission for the rest of the day is not a day off: the person works part of the day, and the time
   // they leave early is charged at the permission rate by the pay rules instead of as leaving without one.
   const fullDayLeave = leave && leave.type !== "permission" ? leave : null;
+  // A Mission is not a leave type (owner spec): a date-range one covers the whole day the same way a full-day
+  // leave does (no deduction); a timed one only covers its own window, handled inside computeDailyAttendance.
+  const fullDayMission = mission && isFullDayMission(mission) ? mission : null;
+  const timedMission = mission && !isFullDayMission(mission) ? missionWindowForDay(mission, date) : null;
 
   const computed = computeDailyAttendance({
     employeeId,
@@ -83,13 +93,14 @@ export async function recalculateDailyAttendance(
       punchType: l.punchType,
       source: l.source,
     })),
-    isOnApprovedLeave: Boolean(fullDayLeave),
+    isOnApprovedLeave: Boolean(fullDayLeave) || Boolean(fullDayMission),
     leaveType:
-      fullDayLeave?.type === "mission"
+      fullDayMission || fullDayLeave?.type === "mission"
         ? "mission"
         : fullDayLeave?.type === "excused_absence"
           ? "excused_absence"
           : "leave",
+    mission: timedMission ?? undefined,
   });
 
   // Work on the weekly day off or a public holiday has no start to be late for and no end to leave before.

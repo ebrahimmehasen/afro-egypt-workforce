@@ -15,6 +15,7 @@ import {
   toEmployeeAcknowledgment,
   toEmployeeDocument,
   toLeave,
+  toMission,
   toOvertime,
   toPayrollPeriod,
   toPayrollRecord,
@@ -54,6 +55,7 @@ export async function getDb(): Promise<Store> {
     shifts,
     dailyAttendance,
     leaves,
+    missions,
     overtime,
     deductions,
     allowances,
@@ -74,6 +76,7 @@ export async function getDb(): Promise<Store> {
     prisma.shift.findMany({ where: { deletedAt: null }, orderBy: { id: "asc" } }),
     prisma.dailyAttendance.findMany({ orderBy: { date: "asc" } }),
     prisma.leave.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.mission.findMany({ orderBy: { createdAt: "desc" } }),
     // a system addition someone removed is kept only so it isn't posted again - it no longer counts
     prisma.overtime.findMany({ where: { voidedAt: null }, orderBy: [{ date: "desc" }, { createdAt: "desc" }] }),
     // a system deduction someone removed is kept only so it isn't posted again - it no longer counts
@@ -96,6 +99,7 @@ export async function getDb(): Promise<Store> {
     // one-punch days of a shift still running read as present, see withOpenShift
     dailyAttendance: dailyAttendance.map((a) => withOpenShift(toDailyAttendance(a))),
     leaves: leaves.map(toLeave),
+    missions: missions.map(toMission),
     overtime: overtime.map(toOvertime),
     deductions: deductions.map(toDeduction),
     allowances: allowances.map(toAllowance),

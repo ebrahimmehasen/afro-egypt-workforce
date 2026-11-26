@@ -9,6 +9,7 @@ import {
   EmployeeAcknowledgment,
   EmployeeDocument,
   Leave,
+  Mission,
   Overtime,
   PayrollPeriod,
   PayrollRecord,
@@ -29,6 +30,7 @@ export interface Store {
   shifts: Shift[];
   dailyAttendance: DailyAttendance[]; // calculated, correctable
   leaves: Leave[];
+  missions: Mission[];
   overtime: Overtime[];
   deductions: Deduction[];
   allowances: Allowance[];

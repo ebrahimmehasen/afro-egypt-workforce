@@ -112,6 +112,9 @@ export interface MidDayInput {
   dayEnd: Date;
   permissions: TimedPermission[];
   graceMinutes: number;
+  /** A timed Mission's window that day, if any: minutes a plain (no-permission) exit spends inside it are not
+   * charged — the owner's rule that a mission explains only the minutes actually inside its own window. */
+  missionWindow?: { start: Date; end: Date | null } | null;
   /**
    * Corrected by HR: their check-in and check-out stand, and the device's punches in between are not read — unless HR
    * has entered a punch after reviewing the day (source HR_REVIEW_SOURCE), in which case those and the device's middle
@@ -150,6 +153,14 @@ function splitAgainst(out: Date, minutes: number, p: TimedPermission) {
 
 /** Does a stretch [out, back] touch the permission's window at all? Only then is it that permission's. */
 const overlaps = (out: Date, back: Date, p: TimedPermission) => out.getTime() < endOf(p).getTime() && back.getTime() > p.start.getTime();
+
+/** Minutes of [a, b] that fall inside a mission window (open-ended — no `end` yet — covers everything from its start on). */
+export function missionOverlapMinutes(a: Date, b: Date, w?: { start: Date; end: Date | null } | null): number {
+  if (!w) return 0;
+  const start = Math.max(a.getTime(), w.start.getTime());
+  const end = Math.min(b.getTime(), w.end ? w.end.getTime() : b.getTime());
+  return Math.max(0, (end - start) / MS_PER_MIN);
+}
 
 export function analyzeMidDay(input: MidDayInput): MidDayAnalysis {
   const { actualIn, actualOut, dayEnd, graceMinutes } = input;
@@ -206,7 +217,8 @@ export function analyzeMidDay(input: MidDayInput): MidDayAnalysis {
         const candidates = permissions.filter((p) => overlaps(out, back, p) && !(kindOf(p) === "temporary" && used.has(p.id)));
         const permission = candidates.sort((a, b) => Math.abs(a.start.getTime() - out.getTime()) - Math.abs(b.start.getTime() - out.getTime()))[0];
         if (!permission) {
-          intervals.push({ case: 6, out, back, minutes, permission: null, permissionMinutes: 0, overrunMinutes: 0, overrunCharged: 0, unauthorizedMinutes: minutes, unauthorizedCharged: afterGrace(minutes, graceMinutes) });
+          const chargeable = Math.max(0, minutes - missionOverlapMinutes(out, back, input.missionWindow));
+          intervals.push({ case: 6, out, back, minutes, permission: null, permissionMinutes: 0, overrunMinutes: 0, overrunCharged: 0, unauthorizedMinutes: chargeable, unauthorizedCharged: afterGrace(chargeable, graceMinutes) });
           continue;
         }
         used.add(permission.id);

@@ -44,6 +44,12 @@ export interface ComputeDailyAttendanceInput {
   logs: AttendanceLog[]; // all raw logs for this employee on this date (already filtered)
   isOnApprovedLeave: boolean;
   leaveType?: "mission" | "excused_absence" | "leave";
+  /**
+   * A timed Mission window covering part of this day (a date-range Mission is handled upstream like a full-day
+   * leave instead — see attendance-service.ts). `end` is null while the employee hasn't returned and HR hasn't
+   * confirmed when the mission ended yet.
+   */
+  mission?: { start: Date; end: Date | null };
 }
 
 export interface ComputedAttendance {
@@ -63,8 +69,39 @@ export interface ComputedAttendance {
  * Core attendance calculation. First punch of the day = IN, last punch = OUT.
  * Grace period distinguishes "actual lateness" from "deductible lateness" per spec §20.
  */
+/**
+ * A timed Mission explains some of a day's lateness/early-leave/missing punch: time on a mission inside
+ * working hours is normal worked time, no deduction, and time past the official end is overtime (§ owner
+ * spec). Scoped per day, not per minute: when the mission reaches back to the shift's start it clears that
+ * day's whole late charge, and when it reaches (or outlasts) the final punch it clears the whole early-leave
+ * charge — a day the mission only partly explains still has to be reviewed by HR like any other exception.
+ */
+function applyMission(computed: ComputedAttendance, mission: { start: Date; end: Date | null }, scheduledStart: Date, scheduledEnd: Date): ComputedAttendance {
+  if (!computed.actualIn) return computed;
+
+  if (!computed.actualOut) {
+    if (!mission.end) return computed; // not resolved yet — HR must set confirmedEnd/durationMinutes or correct the punch
+    const effectiveOut = mission.end.getTime() > scheduledEnd.getTime() ? mission.end : scheduledEnd;
+    const workedMinutes = Math.max(0, Math.round((effectiveOut.getTime() - computed.actualIn.getTime()) / 60000));
+    const shiftDurationMinutes = Math.round((scheduledEnd.getTime() - scheduledStart.getTime()) / 60000);
+    const overtimeMinutes = Math.max(0, Math.round((effectiveOut.getTime() - scheduledEnd.getTime()) / 60000));
+    return { ...computed, actualOut: effectiveOut, earlyLeaveMinutes: 0, workedMinutes, overtimeMinutes, status: "mission" };
+  }
+
+  const lateExplained = mission.start.getTime() <= scheduledStart.getTime();
+  const earlyExplained = !mission.end || mission.end.getTime() >= computed.actualOut.getTime();
+
+  return {
+    ...computed,
+    lateMinutes: lateExplained ? 0 : computed.lateMinutes,
+    deductibleLateMinutes: lateExplained ? 0 : computed.deductibleLateMinutes,
+    earlyLeaveMinutes: earlyExplained ? 0 : computed.earlyLeaveMinutes,
+    status: "mission",
+  };
+}
+
 export function computeDailyAttendance(input: ComputeDailyAttendanceInput): ComputedAttendance {
-  const { shift, logs, date, isOnApprovedLeave, leaveType } = input;
+  const { shift, logs, date, isOnApprovedLeave, leaveType, mission } = input;
   const { scheduledStart, scheduledEnd } = getShiftWindow(date, shift);
 
   const sorted = [...logs].sort(
@@ -109,7 +146,7 @@ export function computeDailyAttendance(input: ComputeDailyAttendanceInput): Comp
     // Only one punch recorded — HR must review, do not auto-mark absent (spec §23)
     const lateMinutes = Math.max(0, Math.round((actualIn.getTime() - scheduledStart.getTime()) / 60000));
     const deductibleLateMinutes = Math.max(0, lateMinutes - shift.gracePeriodMinutes);
-    return {
+    const result: ComputedAttendance = {
       scheduledStart,
       scheduledEnd,
       actualIn,
@@ -121,6 +158,7 @@ export function computeDailyAttendance(input: ComputeDailyAttendanceInput): Comp
       overtimeMinutes: 0,
       status: "missing_punch",
     };
+    return mission ? applyMission(result, mission, scheduledStart, scheduledEnd) : result;
   }
 
   const lateMinutes = Math.max(0, Math.round((actualIn.getTime() - scheduledStart.getTime()) / 60000));
@@ -134,7 +172,7 @@ export function computeDailyAttendance(input: ComputeDailyAttendanceInput): Comp
   if (deductibleLateMinutes > 0) status = "late";
   else if (earlyLeaveMinutes > 0) status = "early_leave";
 
-  return {
+  const result: ComputedAttendance = {
     scheduledStart,
     scheduledEnd,
     actualIn,
@@ -146,6 +184,7 @@ export function computeDailyAttendance(input: ComputeDailyAttendanceInput): Comp
     overtimeMinutes,
     status,
   };
+  return mission ? applyMission(result, mission, scheduledStart, scheduledEnd) : result;
 }
 
 /**
@@ -158,6 +197,7 @@ export function computeFromActuals(
   shift: Shift,
   actualIn: Date | null,
   actualOut: Date | null,
+  mission?: { start: Date; end: Date | null },
 ): ComputedAttendance {
   if (!actualIn) {
     return {
@@ -178,7 +218,7 @@ export function computeFromActuals(
   const deductibleLateMinutes = Math.max(0, lateMinutes - shift.gracePeriodMinutes);
 
   if (!actualOut) {
-    return {
+    const result: ComputedAttendance = {
       scheduledStart,
       scheduledEnd,
       actualIn,
@@ -190,6 +230,7 @@ export function computeFromActuals(
       overtimeMinutes: 0,
       status: "missing_punch",
     };
+    return mission ? applyMission(result, mission, scheduledStart, scheduledEnd) : result;
   }
 
   const earlyLeaveMinutes = Math.max(0, Math.round((scheduledEnd.getTime() - actualOut.getTime()) / 60000));
@@ -201,7 +242,7 @@ export function computeFromActuals(
   if (deductibleLateMinutes > 0) status = "late";
   else if (earlyLeaveMinutes > 0) status = "early_leave";
 
-  return {
+  const result: ComputedAttendance = {
     scheduledStart,
     scheduledEnd,
     actualIn,
@@ -213,6 +254,7 @@ export function computeFromActuals(
     overtimeMinutes,
     status,
   };
+  return mission ? applyMission(result, mission, scheduledStart, scheduledEnd) : result;
 }
 
 /**

@@ -36,7 +36,9 @@ function SubmitButton() {
   return <Button type="submit" disabled={pending}>{pending ? t.common.saving : t.leaves.submitRequest}</Button>;
 }
 
-const LEAVE_TYPES: LeaveType[] = ["annual", "casual", "sick", "unpaid", "mission", "permission", "excused_absence"];
+// "mission" is no longer offered here — missions are their own thing now (see /missions). Older approved
+// mission leave rows keep working exactly as before (full-day, no deduction); this just stops new ones.
+const LEAVE_TYPES: LeaveType[] = ["annual", "casual", "sick", "unpaid", "permission", "excused_absence"];
 
 /** An employee's working times and Thursday rule, for telling a temporary permission from leaving early. */
 export type PermissionDayRules = { schedule: ScheduleTimes; rules: Pick<PayTypeRules, "thursdayRuleEnabled" | "thursdayWorkEnd"> };
