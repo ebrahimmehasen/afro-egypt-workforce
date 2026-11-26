@@ -850,6 +850,8 @@ model CaseProof {
 
   /// Every employee the case is about (one, or a group). The employeeId / departmentId above stay as the first of them.
   links CaseProofEmployee[]
+  /// Every photo of the case, in upload order. photoKey/photoMime/photoSize above stay as the first of them (back-compat).
+  photos CaseProofPhoto[]
 }
 
 /// One employee a case is attached to. A case about a group has one row per employee; the case shows under each of them.
@@ -865,4 +867,23 @@ model CaseProofEmployee {
 
   @@unique([caseProofId, employeeId])
   @@index([employeeId])
+}
+
+/// One photo of a case, in upload order (position 0 is first). A case can carry more than one photo at once; adding or
+/// removing one re-asks the AI for a draft of the whole set. Deleting the case deletes its photo rows (the files on disk
+/// are removed by the same code path that deletes the row).
+model CaseProofPhoto {
+  id          String    @id @default(cuid())
+  caseProofId String
+  caseProof   CaseProof @relation(fields: [caseProofId], references: [id], onDelete: Cascade)
+  /// The photo: a random key relative to the private storage root (storage/uploads/case-proof), never a URL.
+  photoKey    String
+  photoMime   String
+  photoSize   Int
+  position    Int
+  createdAt   DateTime  @default(now())
+
+  /// Also what makes the migration's backfill (INSERT IGNORE) safe to run twice: a second run re-inserting the same
+  /// case's position 0 is simply ignored, never duplicated.
+  @@unique([caseProofId, position])
 }
