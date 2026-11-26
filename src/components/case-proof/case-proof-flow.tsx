@@ -91,9 +91,9 @@ export function CasePhotos({ caseId, photos, canEdit, initialDraft = null }: { c
                   disabled={busy !== null}
                   aria-label={c.removePhoto}
                   data-testid="remove-photo"
-                  className="absolute end-1 top-1 rounded-full bg-background/90 p-1 text-destructive opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 disabled:opacity-50"
+                  className="absolute end-1 top-1 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-destructive shadow disabled:opacity-50"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-4 w-4" />
                 </button>
               )}
             </div>
@@ -103,7 +103,7 @@ export function CasePhotos({ caseId, photos, canEdit, initialDraft = null }: { c
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         <span data-testid="photos-count">{format(c.photosCount, { count: list.length })}</span>
         {canEdit && list.length < L.maxPhotosPerCase && (
-          <label className="cursor-pointer text-primary hover:underline">
+          <label className="inline-flex min-h-10 cursor-pointer items-center rounded-md border border-input px-3 text-sm text-primary hover:bg-muted">
             {busy === "add" ? c.addingPhotos : c.addMorePhotos}
             <input type="file" accept={CASE_PHOTO_ACCEPT_ATTR} multiple className="sr-only" onChange={handleAdd} disabled={busy !== null} />
           </label>
@@ -253,7 +253,7 @@ export function CaseProofFlow({ employees }: { employees: PickEmployee[] }) {
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="cp-photo">{c.photoLabel}</Label>
-        <Input id="cp-photo" name="photo" type="file" accept={CASE_PHOTO_ACCEPT_ATTR} capture="environment" multiple required />
+        <Input id="cp-photo" name="photo" type="file" accept={CASE_PHOTO_ACCEPT_ATTR} multiple required />
         <p className="text-xs text-muted-foreground">{format(c.photoHint, { size: Math.round(L.maxPhotoBytes / (1024 * 1024)), max: L.maxPhotosPerCase })}</p>
       </div>
       <p className="text-xs text-muted-foreground">{c.aiPrivacy}</p>
