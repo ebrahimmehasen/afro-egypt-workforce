@@ -12,7 +12,7 @@ import { DayCharge, leaveCharges } from "@/lib/leave-balance";
 import { trackedAbsentDays } from "@/lib/leave-days";
 import { withoutQuarantined } from "@/lib/punch-quarantine";
 import { punchEngineSource } from "@/lib/hr-review-punch";
-import { isFullDayMission } from "@/lib/missions";
+import { isFullDayMission, missionWindowForDay } from "@/lib/missions";
 
 // Posts what each finished day of attendance costs and earns, by the employee's pay-type rules: deductions
 // (absence, lateness, permission, leaving without permission) to the Deduction table and additions
@@ -193,6 +193,8 @@ export function systemEntriesFor(
   charge?: DayCharge,
   /** the day's punches and approved timed permissions, for the exits in the middle of the day */
   midDay?: Omit<NonNullable<DayPayInput["midDay"]>, "corrected">,
+  /** a timed Mission's window that day: only the minutes inside it are not late/exit-charged */
+  missionWindow?: { start: Date; end: Date | null } | null,
 ): { deductions: SystemDeduction[]; additions: SystemAddition[] } {
   const deductions: SystemDeduction[] = [];
   const additions: SystemAddition[] = [];
@@ -230,6 +232,7 @@ export function systemEntriesFor(
     actualOut: day.actualOut,
     hasPermission,
     midDay: midDay ? { ...midDay, corrected: day.corrected } : undefined,
+    missionWindow,
   });
   for (const item of pay.items) {
     if (item.amount <= 0) continue;
@@ -371,6 +374,15 @@ export async function postAttendanceDeductions(now: Date = new Date()): Promise<
     // a permission with a time isn't the day's leave: it is read against the punches (mid-day-exits.ts)
     const leave = onDay.find((l) => !isTimedPermission(l)) ?? null;
     const window = punchWindow(date, effectiveShift(ctx, employee, date));
+    // A Mission that day explains the late/exit minutes actually inside its window (owner spec): a date-range
+    // mission covers the whole scheduled day, same as before; a timed one only its own start/end — lateness
+    // before it, or an exit outside it, still counts under the normal rules.
+    const dayMission = missions.find((m) => m.employeeId === d.employeeId && dayStr(m.from) <= date && dayStr(m.to) >= date);
+    const missionWindow = dayMission
+      ? isFullDayMission(dayMission)
+        ? { start: d.scheduledStart, end: d.scheduledEnd }
+        : missionWindowForDay(dayMission, date)
+      : undefined;
     const entries = systemEntriesFor(
       { employeeId: d.employeeId, date, status: d.status, actualIn: d.actualIn, actualOut: d.actualOut, scheduledStart: d.scheduledStart, corrected: Boolean(d.correctionReason) },
       employee,
@@ -385,17 +397,9 @@ export async function postAttendanceDeductions(now: Date = new Date()): Promise<
           .map((l) => ({ at: l.timestamp, source: punchEngineSource(l) })),
         permissions: timedPermissions(onDay),
       },
+      missionWindow,
     );
-    // A Mission that day explains the late/exit it would otherwise charge (owner spec: no late, early-leave,
-    // absence or exit deduction for a day a mission covers). SystemDeduction has no per-minute breakdown, so
-    // this clears the whole day once a mission applies rather than only the minutes inside its window — fine
-    // for the ordinary one-mission-a-day case; overtime (a separate "addition") is unaffected either way.
-    const dayMission = missions.find((m) => m.employeeId === d.employeeId && dayStr(m.from) <= date && dayStr(m.to) >= date);
-    const deductions = dayMission
-      ? entries.deductions.filter((x) => !["late", "unauthorized_exit", "permission_overrun", "absence"].includes(x.type))
-      : entries.deductions;
-
-    desiredDeductions.push(...deductions);
+    desiredDeductions.push(...entries.deductions);
     desiredAdditions.push(...entries.additions);
   }
 

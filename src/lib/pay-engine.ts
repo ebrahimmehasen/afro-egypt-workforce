@@ -4,7 +4,7 @@
 // /settings. So changing overtime to 2×, or adding a new pay type, never needs a code change.
 
 import { addDays } from "@/lib/today";
-import { DayPunch, MidDayAnalysis, analyzeMidDay } from "@/lib/mid-day-exits";
+import { DayPunch, MidDayAnalysis, analyzeMidDay, missionOverlapMinutes } from "@/lib/mid-day-exits";
 
 export type PayBasis = "monthly" | "daily";
 
@@ -170,6 +170,9 @@ export interface DayPayInput {
   actualOut: Date | null;
   /** An approved permission to leave for the rest of the day. */
   hasPermission: boolean;
+  /** A timed Mission's window that day, if any: minutes inside it are not late/exit-charged (owner spec) —
+   * only the minutes the window doesn't reach still count under the normal rules. */
+  missionWindow?: { start: Date; end: Date | null } | null;
   /**
    * The day's punches and its approved permissions that have a time, for the exits in the middle of the day
    * (see mid-day-exits.ts). Left out, the day is charged exactly as before.
@@ -231,7 +234,8 @@ export function computeDayPay(input: DayPayInput): DayPay {
     return { ...empty, workedMinutes };
   }
 
-  const rawLate = Math.max(0, (actualIn.getTime() - times.start.getTime()) / MS_PER_MIN);
+  // the mission already explains being away for part of that morning — only the minutes it doesn't reach still count
+  const rawLate = Math.max(0, (actualIn.getTime() - times.start.getTime()) / MS_PER_MIN - missionOverlapMinutes(times.start, actualIn, input.missionWindow));
   const lateMinutes = rawLate > rules.graceMinutes ? rawLate - rules.graceMinutes : 0;
   item("late", "deduction", lateMinutes, rules.lateMultiplier);
 
@@ -248,6 +252,7 @@ export function computeDayPay(input: DayPayInput): DayPay {
         permissions: input.midDay.permissions.map((p) => ({ id: p.id, start: at(input.date, p.startTime, schedule.start), durationMinutes: p.durationMinutes })),
         graceMinutes: rules.graceMinutes,
         corrected: input.midDay.corrected,
+        missionWindow: input.missionWindow,
       })
     : null;
   const final = midDay?.finalExit;

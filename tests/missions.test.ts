@@ -21,6 +21,8 @@ const { runAttendanceEffects } = await import("@/lib/attendance-effects");
 const { loadPayContext, scheduleFor } = await import("@/lib/pay-context");
 const { payPeriodOf } = await import("@/lib/pay-rules");
 const { at } = await import("@/lib/pay-engine");
+const { calculatePeriodRecords, previewRecalculation } = await import("@/lib/payroll-recalc");
+const { getDictionary } = await import("@/lib/i18n");
 
 const prisma = new PrismaClient();
 let sampleDb = false;
@@ -142,6 +144,33 @@ describe.skipIf(!sampleDb)("missions, on real rows", () => {
     expect((await deductionsOf(day)).map((d) => d.type)).not.toContain("unauthorized_exit");
   });
 
+  it("a timed mission does not excuse real lateness before its own window: the minutes before it still count", async () => {
+    const day = workdayBack(20, 30);
+    await punch(day, "09:45"); // 45 min late, shift starts at `start` (09:00) — the mission starts later, at noon
+    await punch(day, end);
+    await file({ employeeId: EMP, destination: "عميل", from: day, to: day, startTime: "12:00", endTime: "14:00" });
+    await refresh(day);
+    const late = (await deductionsOf(day)).find((d) => d.type === "late");
+    expect(late).toBeTruthy();
+    expect(late!.amount).toBeGreaterThan(0); // the 45 minutes are unrelated to the mission window — still charged in full
+  });
+
+  it("an exit outside the mission window is still charged; only the part inside it is not", async () => {
+    const day = workdayBack(20, 30);
+    // two separate mid-day exits: 11:00-12:00 (inside the mission, 11:00-13:00) and 15:00-16:00 (well outside it)
+    await punch(day, start);
+    await punch(day, "11:00");
+    await punch(day, "12:00");
+    await punch(day, "15:00");
+    await punch(day, "16:00");
+    await punch(day, end);
+    await file({ employeeId: EMP, destination: "عميل", from: day, to: day, startTime: "11:00", endTime: "13:00" });
+    await refresh(day);
+    const exit = (await deductionsOf(day)).find((d) => d.type === "unauthorized_exit");
+    expect(exit).toBeTruthy(); // the 15:00-16:00 exit, outside the mission, is still charged
+    expect(exit!.amount).toBeGreaterThan(0);
+  });
+
   it("a mission past the overtime start, with a return punch: overtime is posted from Settings values via the normal auto-overtime path", async () => {
     const day = workdayBack(20, 30);
     await punch(day, start);
@@ -205,6 +234,39 @@ describe.skipIf(!sampleDb)("missions, on real rows", () => {
     expect(daily?.status).toBe("mission");
     expect(daily?.deductibleLateMinutes).toBe(0);
     expect(await deductionsOf(day)).toEqual([]);
+  });
+
+  it("a mission on a day inside an approved period: payroll stays put until recalculation, and the preview shows why", async () => {
+    const day = workdayBack(40, 60); // far enough back to sit in its own, otherwise-undisturbed pay month
+    const ctx = await loadPayContext();
+    const { year, month } = payPeriodOf(day, ctx.payPeriodStartDay);
+    const t = getDictionary("ar");
+    const period = await prisma.payrollPeriod.create({ data: { label: "ZZ-mis-approved-preview", year, month, status: "calculated" } });
+    expect(await calculatePeriodRecords(period.id, ACTOR, t, { onlyIf: ["calculated"] })).toBe("done");
+    await prisma.payrollPeriod.update({ where: { id: period.id }, data: { status: "approved", approvedAt: new Date() } });
+    const before = await prisma.payrollRecord.findFirstOrThrow({ where: { periodId: period.id, employeeId: EMP } });
+
+    await new Promise((resolve) => setTimeout(resolve, 10)); // strictly after approvedAt
+    await punch(day, start);
+    await punch(day, "18:30"); // 90 min of overtime past the 17:00 end
+    await file({ employeeId: EMP, destination: "عميل", from: day, to: day, startTime: "16:00", endTime: "18:30" });
+    await refresh(day);
+
+    // the approved period's own stored figures are untouched by the posting
+    const after = await prisma.payrollRecord.findFirstOrThrow({ where: { periodId: period.id, employeeId: EMP } });
+    expect(after.netSalary).toBe(before.netSalary);
+
+    // the preview — read-only, "cancel" is simply not acting on it — shows the overtime and why
+    const changes = await previewRecalculation(period.id);
+    const mine = changes.find((c) => c.employeeId === EMP);
+    expect(mine).toBeDefined();
+    expect(mine!.reasons).toContainEqual(expect.objectContaining({ source: "overtime", action: "created" }));
+
+    // "cancel": nothing was applied by looking at the preview
+    const stillAfter = await prisma.payrollRecord.findFirstOrThrow({ where: { periodId: period.id, employeeId: EMP } });
+    expect(stillAfter.netSalary).toBe(before.netSalary);
+
+    await prisma.payrollPeriod.delete({ where: { id: period.id } });
   });
 
   it("refuses to create a mission in a closed pay period", async () => {
