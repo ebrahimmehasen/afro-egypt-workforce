@@ -10,8 +10,7 @@ import { getLocale } from "@/lib/i18n/locale";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { requestStatusLabel, deductionTypeLabel } from "@/lib/i18n/labels";
 import { canManageEmployeeFiles, hasPermission } from "@/lib/permissions";
-import { canUseDepartment } from "@/lib/case-proof/audience";
-import { loadCaseProofs } from "@/lib/case-proof/data";
+import { loadEmployeeCaseProofTab } from "@/lib/case-proof/data";
 import { EmployeeCases } from "@/components/case-proof/employee-cases";
 import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
 import { missingAcknowledgmentKeys, requiredAcknowledgmentKeys } from "@/lib/acknowledgments";
@@ -78,8 +77,8 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   const missingFilesCount = missingDocs.length + missingAcks.length;
   const canManageDocs = canManageEmployeeFiles(user);
   // case proofs: the admin and the supervisors of this employee's department only (nobody else sees the tab or the data)
-  const showCaseProof = canUseDepartment(user, employee.departmentId);
-  const caseProofs = showCaseProof ? await loadCaseProofs(user, { employeeId: employee.id, status: "saved" }) : [];
+  // (this page is keyed by the employee NUMBER in the URL; the tab reads by the employee's database id, employee.id)
+  const { show: showCaseProof, cases: caseProofs } = await loadEmployeeCaseProofTab(user, { id: employee.id, departmentId: employee.departmentId });
   const canEdit = hasPermission(user, "employees");
   const archived = isArchived(employee);
   // Annual-leave balance, worked out now from the hire date, this employee's leaves and the days they were absent

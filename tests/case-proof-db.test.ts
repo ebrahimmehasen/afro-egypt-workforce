@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
 import type { User } from "@/lib/types";
 import { ar } from "@/lib/i18n/dictionaries/ar";
@@ -28,7 +29,7 @@ vi.mock("@/lib/case-proof/ai-draft", () => ({
 const { POST: upload } = await import("@/app/api/case-proof/route");
 const { GET: photo } = await import("@/app/api/case-proof/[id]/photo/route");
 const { saveCaseProof, discardCaseProof } = await import("@/lib/actions/case-proof");
-const { loadCaseProofs } = await import("@/lib/case-proof/data");
+const { loadCaseProofs, loadCaseProof, loadEmployeeCaseProofTab } = await import("@/lib/case-proof/data");
 const { CASE_PROOF_STORAGE_ROOT } = await import("@/lib/case-proof/files");
 const { CASE_PROOF_LIMITS: L } = await import("@/lib/case-proof/config");
 
@@ -46,6 +47,7 @@ let deptA = "";
 let deptB = "";
 let empA = "";
 let empB = "";
+let empA2 = "";
 const png = () => new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
 
 let uid = 0;
@@ -55,13 +57,13 @@ const supA = () => mk({ role: "supervisor", departmentIds: [deptA], permissions:
 const supB = () => mk({ role: "supervisor", departmentIds: [deptB] });
 const hr = () => mk({ role: "hr", departmentIds: [deptA], permissions: ["employees", "attendance", "leaves"] });
 
-const request = (fields: Record<string, string>, file?: { bytes: Uint8Array; type: string; name?: string }, headers: Record<string, string> = {}) => {
+const request = (fields: Record<string, string | string[]>, file?: { bytes: Uint8Array; type: string; name?: string }, headers: Record<string, string> = {}) => {
   const form = new FormData();
-  for (const [k, v] of Object.entries(fields)) form.set(k, v);
+  for (const [k, v] of Object.entries(fields)) for (const one of Array.isArray(v) ? v : [v]) form.append(k, one);
   if (file) form.set("photo", new File([file.bytes as BlobPart], file.name ?? "problem.png", { type: file.type }));
   return new Request("http://localhost/api/case-proof", { method: "POST", body: form, headers }) as never;
 };
-const post = (who: User | null, employeeId: string, file: { bytes: Uint8Array; type: string } | null = { bytes: png(), type: "image/png" }) => {
+const post = (who: User | null, employeeId: string | string[], file: { bytes: Uint8Array; type: string } | null = { bytes: png(), type: "image/png" }) => {
   session = who;
   return upload(request({ employeeId }, file ?? undefined));
 };
@@ -96,6 +98,7 @@ beforeAll(async () => {
     prisma.employee.create({ data: { employeeNumber: `${TAG}-${n}`, name: `${TAG} Employee ${n}`, departmentId, jobTitle: "x", hireDate: new Date("2018-01-01"), shiftId: shift.id, basicSalary: 6000 } }).then((e) => e.id);
   empA = await employee("A", deptA);
   empB = await employee("B", deptB);
+  empA2 = await employee("A2", deptA);
 });
 
 afterAll(async () => {
@@ -187,7 +190,9 @@ describe.skipIf(!hasDb)("the AI draft and its fallback", () => {
     expect(body).toMatchObject({ draft: "A cracked carton on the packing line.", aiAvailable: true });
     expect(await prisma.caseProof.findUnique({ where: { id: body.id } })).toMatchObject({ aiDraft: "A cracked carton on the packing line.", aiGenerated: true, finalText: null, status: "draft" });
     expect(aiCalls).toHaveLength(1);
-    expect(aiCalls[0].context).toMatchObject({ department: `${TAG} A`, uploader: ACTOR, employee: `${TAG} Employee A` });
+    // the department and the uploader only: the employee name is never handed to the AI
+    expect(aiCalls[0].context).toEqual({ department: `${TAG} A`, uploader: ACTOR, locale: "ar" });
+    expect(JSON.stringify(aiCalls[0].context)).not.toContain("Employee");
     expect(aiCalls[0].image.mime).toBe("image/png");
   });
 
@@ -371,5 +376,174 @@ describe.skipIf(!hasDb)("it has no effect on punches, attendance, payroll or any
 
     expect(await tables()).toEqual(before);
     expect(await prisma.employee.findUnique({ where: { id: empA } })).toEqual(employeeBefore);
+  });
+});
+
+describe.skipIf(!hasDb)("a case about a group of employees", () => {
+  const rowCount = () => prisma.caseProof.count();
+  const linkCount = () => prisma.caseProofEmployee.count();
+
+  it("the admin may pick employees of several departments: one case, one link per employee, the first is the primary", async () => {
+    aiImpl = async () => ({ ok: true, text: "AI: a spilled pallet of cartons." });
+    const res = await post(admin(), [empA, empB, empA2]);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string; employees: number };
+    expect(body.employees).toBe(3);
+    const row = (await prisma.caseProof.findUnique({ where: { id: body.id }, include: { links: true } }))!;
+    expect(row).toMatchObject({ employeeId: empA, departmentId: deptA });
+    expect(row.links.map((l) => [l.employeeId, l.departmentId]).sort()).toEqual([[empA, deptA], [empA2, deptA], [empB, deptB]].sort());
+    // the draft was asked for once, with the departments and the uploader only
+    expect(aiCalls).toHaveLength(1);
+    expect(aiCalls[0].context).toEqual({ department: `${TAG} A, ${TAG} B`, uploader: ACTOR, locale: "ar" });
+    expect(JSON.stringify(aiCalls[0].context)).not.toContain("Employee");
+  });
+
+  it("a supervisor may pick several employees, all inside his own departments", async () => {
+    const res = await post(supA(), [empA, empA2]);
+    expect(res.status).toBe(200);
+    const { id } = (await res.json()) as { id: string };
+    expect(await prisma.caseProofEmployee.count({ where: { caseProofId: id } })).toBe(2);
+  });
+
+  it("ONE employee outside his departments refuses the whole request: nothing is created for the others, no file, no AI call", async () => {
+    const before = { rows: await rowCount(), links: await linkCount(), files: files().length };
+    aiImpl = async () => ({ ok: true, text: "must not be asked" });
+    for (const picked of [[empA, empB], [empB, empA], [empA, empA2, empB], [empA, "no-such-employee"], [empB]]) {
+      const res = await post(supA(), picked);
+      expect(res.status, picked.join()).toBe(403);
+      expect(await res.json()).toMatchObject({ error: "noEmployee" });
+    }
+    expect({ rows: await rowCount(), links: await linkCount(), files: files().length }).toEqual(before);
+    expect(aiCalls).toEqual([]);
+  });
+
+  it("HR is refused for a group too, even holding every grant and the same department; so are an employee, a staff account and anonymous", async () => {
+    const before = { rows: await rowCount(), links: await linkCount(), files: files().length };
+    for (const [who, status] of [[hr(), 403], [mk({ role: "employee" }), 403], [mk({ role: "staff", departmentIds: [deptA] }), 403], [null, 401]] as const) {
+      expect((await post(who, [empA, empA2])).status).toBe(status);
+    }
+    expect({ rows: await rowCount(), links: await linkCount(), files: files().length }).toEqual(before);
+  });
+
+  it("the same employee twice counts once; more than the limit is refused", async () => {
+    const res = await post(admin(), [empA, empA, empA]);
+    const { id } = (await res.json()) as { id: string };
+    expect(await prisma.caseProofEmployee.count({ where: { caseProofId: id } })).toBe(1);
+    const many = Array.from({ length: L.maxEmployeesPerCase + 1 }, (_, i) => `e${i}`);
+    expect((await post(admin(), many)).status).toBe(400);
+  });
+
+  describe("and where it shows", () => {
+    let groupId = "";
+    let crossId = "";
+    const text = `${TAG} group text: the pallet was left in the aisle`;
+    const crossText = `${TAG} cross-department text: the machine was left running`;
+    beforeAll(async () => {
+      const supervisor = supA();
+      groupId = ((await (await post(supervisor, [empA, empA2])).json()) as { id: string }).id;
+      session = supervisor;
+      await saveCaseProof({}, form({ id: groupId, text }));
+      const manager = admin();
+      crossId = ((await (await post(manager, [empA, empB])).json()) as { id: string }).id;
+      session = manager;
+      await saveCaseProof({}, form({ id: crossId, text: crossText }));
+    });
+
+    it("a saved group case appears under EACH linked employee profile tab, for the admin and for the department supervisor", async () => {
+      for (const [who, name] of [[admin(), "admin"], [supA(), "supervisor"]] as const) {
+        for (const emp of [{ id: empA, departmentId: deptA }, { id: empA2, departmentId: deptA }]) {
+          const tab = await loadEmployeeCaseProofTab(who, emp);
+          expect(tab.show, `${name} ${emp.id}`).toBe(true);
+          const found = tab.cases.find((c) => c.id === groupId)!;
+          expect(found, `${name} ${emp.id}`).toBeTruthy();
+          expect(found.finalText).toBe(text);
+          expect(found.employees.map((e) => e.id).sort()).toEqual([empA, empA2].sort());
+        }
+      }
+    });
+
+    it("only saved cases are on the tab (a draft is not)", async () => {
+      const draftId = ((await (await post(supA(), [empA, empA2])).json()) as { id: string }).id;
+      const tab = await loadEmployeeCaseProofTab(admin(), { id: empA2, departmentId: deptA });
+      expect(tab.cases.some((c) => c.id === draftId)).toBe(false);
+    });
+
+    it("a case across two departments: each department supervisor sees it under his own employee and is shown only his own employees", async () => {
+      const a = await loadEmployeeCaseProofTab(supA(), { id: empA, departmentId: deptA });
+      const caseA = a.cases.find((c) => c.id === crossId)!;
+      expect(caseA.employees.map((e) => e.id)).toEqual([empA]);
+      expect(JSON.stringify(caseA)).not.toContain(`${TAG} Employee B`);
+
+      const b = await loadEmployeeCaseProofTab(supB(), { id: empB, departmentId: deptB });
+      const caseB = b.cases.find((c) => c.id === crossId)!;
+      expect(caseB.employees.map((e) => e.id)).toEqual([empB]);
+      expect(JSON.stringify(caseB)).not.toContain(`${TAG} Employee A`);
+
+      // the admin sees everyone it is attached to
+      const all = await loadEmployeeCaseProofTab(admin(), { id: empB, departmentId: deptB });
+      expect(all.cases.find((c) => c.id === crossId)!.employees.map((e) => e.id).sort()).toEqual([empA, empB].sort());
+    });
+
+    it("a supervisor sees nothing under an employee of a department that is not his, nor a group case with none of his people", async () => {
+      expect(await loadEmployeeCaseProofTab(supB(), { id: empA, departmentId: deptA })).toEqual({ show: false, cases: [] });
+      expect(await loadCaseProof(supB(), groupId)).toBeNull();
+      expect((await getPhoto(supB(), groupId)).status).toBe(404);
+      expect((await loadCaseProofs(supB())).some((c) => c.id === groupId)).toBe(false);
+    });
+
+    it("HR, an employee, a staff account and a supervisor with no departments: no tab and no data, and no list, detail or photo", async () => {
+      for (const [name, who] of [
+        ["hr", hr()],
+        ["employee", mk({ role: "employee", departmentIds: [deptA] })],
+        ["staff", mk({ role: "staff", departmentIds: [deptA], permissions: ["employees"] })],
+        ["supervisor with no departments", mk({ role: "supervisor", departmentIds: [] })],
+      ] as const) {
+        expect(await loadEmployeeCaseProofTab(who, { id: empA, departmentId: deptA }), name).toEqual({ show: false, cases: [] });
+        expect(await loadCaseProofs(who), name).toEqual([]);
+        expect(await loadCaseProof(who, groupId), name).toBeNull();
+        expect((await getPhoto(who, groupId)).status, name).toBe(403);
+      }
+      expect((await getPhoto(null, groupId)).status).toBe(401);
+    });
+
+    it("editing the text of a group case changes it under every employee, and the audit entry names them all", async () => {
+      session = admin();
+      await saveCaseProof({}, form({ id: groupId, text: `${text} (edited)` }));
+      for (const emp of [empA, empA2]) {
+        const tab = await loadEmployeeCaseProofTab(admin(), { id: emp, departmentId: deptA });
+        expect(tab.cases.find((c) => c.id === groupId)!.finalText).toBe(`${text} (edited)`);
+      }
+      const entry = await prisma.auditLogEntry.findFirst({ where: { userName: ACTOR, action: ar.auditActions.editCaseProof, newValue: { contains: "(edited)" } } });
+      expect(entry!.reason).toContain(`${TAG}-A`);
+      expect(entry!.reason).toContain(`${TAG}-A2`);
+    });
+
+    it("discarding an unsaved group case removes every link with it", async () => {
+      const supervisor = supA();
+      const { id } = (await (await post(supervisor, [empA, empA2])).json()) as { id: string };
+      expect(await prisma.caseProofEmployee.count({ where: { caseProofId: id } })).toBe(2);
+      session = supervisor;
+      expect(await discardCaseProof(id)).toMatchObject({ success: true });
+      expect(await prisma.caseProofEmployee.count({ where: { caseProofId: id } })).toBe(0);
+    });
+  });
+});
+
+describe.skipIf(!hasDb)("the migration keeps an existing single-employee case valid", () => {
+  it("copies a case that has no link into the join table, and is safe to run twice", async () => {
+    const sql = readFileSync(path.join(process.cwd(), "prisma", "migrations", "20261127120000_case_proof_employees", "migration.sql"), "utf8");
+    const backfill = sql.slice(sql.indexOf("INSERT IGNORE")).trim().replace(/;\s*$/, "");
+    const legacy = await prisma.caseProof.create({
+      data: { employeeId: empA, departmentId: deptA, createdById: `${TAG}-legacy`, createdByName: ACTOR, photoKey: `${TAG}-legacy.png`, photoMime: "image/png", photoSize: 1, status: "saved", finalText: "Saved before group cases existed" },
+    });
+    expect(await prisma.caseProofEmployee.count({ where: { caseProofId: legacy.id } })).toBe(0);
+    await prisma.$executeRawUnsafe(backfill);
+    await prisma.$executeRawUnsafe(backfill);
+    const links = await prisma.caseProofEmployee.findMany({ where: { caseProofId: legacy.id } });
+    expect(links).toHaveLength(1);
+    expect(links[0]).toMatchObject({ employeeId: empA, departmentId: deptA });
+    // and it now shows under that employee like any other case
+    const tab = await loadEmployeeCaseProofTab(admin(), { id: empA, departmentId: deptA });
+    expect(tab.cases.some((c) => c.id === legacy.id && c.finalText === "Saved before group cases existed")).toBe(true);
   });
 });

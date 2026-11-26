@@ -22,9 +22,13 @@ async function authorize() {
   return { user: user && canUseCaseProof(user) ? user : null, t };
 }
 
-function refresh(employeeId?: string) {
+/** "Name (number) — Department" for each employee the case is attached to, for the audit entry. */
+const namesOf = (employees: { name: string; employeeNumber: string; departmentName: string }[]) => employees.map((e) => `${e.name} (${e.employeeNumber}) — ${e.departmentName}`).join("؛ ");
+
+/** The employee profile page is keyed by the employee NUMBER in its URL (/employees/ACC-001). */
+function refresh(employeeNumbers: string[] = []) {
   revalidatePath("/case-proof");
-  if (employeeId) revalidatePath(`/employees/${employeeId}`);
+  for (const number of employeeNumbers) revalidatePath(`/employees/${number}`);
   revalidatePath("/audit-log");
 }
 
@@ -49,11 +53,11 @@ export async function saveCaseProof(_prev: ActionState, formData: FormData): Pro
       // what it said before: the previous text, or (first save) the AI draft it started from
       oldValue: row.finalText ?? row.aiDraft ?? "-",
       newValue: text,
-      reason: `${row.employee.name} (${row.employee.employeeNumber}) — ${row.employee.department.name}`,
+      reason: namesOf(row.employees),
     },
     (tx) => tx.caseProof.update({ where: { id }, data: { finalText: text, status: "saved", savedAt: row.savedAt ?? new Date() } }),
   );
-  refresh(row.employeeId);
+  refresh(row.employees.map((e) => e.employeeNumber));
   return { success: true, message: t.caseProof.saved };
 }
 
@@ -68,10 +72,10 @@ export async function discardCaseProof(id: string): Promise<ActionState> {
 
   await recordChangeAs(
     user.name,
-    { module: t.caseProof.title, action: t.auditActions.discardCaseProof, oldValue: `${row.employee.name} — ${row.aiDraft ?? "-"}`, reason: user.name },
+    { module: t.caseProof.title, action: t.auditActions.discardCaseProof, oldValue: `${row.employees.map((e) => e.name).join("، ")} — ${row.aiDraft ?? "-"}`, reason: user.name },
     (tx) => tx.caseProof.delete({ where: { id } }),
   );
   await unlink(path.join(CASE_PROOF_STORAGE_ROOT, path.basename(row.photoKey))).catch(() => undefined);
-  refresh(row.employeeId);
+  refresh(row.employees.map((e) => e.employeeNumber));
   return { success: true, message: t.caseProof.discarded };
 }

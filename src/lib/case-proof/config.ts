@@ -23,6 +23,8 @@ export const CASE_PROOF_LIMITS = {
   /** Uploads (each one asks the AI once) a person may make per window. */
   uploadsPerUser: 20,
   uploadsWindowMs: 60 * 60 * 1000,
+  /** Employees one case may be attached to (a group). */
+  maxEmployeesPerCase: 30,
   /** Context strings handed to the AI are cut to this length. */
   maxContextLength: 120,
 } as const;

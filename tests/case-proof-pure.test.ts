@@ -1,5 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
 import { middleware } from "@/middleware";
@@ -9,6 +11,7 @@ import { checkCasePhoto } from "@/lib/case-proof/files";
 import { requestCaseDraft } from "@/lib/case-proof/ai-draft";
 import { CASE_PROOF_LIMITS as L } from "@/lib/case-proof/config";
 import { NAV_ITEMS } from "@/lib/i18n/labels";
+import { EmployeeCases } from "@/components/case-proof/employee-cases";
 import type { User } from "@/lib/types";
 import { ar } from "@/lib/i18n/dictionaries/ar";
 import { en } from "@/lib/i18n/dictionaries/en";
@@ -113,7 +116,7 @@ describe("the photo checks", () => {
 
 describe("the AI draft client: a draft, or an honest empty field", () => {
   const image = { mime: "image/png", bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]) };
-  const context = { department: "Packing", uploader: "Supervisor Sami", employee: "Hossam", locale: "en" as const };
+  const context = { department: "Packing", uploader: "Supervisor Sami", locale: "en" as const };
   const env = { ASSISTANT_BRIDGE_SECRET: "s3cret", ASSISTANT_BRIDGE_URL: "http://127.0.0.1:4100" };
   const reply = (status: number, body: unknown): typeof fetch => (async () => new Response(JSON.stringify(body), { status })) as typeof fetch;
 
@@ -128,7 +131,9 @@ describe("the AI draft client: a draft, or an honest empty field", () => {
     expect(seen!.url).toBe("http://127.0.0.1:4100/describe-image");
     expect(seen!.headers["x-bridge-secret"]).toBe("s3cret");
     expect(seen!.body.image).toEqual({ mediaType: "image/png", data: Buffer.from(image.bytes).toString("base64") });
-    expect(seen!.body.context).toEqual({ locale: "en", department: "Packing", uploader: "Supervisor Sami", employee: "Hossam" });
+    // the department and the uploader only: no employee name is ever sent
+    expect(seen!.body.context).toEqual({ locale: "en", department: "Packing", uploader: "Supervisor Sami" });
+    expect(JSON.stringify(seen!.body)).not.toContain("Hossam");
   });
 
   it("not configured: an empty draft with the reason, and no request is made", async () => {
@@ -162,9 +167,9 @@ describe("the AI draft client: a draft, or an honest empty field", () => {
       body = JSON.parse(String(init.body));
       return new Response(JSON.stringify({ ok: true, answer: "x".repeat(L.maxDraftLength + 500) }));
     }) as unknown as typeof fetch;
-    const result = await requestCaseDraft({ image, context: { ...context, employee: `A\nB ${"y".repeat(500)}` }, env, fetchImpl });
-    expect(body!.context.employee.length).toBeLessThanOrEqual(L.maxContextLength);
-    expect(body!.context.employee).not.toContain("\n");
+    const result = await requestCaseDraft({ image, context: { ...context, department: `A\nB ${"y".repeat(500)}` }, env, fetchImpl });
+    expect(body!.context.department.length).toBeLessThanOrEqual(L.maxContextLength);
+    expect(body!.context.department).not.toContain("\n");
     expect(result.ok && result.text.length).toBe(L.maxDraftLength);
   });
 });
@@ -225,5 +230,94 @@ describe("Arabic and English have the same case-proof strings", () => {
 
   it("the audit labels exist in both", () => {
     for (const d of [ar, en]) for (const k of ["createCaseProof", "saveCaseProof", "editCaseProof", "discardCaseProof"] as const) expect(d.auditActions[k].length).toBeGreaterThan(3);
+  });
+});
+
+describe("the employee profile tab", () => {
+  const root = process.cwd();
+  const profile = readFileSync(path.join(root, "src", "app", "(app)", "employees", "[id]", "page.tsx"), "utf8");
+  const employeePage = readFileSync(path.join(root, "src", "app", "(app)", "case-proof", "employee", "[id]", "page.tsx"), "utf8");
+
+  it("the real profile route is keyed by the employee NUMBER in the URL, and the tab reads by the employee database id", () => {
+    expect(profile).toContain("const { id: employeeNumber } = await params;");
+    expect(profile).toContain("db.employees.find((e) => e.employeeNumber === employeeNumber)");
+    expect(profile).toContain("loadEmployeeCaseProofTab(user, { id: employee.id, departmentId: employee.departmentId })");
+  });
+
+  it("both the tab and its content exist only when the loader says to show them, and the page never reads cases itself", () => {
+    expect(profile).toContain("const { show: showCaseProof, cases: caseProofs } = await loadEmployeeCaseProofTab");
+    expect(profile).toMatch(/\{showCaseProof && <TabsTrigger value="case-proof">/);
+    expect(profile).toMatch(/\{showCaseProof && \(\s*<TabsContent value="case-proof">/);
+    expect(profile).not.toMatch(/prisma\.caseProof/);
+    expect(profile).not.toContain("loadCaseProofs(");
+  });
+
+  it("the case-proof area has its own page per employee (for a supervisor who cannot open the profile), 404 for anyone not allowed", () => {
+    expect(employeePage).toContain("loadEmployeeCaseProofTab(user, employee)");
+    expect(employeePage).toMatch(/if \(!tab\.show\) notFound\(\);/);
+    expect(employeePage).toContain('requireAccess("/case-proof")');
+  });
+
+  const cases = [
+    { id: "c1", createdAt: new Date("2026-11-10T09:00:00Z"), createdByName: "Supervisor Sami", finalText: "The pallet was left in the aisle.", aiGenerated: true, employees: [{ id: "e1", name: "Hossam" }, { id: "e2", name: "Mona" }] },
+    { id: "c2", createdAt: new Date("2026-11-11T09:00:00Z"), createdByName: "Supervisor Sami", finalText: "A label was upside down.", aiGenerated: false, employees: [{ id: "e1", name: "Hossam" }] },
+  ];
+  const render = (list: typeof cases, locale: "ar" | "en") =>
+    renderToStaticMarkup(createElement(EmployeeCases, { cases: list, t: locale === "ar" ? ar : en, locale }));
+
+  it("shows each saved case with its photo link, its text and (for a group) the other employees, in both languages", () => {
+    for (const locale of ["ar", "en"] as const) {
+      const html = render(cases, locale);
+      expect(html).toContain('data-testid="employee-cases"');
+      expect(html).toContain("The pallet was left in the aisle.");
+      expect(html).toContain("A label was upside down.");
+      expect(html).toContain("/api/case-proof/c1/photo");
+      expect(html).toContain("/case-proof/c1");
+      // only the group case lists its members
+      expect(html.match(/data-testid="group-members"/g)).toHaveLength(1);
+      expect(html).toContain("Mona");
+      expect(html).toContain((locale === "ar" ? ar : en).caseProof.noEffect);
+    }
+  });
+
+  it("an employee with no cases shows the empty message, and never any case text", () => {
+    const html = render([], "en");
+    expect(html).toContain(en.caseProof.profileEmpty);
+    expect(html).not.toContain("<img");
+  });
+});
+
+describe("the migrations only add", () => {
+  // the statements only: comments out, and the foreign keys' own "ON DELETE ... ON UPDATE ..." clauses out
+  const sql = (name: string) =>
+    readFileSync(path.join(process.cwd(), "prisma", "migrations", name, "migration.sql"), "utf8")
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("--"))
+      .join("\n")
+      .replace(/ON (DELETE|UPDATE) (RESTRICT|CASCADE|SET NULL|NO ACTION)/gi, "");
+
+  it("the group migration adds one table with its foreign keys, and copies existing cases into it without dropping or changing anything", () => {
+    const text = sql("20261127120000_case_proof_employees");
+    expect(text).toContain("CREATE TABLE `CaseProofEmployee`");
+    expect(text).toMatch(/INSERT IGNORE INTO `CaseProofEmployee`[\s\S]*FROM `CaseProof`/);
+    expect(text).not.toMatch(/\bDROP\b|\bDELETE\b|\bTRUNCATE\b|\bUPDATE\b|\bMODIFY\b|\bRENAME\b/i);
+    // the only ALTERs are the new table's own foreign keys
+    const alters = text.match(/ALTER TABLE `[A-Za-z]+`/g) ?? [];
+    expect(alters.every((a) => a === "ALTER TABLE `CaseProofEmployee`")).toBe(true);
+  });
+
+  it("the case migration before it only creates the new table, and neither touches an existing table", () => {
+    const text = sql("20261127110000_case_proof");
+    expect(text).toContain("CREATE TABLE `CaseProof`");
+    expect(text).not.toMatch(/\bDROP\b|\bDELETE\b|\bTRUNCATE\b|\bUPDATE\b|\bMODIFY\b/i);
+    expect((text.match(/ALTER TABLE `[A-Za-z]+`/g) ?? []).every((a) => a === "ALTER TABLE `CaseProof`")).toBe(true);
+  });
+
+  it("the old CaseProof columns are still in the schema, so existing rows stay valid", () => {
+    const schema = readFileSync(path.join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+    const model = schema.slice(schema.indexOf("model CaseProof {"), schema.indexOf("model CaseProofEmployee"));
+    expect(model).toMatch(/employeeId\s+String\b/);
+    expect(model).toMatch(/departmentId\s+String\b/);
+    expect(model).toMatch(/links\s+CaseProofEmployee\[\]/);
   });
 });

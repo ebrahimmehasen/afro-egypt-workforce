@@ -60,6 +60,9 @@ export function CaseProofFlow({ employees }: { employees: PickEmployee[] }) {
   const [pending, startTransition] = useTransition();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // one employee or a group: the picked ids live here, so they survive the filter box hiding some rows
+  const [selected, setSelected] = useState<string[]>([]);
+  const [filter, setFilter] = useState("");
   const [created, setCreated] = useState<{ id: string; draft: string | null; aiAvailable: boolean } | null>(null);
 
   const errorText = (code: string) => (c.errors as Record<string, string>)[code] ?? c.errors.generic;
@@ -67,6 +70,8 @@ export function CaseProofFlow({ employees }: { employees: PickEmployee[] }) {
   async function onUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    if (selected.length === 0) return setError(c.errors.pickOne);
+    if (selected.length > L.maxEmployeesPerCase) return setError(c.errors.tooManyEmployees);
     const form = new FormData(event.currentTarget);
     const photo = form.get("photo");
     if (!(photo instanceof File) || photo.size === 0) return setError(c.errors.empty);
@@ -127,11 +132,27 @@ export function CaseProofFlow({ employees }: { employees: PickEmployee[] }) {
     <form onSubmit={onUpload} className="flex flex-col gap-4 rounded-xl border bg-card p-4">
       <h2 className="flex items-center gap-2 font-semibold"><Camera className="h-4 w-4" />{c.newCase}</h2>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="cp-employee">{c.employeeLabel}</Label>
-        <select id="cp-employee" name="employeeId" required defaultValue="" className="h-10 rounded-md border border-input bg-background px-3 text-sm">
-          <option value="" disabled>{c.chooseEmployee}</option>
-          {employees.map((e) => <option key={e.id} value={e.id}>{e.name} — {e.employeeNumber}</option>)}
-        </select>
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="cp-filter">{c.employeesLabel}</Label>
+          <span className="text-xs text-muted-foreground" data-testid="selected-count">{format(c.selectedCount, { count: selected.length })}</span>
+        </div>
+        <p className="text-xs text-muted-foreground">{c.employeesHint}</p>
+        {selected.map((id) => <input key={id} type="hidden" name="employeeId" value={id} />)}
+        <Input id="cp-filter" type="search" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={c.chooseEmployee} />
+        <div className="max-h-56 overflow-y-auto rounded-md border border-input p-1" role="group" aria-label={c.employeesLabel}>
+          {employees
+            .filter((e) => !filter.trim() || `${e.name} ${e.employeeNumber}`.toLowerCase().includes(filter.trim().toLowerCase()))
+            .map((e) => (
+              <label key={e.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(e.id)}
+                  onChange={(ev) => setSelected((cur) => (ev.target.checked ? [...cur, e.id] : cur.filter((x) => x !== e.id)))}
+                />
+                {e.name} — {e.employeeNumber}
+              </label>
+            ))}
+        </div>
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="cp-photo">{c.photoLabel}</Label>

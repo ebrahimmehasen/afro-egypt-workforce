@@ -1309,6 +1309,11 @@ export interface Dictionary {
     noEffect: string;
     newCase: string;
     employeeLabel: string;
+    employeesLabel: string;
+    employeesHint: string;
+    selectedCount: string;
+    employeeCasesTitle: string;
+    forEmployees: string;
     chooseEmployee: string;
     photoLabel: string;
     photoHint: string;
@@ -1354,6 +1359,8 @@ export interface Dictionary {
       empty: string;
       tooLarge: string;
       noEmployee: string;
+      pickOne: string;
+      tooManyEmployees: string;
       textRequired: string;
       rateLimited: string;
       notFound: string;

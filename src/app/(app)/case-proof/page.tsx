@@ -46,8 +46,8 @@ export default async function CaseProofPage() {
             <TableBody>
               {cases.map((row) => (
                 <TableRow key={row.id}>
-                  <TableCell className="font-medium"><Link className="hover:underline" href={`/case-proof/${row.id}`}>{row.employee.name}</Link></TableCell>
-                  <TableCell>{row.employee.department.name}</TableCell>
+                  <TableCell className="font-medium"><Link className="hover:underline" href={`/case-proof/${row.id}`}>{row.employees.map((e) => e.name).join("، ")}</Link></TableCell>
+                  <TableCell>{[...new Set(row.employees.map((e) => e.departmentName))].join("، ")}</TableCell>
                   <TableCell>{row.createdByName}</TableCell>
                   <TableCell>{dateFmt.format(row.createdAt)}</TableCell>
                   <TableCell><Badge variant={row.status === "saved" ? "success" : "gold"}>{c.statuses[row.status]}</Badge></TableCell>

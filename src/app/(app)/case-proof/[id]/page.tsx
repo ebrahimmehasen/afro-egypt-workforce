@@ -27,14 +27,23 @@ export default async function CaseProofDetailPage({ params }: { params: Promise<
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        title={`${c.title} — ${row.employee.name}`}
-        description={`${row.employee.department.name} — ${row.createdByName} — ${dateFmt.format(row.createdAt)}`}
+        title={`${c.title} — ${row.employees.map((e) => e.name).join("، ")}`}
+        description={`${[...new Set(row.employees.map((e) => e.departmentName))].join("، ")} — ${row.createdByName} — ${dateFmt.format(row.createdAt)}`}
         actions={<Button asChild variant="outline"><Link href="/case-proof">{c.back}</Link></Button>}
       />
       <div className="grid gap-4 rounded-xl border bg-card p-4 md:grid-cols-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`/api/case-proof/${row.id}/photo`} alt={c.photoAlt} className="max-h-96 w-full rounded-lg border object-contain" />
         <div className="flex flex-col gap-3">
+          <p className="text-sm" data-testid="case-employees">
+            <span className="text-muted-foreground">{c.forEmployees} </span>
+            {row.employees.map((e, i) => (
+              <span key={e.id}>
+                {i > 0 && "، "}
+                <Link className="hover:underline" href={`/case-proof/employee/${e.id}`}>{e.name}</Link>
+              </span>
+            ))}
+          </p>
           <div className="flex flex-wrap gap-2">
             <Badge variant={row.status === "saved" ? "success" : "gold"}>{c.statuses[row.status]}</Badge>
             {row.aiGenerated && <Badge variant="outline" className="gap-1"><Sparkles className="h-3 w-3" />{c.aiBadgeSaved}</Badge>}

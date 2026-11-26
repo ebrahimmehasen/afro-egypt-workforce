@@ -47,7 +47,7 @@ let server: Server;
 let base: string;
 
 const image = { mediaType: "image/png", data: Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]).toString("base64") };
-const ctx = { locale: "ar", department: "التعبئة", uploader: "المشرف سامي", employee: "حسام" };
+const ctx = { locale: "ar", department: "التعبئة", uploader: "المشرف سامي" };
 const post = (route: string, body: unknown, secret: string | null = SECRET) =>
   fetch(`${base}${route}`, { method: "POST", headers: { "content-type": "application/json", ...(secret === null ? {} : { "x-bridge-secret": secret }) }, body: typeof body === "string" ? body : JSON.stringify(body) });
 
@@ -84,8 +84,12 @@ afterAll(async () => {
 
 describe("describe-image: the pure rules", () => {
   it("accepts a jpg, png or webp as base64 and cleans the context", () => {
-    const r = validateDescribe({ image, context: { ...ctx, employee: "A\nB" } });
-    expect(r).toMatchObject({ ok: true, value: { image, context: { locale: "ar", employee: "A B" } } });
+    const r = validateDescribe({ image, context: { ...ctx, department: "A\nB" } });
+    expect(r).toMatchObject({ ok: true, value: { image, context: { locale: "ar", department: "A B", uploader: "المشرف سامي" } } });
+    // an employee name sent by mistake is dropped, never carried further
+    const withName = validateDescribe({ image, context: { ...ctx, employee: "حسام" } });
+    expect(withName).toMatchObject({ ok: true });
+    expect(JSON.stringify(withName)).not.toContain("حسام");
     for (const mediaType of ["image/jpeg", "image/webp"]) expect(validateDescribe({ image: { ...image, mediaType }, context: ctx })).toMatchObject({ ok: true });
   });
 
@@ -106,7 +110,7 @@ describe("describe-image: the pure rules", () => {
     expect(args).not.toContain("--mcp-config");
     expect(args).not.toContain("--allowedTools");
     expect(args[args.indexOf("--input-format") + 1]).toBe("stream-json");
-    const line = buildDescribeInput({ image, context: { locale: "ar", department: "D", uploader: "U", employee: "E" } });
+    const line = buildDescribeInput({ image, context: { locale: "ar", department: "D", uploader: "U" } });
     expect(line.endsWith("\n")).toBe(true);
     const message = JSON.parse(line);
     expect(message.message.content[0]).toEqual({ type: "image", source: { type: "base64", media_type: "image/png", data: image.data } });
@@ -131,13 +135,20 @@ describe("describe-image: the service", () => {
     expect(answer).toContain(`IMAGE=image/png:${image.data.length}`);
     expect(answer).toContain("التعبئة");
     expect(answer).toContain("المشرف سامي");
-    expect(answer).toContain("حسام");
+    // no employee name is ever given: not by the app, and not carried through even if one is sent
+    expect(answer).not.toContain("حسام");
     expect(answer).toContain('TOOLS=""');
     expect(answer).toContain("MCP_CONFIG=false");
     expect(answer).toContain("STRICT=true");
     expect(answer).toContain("ALLOWED=false");
     expect(answer).toContain("INPUT_FORMAT=stream-json");
     expect(answer).toContain("SECRET_VISIBLE=false"); // the shared secret never reaches the CLI
+  });
+
+  it("an employee name sent by mistake never reaches the CLI", async () => {
+    const res = await post("/describe-image", { image, context: { ...ctx, employee: "حسام" } });
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(await res.json())).not.toContain("حسام");
   });
 
   it("refuses a wrong or missing secret", async () => {

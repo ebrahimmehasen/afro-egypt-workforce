@@ -4,7 +4,8 @@ import { CASE_PROOF_LIMITS as L } from "@/lib/case-proof/config";
 // sign-in) for a short DRAFT description of one photo, through its tool-less /describe-image call. The same secret and address
 // as the assistant; no new service, no new credential. It NEVER throws and never invents text: when the service is not
 // configured, is an older version without this call, is down, is slow, or answers nothing, the result says why and the
-// supervisor gets an empty field to write in himself. The text is only ever a draft, shown as such and always editable.
+// supervisor gets an empty field to write in himself. The draft is given the department(s) and the uploader as context and
+// NO employee name: it describes the photo, never who it is about. The text is only ever a draft, shown as such and always editable.
 
 export type DraftFailure = "not_configured" | "unavailable" | "timeout" | "auth" | "rate_limited" | "bad_response" | "busy";
 export type DraftResult = { ok: true; text: string } | { ok: false; reason: DraftFailure };
@@ -15,7 +16,6 @@ const asReason = (v: unknown): DraftFailure => REASONS.find((r) => r === v) ?? "
 export interface DraftContext {
   department: string;
   uploader: string;
-  employee: string;
   locale: "ar" | "en";
 }
 
@@ -42,7 +42,7 @@ export async function requestCaseDraft(opts: {
       headers: { "content-type": "application/json", "x-bridge-secret": secret },
       body: JSON.stringify({
         image: { mediaType: opts.image.mime, data: Buffer.from(opts.image.bytes).toString("base64") },
-        context: { locale: opts.context.locale, department: cut(opts.context.department), uploader: cut(opts.context.uploader), employee: cut(opts.context.employee) },
+        context: { locale: opts.context.locale, department: cut(opts.context.department), uploader: cut(opts.context.uploader) },
       }),
     });
     const json = (await res.json().catch(() => null)) as { ok?: unknown; answer?: unknown; code?: unknown } | null;

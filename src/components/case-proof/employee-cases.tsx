@@ -10,6 +10,8 @@ type Cases = {
   createdByName: string;
   finalText: string | null;
   aiGenerated: boolean;
+  /** Everyone the case is attached to (that the viewer may see): more than one means a group case. */
+  employees?: { id: string; name: string }[];
 }[];
 
 /**
@@ -36,6 +38,9 @@ export function EmployeeCases({ cases, t, locale }: { cases: Cases; t: Awaited<R
                   <span>{row.createdByName}</span>
                   {row.aiGenerated && <Badge variant="outline" className="gap-1"><Sparkles className="h-3 w-3" />{c.aiBadgeSaved}</Badge>}
                 </div>
+                {row.employees && row.employees.length > 1 && (
+                  <p className="text-xs text-muted-foreground" data-testid="group-members">{c.forEmployees} {row.employees.map((e) => e.name).join("، ")}</p>
+                )}
                 <p className="line-clamp-3 whitespace-pre-wrap text-sm">{row.finalText ?? c.noText}</p>
                 <Link href={`/case-proof/${row.id}`} className="w-fit text-xs text-primary hover:underline">{c.view}</Link>
               </div>
