@@ -151,6 +151,24 @@ export interface Leave {
   createdAt: string;
 }
 
+export interface Mission {
+  id: string;
+  employeeId: string;
+  destination: string;
+  from: string; // ISO date
+  to: string; // ISO date
+  /** timed mission only ("HH:mm"); undefined on a date-range mission */
+  startTime?: string;
+  endTime?: string;
+  confirmedEnd?: string;
+  durationMinutes?: number;
+  reason?: string;
+  status: RequestStatus;
+  approvedBy?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
 export interface Overtime {
   id: string;
   employeeId: string;

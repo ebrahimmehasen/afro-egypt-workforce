@@ -78,6 +78,7 @@ export function scopedSnapshot(scope: Scope, db: Store): Store {
     employees: employeesInScope(scope, db.employees),
     dailyAttendance: rowsInScope(scope, db.dailyAttendance),
     leaves: rowsInScope(scope, db.leaves),
+    missions: rowsInScope(scope, db.missions),
     overtime: rowsInScope(scope, db.overtime),
     deductions: rowsInScope(scope, db.deductions),
     allowances: rowsInScope(scope, db.allowances),

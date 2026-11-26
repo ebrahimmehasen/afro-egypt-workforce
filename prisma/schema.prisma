@@ -311,6 +311,7 @@ model Employee {
   attendanceLogs  AttendanceLog[]
   dailyAttendance DailyAttendance[]
   leaves          Leave[]
+  missions        Mission[]
   overtime        Overtime[]
   deductions      Deduction[]
   allowances      Allowance[]
@@ -492,6 +493,37 @@ model Leave {
 
   @@index([employeeId])
   @@index([status])
+}
+
+/// A mission: the employee works outside the workplace (not a leave type — no deduction for the window, and
+/// time past official hours counts as overtime). Either a date range (`from`/`to`, no times — covers whole
+/// days) or a single timed day (`from` == `to`, `startTime`/`endTime` set). If the employee never punches
+/// back in and the mission ran past working hours, HR confirms when it actually ended: `confirmedEnd` (a
+/// clock time) or `durationMinutes` from the start — whichever HR set — stands in for the missing punch until
+/// a real (or corrected) one replaces it.
+model Mission {
+  id              String        @id @default(cuid())
+  employeeId      String
+  employee        Employee      @relation(fields: [employeeId], references: [id])
+  destination     String
+  from            DateTime      @db.Date
+  to              DateTime      @db.Date
+  /// Timed mission only ("HH:mm"); null on a date-range mission (covers whole days).
+  startTime       String?
+  endTime         String?
+  /// HR-confirmed actual end ("HH:mm") when the employee never punched back in.
+  confirmedEnd    String?
+  /// Or the duration HR set from the mission's start, when no confirmed end time was given.
+  durationMinutes Int?
+  reason          String?       @db.Text
+  status          RequestStatus @default(approved)
+  approvedBy      String?
+  createdBy       String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([employeeId])
+  @@index([from, to])
 }
 
 model Overtime {

@@ -14,6 +14,7 @@ import type {
   EmployeeAcknowledgment as PEmployeeAcknowledgment,
   EmployeeDocument as PEmployeeDocument,
   Leave as PLeave,
+  Mission as PMission,
   Overtime as POvertime,
   PayrollPeriod as PPayrollPeriod,
   PayrollRecord as PPayrollRecord,
@@ -30,6 +31,7 @@ import type {
   EmployeeAcknowledgment,
   EmployeeDocument,
   Leave,
+  Mission,
   Overtime,
   PayrollPeriod,
   PayrollRecord,
@@ -174,6 +176,25 @@ export function toLeave(l: PLeave): Leave {
     status: l.status,
     approvedBy: l.approvedBy ?? undefined,
     createdAt: iso(l.createdAt),
+  };
+}
+
+export function toMission(m: PMission): Mission {
+  return {
+    id: m.id,
+    employeeId: m.employeeId,
+    destination: m.destination,
+    from: dayStr(m.from),
+    to: dayStr(m.to),
+    startTime: m.startTime ?? undefined,
+    endTime: m.endTime ?? undefined,
+    confirmedEnd: m.confirmedEnd ?? undefined,
+    durationMinutes: m.durationMinutes ?? undefined,
+    reason: m.reason ?? undefined,
+    status: m.status,
+    approvedBy: m.approvedBy ?? undefined,
+    createdBy: m.createdBy ?? undefined,
+    createdAt: iso(m.createdAt),
   };
 }
 
