@@ -79,6 +79,7 @@ export interface Dictionary {
     requests: string;
     biometricDevice: string;
     settings: string;
+    caseProof: string;
   };
   roles: {
     admin: string;
@@ -1302,7 +1303,69 @@ export interface Dictionary {
     noAttendanceRecordForDay: string;
     periodExists: string;
   };
+  caseProof: {
+    title: string;
+    subtitle: string;
+    noEffect: string;
+    newCase: string;
+    employeeLabel: string;
+    chooseEmployee: string;
+    photoLabel: string;
+    photoHint: string;
+    aiPrivacy: string;
+    upload: string;
+    uploading: string;
+    step2: string;
+    aiDraftBadge: string;
+    aiUnavailable: string;
+    aiNoteEmptied: string;
+    textLabel: string;
+    textHint: string;
+    save: string;
+    saving: string;
+    saved: string;
+    discard: string;
+    discardConfirm: string;
+    discarded: string;
+    startOver: string;
+    list: string;
+    emptyList: string;
+    columns: {
+      employee: string;
+      department: string;
+      by: string;
+      date: string;
+      status: string;
+    };
+    statuses: {
+      draft: string;
+      saved: string;
+    };
+    view: string;
+    back: string;
+    photoAlt: string;
+    noText: string;
+    aiBadgeSaved: string;
+    profileTitle: string;
+    profileEmpty: string;
+    errors: {
+      type: string;
+      size: string;
+      empty: string;
+      tooLarge: string;
+      noEmployee: string;
+      textRequired: string;
+      rateLimited: string;
+      notFound: string;
+      locked: string;
+      generic: string;
+    };
+  };
   auditActions: {
+    createCaseProof: string;
+    saveCaseProof: string;
+    editCaseProof: string;
+    discardCaseProof: string;
     addWorkRequest: string;
     approveWorkRequest: string;
     rejectWorkRequest: string;

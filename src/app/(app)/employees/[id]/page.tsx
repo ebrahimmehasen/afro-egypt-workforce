@@ -10,6 +10,9 @@ import { getLocale } from "@/lib/i18n/locale";
 import { translateLabel } from "@/lib/i18n/data-labels";
 import { requestStatusLabel, deductionTypeLabel } from "@/lib/i18n/labels";
 import { canManageEmployeeFiles, hasPermission } from "@/lib/permissions";
+import { canUseDepartment } from "@/lib/case-proof/audience";
+import { loadCaseProofs } from "@/lib/case-proof/data";
+import { EmployeeCases } from "@/components/case-proof/employee-cases";
 import { missingDocumentTypes, requiredDocumentTypes } from "@/lib/documents";
 import { missingAcknowledgmentKeys, requiredAcknowledgmentKeys } from "@/lib/acknowledgments";
 import { EmployeeFormDialog } from "@/components/employees/employee-form-dialog";
@@ -74,6 +77,9 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   const missingAcks = missingAcknowledgmentKeys(acknowledgments, requiredAcks);
   const missingFilesCount = missingDocs.length + missingAcks.length;
   const canManageDocs = canManageEmployeeFiles(user);
+  // case proofs: the admin and the supervisors of this employee's department only (nobody else sees the tab or the data)
+  const showCaseProof = canUseDepartment(user, employee.departmentId);
+  const caseProofs = showCaseProof ? await loadCaseProofs(user, { employeeId: employee.id, status: "saved" }) : [];
   const canEdit = hasPermission(user, "employees");
   const archived = isArchived(employee);
   // Annual-leave balance, worked out now from the hire date, this employee's leaves and the days they were absent
@@ -193,6 +199,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
           <TabsTrigger value="overtime">{t.employees.tabOvertime}</TabsTrigger>
           <TabsTrigger value="deductions">{t.employees.tabDeductions}</TabsTrigger>
           <TabsTrigger value="payroll">{t.employees.tabPayroll}</TabsTrigger>
+          {showCaseProof && <TabsTrigger value="case-proof">{t.caseProof.profileTitle}</TabsTrigger>}
           {showActions && <TabsTrigger value="actions">{t.common.actions}</TabsTrigger>}
         </TabsList>
 
@@ -381,6 +388,12 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
             </CardContent>
           </Card>
         </TabsContent>
+
+        {showCaseProof && (
+          <TabsContent value="case-proof">
+            <EmployeeCases cases={caseProofs} t={t} locale={locale} />
+          </TabsContent>
+        )}
 
         {showActions && (
           <TabsContent value="actions">

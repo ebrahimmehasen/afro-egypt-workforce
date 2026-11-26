@@ -6,6 +6,7 @@ export const ASSISTANT_LINK_ROOTS = [
   "attendance",
   "audit-log",
   "biometric-device",
+  "case-proof",
   "change-requests",
   "dashboard",
   "deductions",

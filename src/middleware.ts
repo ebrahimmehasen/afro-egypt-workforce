@@ -15,12 +15,12 @@ const ALWAYS_ALLOWED = ["/dashboard", "/payslip", "/leave-paper"];
  * this middleware never runs on them at all — they carry their own session +
  * per-record scope check (canViewEmployee).
  */
-function userFromCookie(raw: string): { role: Role; permissions: string[] } | null {
+function userFromCookie(raw: string): { role: Role; permissions: string[]; departmentIds: string[] } | null {
   try {
     const body = raw.slice(0, raw.lastIndexOf("."));
     const json = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
     if (!json?.role) return null;
-    return { role: json.role, permissions: Array.isArray(json.permissions) ? json.permissions : [] };
+    return { role: json.role, permissions: Array.isArray(json.permissions) ? json.permissions : [], departmentIds: Array.isArray(json.departmentIds) ? json.departmentIds : [] };
   } catch {
     return null;
   }

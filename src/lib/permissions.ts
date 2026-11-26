@@ -1,4 +1,5 @@
 import { Role, User } from "@/lib/types";
+import { canUseCaseProof } from "@/lib/case-proof/audience";
 
 /**
  * Grantable page permissions. admin/employee never consult this list (see
@@ -35,7 +36,7 @@ const ADMIN_NAV = [
 ];
 const EMPLOYEE_NAV = ["/dashboard", "/attendance", "/leaves", "/payroll"];
 
-type SessionLike = Pick<User, "role" | "permissions">;
+type SessionLike = Pick<User, "role" | "permissions"> & Partial<Pick<User, "departmentIds">>;
 
 /**
  * Self-service accounts see only their own data (own attendance, leaves,
@@ -57,7 +58,13 @@ export function hasPermission(user: SessionLike, key: PermissionKey): boolean {
   return Array.isArray(user.permissions) && user.permissions.includes(key);
 }
 
+/** The pages a user can open: their role's pages, plus Case proof for the admin and a department supervisor (see canUseCaseProof). */
 export function allowedNavPaths(user: SessionLike): string[] {
+  const base = basePaths(user);
+  return canUseCaseProof(user) ? [...base, "/case-proof"] : base;
+}
+
+function basePaths(user: SessionLike): string[] {
   if (user.role === "admin") return ADMIN_NAV;
   if (isSelfService(user)) return EMPLOYEE_NAV;
   const granted = PERMISSION_DEFS.filter((p) => hasPermission(user, p.key)).map((p) => p.path);
