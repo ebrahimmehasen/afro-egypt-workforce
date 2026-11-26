@@ -9,7 +9,7 @@ import { defineConfig } from "vitest/config";
 const SERIAL_AFTER_ALL = ["tests/payroll-recalc.test.ts"];
 // punch-quarantine posts deductions and overtime for temporary employees (the job covers every employee), which the
 // department report and the payroll run would also count: it runs alone too, after payroll-recalc.
-const SERIAL_LAST = ["tests/punch-quarantine.test.ts", "tests/leave-rules.test.ts", "tests/payroll-approval-guard.test.ts"];
+const SERIAL_LAST = ["tests/punch-quarantine.test.ts", "tests/leave-rules.test.ts", "tests/payroll-approval-guard.test.ts", "tests/case-proof-db.test.ts"];
 // exit-classification snapshots every pay row of a month, so nothing else may write pay rows while it runs: last of all.
 const SERIAL_FINAL = ["tests/exit-classification.test.ts"];
 

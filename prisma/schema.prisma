@@ -203,6 +203,7 @@ model Department {
 
   employees Employee[] @relation("DepartmentMembers")
   users     User[]
+  caseProofs CaseProof[]
 
   @@index([managerId])
 }
@@ -325,6 +326,8 @@ model Employee {
   @@index([status])
   @@index([payTypeId])
   @@index([workScheduleId])
+  caseProofs CaseProof[]
+  caseProofLinks CaseProofEmployee[]
 }
 
 /// A pay type (نوع الأجر) and every rule used to calculate its pay. Nothing about pay is fixed in code: each
@@ -908,4 +911,58 @@ model FormField {
   builtin   Boolean       @default(false)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+}
+
+// ---- Case proof ("إثبات الحالة"): a photo of a problem with an employee at work, a short description (an AI draft the
+// supervisor edits), kept under that employee as a REFERENCE for judging efficiency later. Additive only. It has no effect
+// on punches, attendance, payroll, deductions or any pay rule, and it is not a penalty.
+
+enum CaseProofStatus {
+  draft
+  saved
+}
+
+model CaseProof {
+  id           String          @id @default(cuid())
+  employeeId   String
+  employee     Employee        @relation(fields: [employeeId], references: [id])
+  /// The employee's department when the case was made (an employee may move later; the case keeps where it happened).
+  departmentId String
+  department   Department      @relation(fields: [departmentId], references: [id])
+  createdById  String
+  createdByName String
+  /// The photo: a random key relative to the private storage root (storage/uploads/case-proof), never a URL.
+  photoKey     String
+  photoMime    String
+  photoSize    Int
+  /// What the AI wrote from the photo (empty when it was unavailable). Kept as written, even after the text is edited.
+  aiDraft      String?         @db.Text
+  aiGenerated  Boolean         @default(false)
+  /// The description the supervisor wrote or approved: this is the record.
+  finalText    String?         @db.Text
+  status       CaseProofStatus @default(draft)
+  savedAt      DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([employeeId, createdAt])
+  @@index([departmentId, createdAt])
+
+  /// Every employee the case is about (one, or a group). The employeeId / departmentId above stay as the first of them.
+  links CaseProofEmployee[]
+}
+
+/// One employee a case is attached to. A case about a group has one row per employee; the case shows under each of them.
+model CaseProofEmployee {
+  id          String    @id @default(cuid())
+  caseProofId String
+  caseProof   CaseProof @relation(fields: [caseProofId], references: [id], onDelete: Cascade)
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  /// The employee's department when the case was made.
+  departmentId String
+  createdAt   DateTime  @default(now())
+
+  @@unique([caseProofId, employeeId])
+  @@index([employeeId])
 }

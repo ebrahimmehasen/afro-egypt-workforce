@@ -5,6 +5,7 @@
 //
 //   POST /ask-stream  the answer as it is written: one JSON event per line (delta, tool, done, error)
 //   POST /ask         the same question, answered once it is complete
+//   POST /describe-image  a short draft description of one photo (case proof): no tools, no app access
 //   GET  /health
 
 import crypto from "node:crypto";
@@ -14,7 +15,10 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { LIMITS, buildCliArgs, buildMcpConfig, buildPrompt, buildSystemPrompt, parseCliResult, readStreamLine, validateAsk } from "./bridge-core.mjs";
+import {
+  DESCRIBE_LIMITS, LIMITS, buildCliArgs, buildDescribeArgs, buildDescribeInput, buildDescribeSystemPrompt, buildMcpConfig, buildPrompt, buildSystemPrompt,
+  parseCliResult, readStreamLine, validateAsk, validateDescribe,
+} from "./bridge-core.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -271,11 +275,66 @@ export function createBridge(config) {
     return reply(res, 200, { ok: true, answer: outcome.answer, toolsUsed: outcome.toolsUsed });
   }
 
+
+  /**
+   * POST /describe-image — a short draft description of one photo (case proof). Same secret, same limit on how many run at
+   * once, same CLI and sign-in as the assistant; but no tools and no app access at all, and only sizes are logged.
+   */
+  async function handleDescribe(req, res) {
+    if (!sameSecret(req.headers["x-bridge-secret"], config.secret)) return reply(res, 401, { ok: false, code: "auth", message: "Wrong secret." });
+    let body;
+    try {
+      body = JSON.parse(await readBody(req, DESCRIBE_LIMITS.body));
+    } catch {
+      return fail(res, "bad_request", "The body is not valid JSON, or is too large.");
+    }
+    const checked = validateDescribe(body);
+    if (!checked.ok) return fail(res, "bad_request", checked.message);
+
+    const gone = new AbortController();
+    res.on("close", () => {
+      if (!res.writableEnded) gone.abort();
+    });
+    const release = await gate.acquire();
+    if (!release) return fail(res, "busy", "The assistant is busy answering other questions. Try again in a moment.");
+
+    const startedAt = Date.now();
+    let outcome;
+    try {
+      let result = null;
+      const args = buildDescribeArgs({ systemPrompt: buildDescribeSystemPrompt(checked.value.context), model: config.model, budgetUsd: config.budgetUsd });
+      const env = { ...process.env, DISABLE_AUTOUPDATER: "1" };
+      delete env.ASSISTANT_BRIDGE_SECRET;
+      if (config.configDir) env.CLAUDE_CONFIG_DIR = config.configDir;
+      const run = await streamCli(config, args, buildDescribeInput(checked.value), env, {
+        onLine: (line) => {
+          const event = readStreamLine(line);
+          if (event?.type === "result") result = event.parsed;
+        },
+        signal: gone.signal,
+      });
+      if (run.aborted) outcome = { ok: false, code: "aborted", message: "Nobody was waiting for the answer any more." };
+      else if (run.timedOut) outcome = { ok: false, code: "timeout", message: `The assistant did not answer within ${config.timeoutMs / 1000}s.` };
+      else if (run.spawnFailed) outcome = { ok: false, code: "unavailable", message: `The Claude CLI could not be started: ${run.stderr.slice(0, 200)}` };
+      else outcome = result ?? parseCliResult(run.tail, run.stderr);
+    } catch (e) {
+      console.error(`${new Date().toISOString()} error ${e instanceof Error ? e.message : e}`);
+      outcome = { ok: false, code: "unavailable", message: "The assistant service failed." };
+    } finally {
+      release();
+    }
+    console.log(`${new Date().toISOString()} describe ok=${outcome.ok} ${outcome.ok ? "" : `code=${outcome.code}`} ms=${Date.now() - startedAt}`);
+    if (res.destroyed) return undefined;
+    if (!outcome.ok) return fail(res, outcome.code, outcome.message);
+    return reply(res, 200, { ok: true, answer: outcome.answer });
+  }
+
   return http.createServer(async (req, res) => {
     try {
       if (req.method === "GET" && req.url === "/health") return reply(res, 200, { ok: true, running: gate.running });
       if (req.method === "POST" && req.url === "/ask") return await handleAsk(req, res, false);
       if (req.method === "POST" && req.url === "/ask-stream") return await handleAsk(req, res, true);
+      if (req.method === "POST" && req.url === "/describe-image") return await handleDescribe(req, res);
       return reply(res, 404, { ok: false, code: "bad_request", message: "Not found." });
     } catch (e) {
       console.error(`${new Date().toISOString()} error ${e instanceof Error ? e.message : e}`);
