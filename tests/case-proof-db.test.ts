@@ -12,7 +12,8 @@ import { ar } from "@/lib/i18n/dictionaries/ar";
  * entries with the old and new text, and that none of it touches a punch, a day, payroll or any pay table.
  */
 let session: User | null = null;
-type Ai = typeof import("@/lib/case-proof/ai-draft").requestCaseDraft;
+// route.ts and the photo actions always ask for the combined SET draft (even a single-photo upload is a set of one).
+type Ai = typeof import("@/lib/case-proof/ai-draft").requestCaseSetDraft;
 let aiImpl: Ai = async () => ({ ok: false, reason: "not_configured" });
 const aiCalls: Parameters<Ai>[0][] = [];
 
@@ -20,7 +21,7 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined, s
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/lib/auth", () => ({ getSession: async () => session }));
 vi.mock("@/lib/case-proof/ai-draft", () => ({
-  requestCaseDraft: async (opts: Parameters<Ai>[0]) => {
+  requestCaseSetDraft: async (opts: Parameters<Ai>[0]) => {
     aiCalls.push(opts);
     return aiImpl(opts);
   },
@@ -193,7 +194,8 @@ describe.skipIf(!hasDb)("the AI draft and its fallback", () => {
     // the department and the uploader only: the employee name is never handed to the AI
     expect(aiCalls[0].context).toEqual({ department: `${TAG} A`, uploader: ACTOR, locale: "ar" });
     expect(JSON.stringify(aiCalls[0].context)).not.toContain("Employee");
-    expect(aiCalls[0].image.mime).toBe("image/png");
+    expect(aiCalls[0].images).toHaveLength(1);
+    expect(aiCalls[0].images[0].mime).toBe("image/png");
   });
 
   it("when the AI call fails, the draft is empty (never a made-up one), the reason is given, and the whole flow still works", async () => {

@@ -1525,6 +1525,12 @@ export interface Dictionary {
     aiDraftBadge: string;
     aiUnavailable: string;
     aiNoteEmptied: string;
+    aiSuggestionLabel: string;
+    photosCount: string;
+    addMorePhotos: string;
+    addingPhotos: string;
+    removePhoto: string;
+    removePhotoConfirm: string;
     textLabel: string;
     textHint: string;
     save: string;
@@ -1562,6 +1568,8 @@ export interface Dictionary {
       noEmployee: string;
       pickOne: string;
       tooManyEmployees: string;
+      tooManyPhotos: string;
+      minOnePhoto: string;
       textRequired: string;
       rateLimited: string;
       notFound: string;

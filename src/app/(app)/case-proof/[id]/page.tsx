@@ -10,7 +10,7 @@ import { APP_TIME_ZONE, intlLocale } from "@/lib/i18n/format";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CaseTextForm } from "@/components/case-proof/case-proof-flow";
+import { CasePhotos, CaseTextForm } from "@/components/case-proof/case-proof-flow";
 
 export default async function CaseProofDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireAccess("/case-proof");
@@ -32,8 +32,7 @@ export default async function CaseProofDetailPage({ params }: { params: Promise<
         actions={<Button asChild variant="outline"><Link href="/case-proof">{c.back}</Link></Button>}
       />
       <div className="grid gap-4 rounded-xl border bg-card p-4 md:grid-cols-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`/api/case-proof/${row.id}/photo`} alt={c.photoAlt} className="max-h-96 w-full rounded-lg border object-contain" />
+        <CasePhotos caseId={row.id} photos={row.photos} canEdit={canEditCaseProof(user, row.createdById)} initialDraft={row.aiDraft} />
         <div className="flex flex-col gap-3">
           <p className="text-sm" data-testid="case-employees">
             <span className="text-muted-foreground">{c.forEmployees} </span>

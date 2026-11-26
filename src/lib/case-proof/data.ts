@@ -8,20 +8,23 @@ import { canUseDepartment, caseProofDepartments, canUseCaseProof } from "@/lib/c
 // else, HR included, sees any case.
 
 const employeeSelect = { id: true, name: true, employeeNumber: true, departmentId: true, department: { select: { name: true } } } as const;
-const include = { links: { include: { employee: { select: employeeSelect } } } } as const;
+const photoSelect = { id: true, position: true } as const;
+const include = { links: { include: { employee: { select: employeeSelect } } }, photos: { select: photoSelect, orderBy: { position: "asc" } } } as const;
 
 type Row = Awaited<ReturnType<typeof prisma.caseProof.findMany<{ include: typeof include }>>>[number];
 export type CaseEmployee = { id: string; name: string; employeeNumber: string; departmentId: string; departmentName: string };
-export type VisibleCase = Omit<Row, "links"> & { employees: CaseEmployee[] };
+export type CasePhoto = { id: string; position: number };
+export type VisibleCase = Omit<Row, "links" | "photos"> & { employees: CaseEmployee[]; photos: CasePhoto[] };
 
-/** The linked employees this user may see (all for the admin, only his departments' for a supervisor). */
+/** The linked employees this user may see (all for the admin, only his departments' for a supervisor). The photo rows
+ * are never scoped per employee (a case's photos are not employee-specific), only never leaking the photoKey itself. */
 function shape(user: User, row: Row): VisibleCase {
-  const { links, ...rest } = row;
+  const { links, photos, ...rest } = row;
   const employees = links
     .map((l) => ({ id: l.employee.id, name: l.employee.name, employeeNumber: l.employee.employeeNumber, departmentId: l.employee.departmentId, departmentName: l.employee.department.name }))
     .filter((e) => canUseDepartment(user, e.departmentId))
     .sort((a, b) => a.name.localeCompare(b.name));
-  return { ...rest, employees };
+  return { ...rest, employees, photos };
 }
 
 const visibleWhere = (user: User) => {

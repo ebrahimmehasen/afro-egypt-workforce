@@ -8,7 +8,7 @@ import { middleware } from "@/middleware";
 import { allowedNavPaths, canAccess } from "@/lib/permissions";
 import { canUseCaseProof, canUseDepartment, caseProofDepartments } from "@/lib/case-proof/audience";
 import { checkCasePhoto } from "@/lib/case-proof/files";
-import { requestCaseDraft } from "@/lib/case-proof/ai-draft";
+import { requestCaseDraft, requestCaseSetDraft } from "@/lib/case-proof/ai-draft";
 import { CASE_PROOF_LIMITS as L } from "@/lib/case-proof/config";
 import { NAV_ITEMS } from "@/lib/i18n/labels";
 import { EmployeeCases } from "@/components/case-proof/employee-cases";
@@ -171,6 +171,50 @@ describe("the AI draft client: a draft, or an honest empty field", () => {
     expect(body!.context.department.length).toBeLessThanOrEqual(L.maxContextLength);
     expect(body!.context.department).not.toContain("\n");
     expect(result.ok && result.text.length).toBe(L.maxDraftLength);
+  });
+});
+
+describe("the AI set-draft client: the combined draft for a whole set of photos, or an honest empty field", () => {
+  const images = [
+    { mime: "image/png", bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]) },
+    { mime: "image/jpeg", bytes: new Uint8Array([0xff, 0xd8, 0xff, 4, 5]) },
+  ];
+  const context = { department: "Packing", uploader: "Supervisor Sami", locale: "en" as const };
+  const env = { ASSISTANT_BRIDGE_SECRET: "s3cret", ASSISTANT_BRIDGE_URL: "http://127.0.0.1:4100" };
+  const reply = (status: number, body: unknown): typeof fetch => (async () => new Response(JSON.stringify(body), { status })) as typeof fetch;
+
+  it("sends every photo of the set, the three names and the secret to the assistant service's describe-images call", async () => {
+    let seen: { url: string; headers: Record<string, string>; body: { images: { mediaType: string; data: string }[]; context: Record<string, string> } } | null = null;
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      seen = { url, headers: init.headers as Record<string, string>, body: JSON.parse(String(init.body)) };
+      return new Response(JSON.stringify({ ok: true, answer: "  Two photos of a cracked box on the packing line.  " }));
+    }) as unknown as typeof fetch;
+    const result = await requestCaseSetDraft({ images, context, env, fetchImpl });
+    expect(result).toEqual({ ok: true, text: "Two photos of a cracked box on the packing line." });
+    expect(seen!.url).toBe("http://127.0.0.1:4100/describe-images");
+    expect(seen!.headers["x-bridge-secret"]).toBe("s3cret");
+    expect(seen!.body.images).toEqual(images.map((i) => ({ mediaType: i.mime, data: Buffer.from(i.bytes).toString("base64") })));
+    expect(seen!.body.context).toEqual({ locale: "en", department: "Packing", uploader: "Supervisor Sami" });
+    expect(JSON.stringify(seen!.body)).not.toContain("Hossam");
+  });
+
+  it("not configured: an empty draft with the reason, and no request is made", async () => {
+    let called = false;
+    const result = await requestCaseSetDraft({ images, context, env: {}, fetchImpl: (async () => ((called = true), new Response("{}"))) as unknown as typeof fetch });
+    expect(result).toEqual({ ok: false, reason: "not_configured" });
+    expect(called).toBe(false);
+  });
+
+  it("an older service without the call, a failing one, an unreachable one: never a made-up description", async () => {
+    expect(await requestCaseSetDraft({ images, context, env, fetchImpl: reply(404, { ok: false, code: "bad_request" }) })).toEqual({ ok: false, reason: "unavailable" });
+    expect(await requestCaseSetDraft({ images, context, env, fetchImpl: reply(503, { ok: false, code: "auth" }) })).toEqual({ ok: false, reason: "auth" });
+    expect(await requestCaseSetDraft({ images, context, env, fetchImpl: (async () => Promise.reject(new Error("ECONNREFUSED"))) as unknown as typeof fetch })).toEqual({ ok: false, reason: "unavailable" });
+  });
+
+  it("an empty answer is not a draft, and a slow service times out", async () => {
+    expect(await requestCaseSetDraft({ images, context, env, fetchImpl: reply(200, { ok: true, answer: "   " }) })).toEqual({ ok: false, reason: "bad_response" });
+    const slow = ((_url: string, init: RequestInit) => new Promise((_resolve, reject) => init.signal!.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }))))) as unknown as typeof fetch;
+    expect(await requestCaseSetDraft({ images, context, env, fetchImpl: slow, timeoutMs: 20 })).toEqual({ ok: false, reason: "timeout" });
   });
 });
 

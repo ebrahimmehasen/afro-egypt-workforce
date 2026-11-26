@@ -3,9 +3,9 @@
 import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
-import { Camera, Sparkles } from "lucide-react";
+import { Camera, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
-import { discardCaseProof, saveCaseProof } from "@/lib/actions/case-proof";
+import { addCaseProofPhotos, discardCaseProof, removeCaseProofPhoto, saveCaseProof } from "@/lib/actions/case-proof";
 import { keepFilledFields, useActionFeedback } from "@/hooks/use-action-feedback";
 import { useT } from "@/components/providers/locale-provider";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,104 @@ export interface PickEmployee {
   id: string;
   name: string;
   employeeNumber: string;
+}
+
+export interface CasePhoto {
+  id: string;
+  position: number;
+}
+
+/**
+ * The thumbnail grid of a case's current photos, with the ONE combined AI draft shown underneath — clearly labelled as a
+ * suggestion, never the record. Every add or remove re-reads the full current set and refreshes that draft right here
+ * (it never touches the saved finalText — see ai-draft.ts and the server actions). Read only (no remove control, no
+ * "add more", no AI status line) when `canEdit` is false; a lone photo has no remove control either way.
+ */
+export function CasePhotos({ caseId, photos, canEdit, initialDraft = null }: { caseId: string; photos: CasePhoto[]; canEdit: boolean; initialDraft?: string | null }) {
+  const t = useT();
+  const c = t.caseProof;
+  const [list, setList] = useState(photos);
+  const [draft, setDraft] = useState(initialDraft);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleAdd(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (files.length === 0) return;
+    setError(null);
+    if (list.length + files.length > L.maxPhotosPerCase) return setError(c.errors.tooManyPhotos);
+    const form = new FormData();
+    for (const file of files) form.append("photo", file);
+    setBusy("add");
+    const result = await addCaseProofPhotos(caseId, form);
+    setBusy(null);
+    if (result.error) return setError(result.error);
+    if (result.photos) setList(result.photos);
+    setDraft(result.draft ?? null);
+  }
+
+  async function handleRemove(photoId: string) {
+    if (!window.confirm(c.removePhotoConfirm)) return;
+    setError(null);
+    setBusy(photoId);
+    const result = await removeCaseProofPhoto(caseId, photoId);
+    setBusy(null);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    if (result.photos) setList(result.photos);
+    setDraft(result.draft ?? null);
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {list.length === 0 ? (
+        // a legacy case predating the photos table (or awaiting its backfilled row): its one photo is still served by
+        // the original single-photo route, which keeps working unchanged
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`/api/case-proof/${caseId}/photo`} alt={c.photoAlt} className="max-h-96 w-full rounded-lg border object-contain" data-testid="legacy-photo" />
+      ) : (
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" data-testid="case-photos-grid">
+          {list.map((p) => (
+            <div key={p.id} className="group relative aspect-square overflow-hidden rounded-md border">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`/api/case-proof/${caseId}/photos/${p.id}`} alt={c.photoAlt} className="h-full w-full object-cover" />
+              {canEdit && list.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemove(p.id)}
+                  disabled={busy !== null}
+                  aria-label={c.removePhoto}
+                  data-testid="remove-photo"
+                  className="absolute end-1 top-1 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-destructive shadow disabled:opacity-50"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <span data-testid="photos-count">{format(c.photosCount, { count: list.length })}</span>
+        {canEdit && list.length < L.maxPhotosPerCase && (
+          <label className="inline-flex min-h-10 cursor-pointer items-center rounded-md border border-input px-3 text-sm text-primary hover:bg-muted">
+            {busy === "add" ? c.addingPhotos : c.addMorePhotos}
+            <input type="file" accept={CASE_PHOTO_ACCEPT_ATTR} multiple className="sr-only" onChange={handleAdd} disabled={busy !== null} />
+          </label>
+        )}
+      </div>
+      {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
+      {canEdit &&
+        (draft ? (
+          <p className="rounded-md bg-muted px-3 py-2 text-sm" data-testid="ai-suggestion"><span className="font-medium">{c.aiSuggestionLabel}:</span> {draft}</p>
+        ) : (
+          <p className="rounded-md bg-warning/10 px-3 py-2 text-sm" role="status">{c.aiUnavailable}</p>
+        ))}
+    </div>
+  );
 }
 
 function SaveButton() {
@@ -63,7 +161,7 @@ export function CaseProofFlow({ employees }: { employees: PickEmployee[] }) {
   // one employee or a group: the picked ids live here, so they survive the filter box hiding some rows
   const [selected, setSelected] = useState<string[]>([]);
   const [filter, setFilter] = useState("");
-  const [created, setCreated] = useState<{ id: string; draft: string | null; aiAvailable: boolean } | null>(null);
+  const [created, setCreated] = useState<{ id: string; draft: string | null; aiAvailable: boolean; photos: CasePhoto[] } | null>(null);
 
   const errorText = (code: string) => (c.errors as Record<string, string>)[code] ?? c.errors.generic;
 
@@ -73,15 +171,16 @@ export function CaseProofFlow({ employees }: { employees: PickEmployee[] }) {
     if (selected.length === 0) return setError(c.errors.pickOne);
     if (selected.length > L.maxEmployeesPerCase) return setError(c.errors.tooManyEmployees);
     const form = new FormData(event.currentTarget);
-    const photo = form.get("photo");
-    if (!(photo instanceof File) || photo.size === 0) return setError(c.errors.empty);
-    if (photo.size > L.maxPhotoBytes) return setError(c.errors.size);
+    const photos = form.getAll("photo").filter((f): f is File => f instanceof File && f.size > 0);
+    if (photos.length === 0) return setError(c.errors.empty);
+    if (photos.length > L.maxPhotosPerCase) return setError(c.errors.tooManyPhotos);
+    if (photos.some((p) => p.size > L.maxPhotoBytes)) return setError(c.errors.size);
     setUploading(true);
     try {
       const res = await fetch("/api/case-proof", { method: "POST", body: form });
-      const body = (await res.json().catch(() => ({}))) as { id?: string; draft?: string | null; aiAvailable?: boolean; error?: string };
+      const body = (await res.json().catch(() => ({}))) as { id?: string; draft?: string | null; aiAvailable?: boolean; error?: string; photos?: CasePhoto[] };
       if (!res.ok || !body.id) return setError(errorText(body.error ?? "generic"));
-      setCreated({ id: body.id, draft: body.draft ?? null, aiAvailable: Boolean(body.aiAvailable) });
+      setCreated({ id: body.id, draft: body.draft ?? null, aiAvailable: Boolean(body.aiAvailable), photos: body.photos ?? [] });
     } catch {
       setError(c.errors.generic);
     } finally {
@@ -107,12 +206,10 @@ export function CaseProofFlow({ employees }: { employees: PickEmployee[] }) {
     return (
       <div className="grid gap-4 rounded-xl border bg-card p-4 md:grid-cols-2" data-testid="case-review">
         <div className="flex flex-col gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/api/case-proof/${created.id}/photo`} alt={c.photoAlt} className="max-h-96 w-full rounded-lg border object-contain" />
+          <CasePhotos caseId={created.id} photos={created.photos} canEdit initialDraft={created.draft} />
         </div>
         <div className="flex flex-col gap-3">
           <h2 className="font-semibold">{c.step2}</h2>
-          {!created.aiAvailable && <p className="rounded-md bg-warning/10 px-3 py-2 text-sm" role="status">{c.aiUnavailable}</p>}
           <CaseTextForm
             id={created.id}
             initial={created.draft ?? ""}
@@ -156,8 +253,8 @@ export function CaseProofFlow({ employees }: { employees: PickEmployee[] }) {
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="cp-photo">{c.photoLabel}</Label>
-        <Input id="cp-photo" name="photo" type="file" accept={CASE_PHOTO_ACCEPT_ATTR} capture="environment" required />
-        <p className="text-xs text-muted-foreground">{format(c.photoHint, { size: Math.round(L.maxPhotoBytes / (1024 * 1024)) })}</p>
+        <Input id="cp-photo" name="photo" type="file" accept={CASE_PHOTO_ACCEPT_ATTR} multiple required />
+        <p className="text-xs text-muted-foreground">{format(c.photoHint, { size: Math.round(L.maxPhotoBytes / (1024 * 1024)), max: L.maxPhotosPerCase })}</p>
       </div>
       <p className="text-xs text-muted-foreground">{c.aiPrivacy}</p>
       {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{error}</p>}
