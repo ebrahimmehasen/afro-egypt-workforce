@@ -13,8 +13,10 @@ export const CASE_PHOTO_ACCEPT_ATTR = ".jpg,.jpeg,.png,.webp";
 export const CASE_PROOF_LIMITS = {
   /** One photo, in bytes. */
   maxPhotoBytes: 5 * 1024 * 1024,
-  /** The whole upload request (the photo plus the other fields). Refused before it is read when it says it is larger. */
-  maxRequestBytes: 5 * 1024 * 1024 + 64 * 1024,
+  /** Photos a single case may carry at once (an upload, or adding more to a draft later, is refused past this). */
+  maxPhotosPerCase: 10,
+  /** The whole upload request (every photo plus the other fields). Refused before it is read when it says it is larger. */
+  maxRequestBytes: 5 * 1024 * 1024 * 10 + 64 * 1024,
   /** The description a supervisor saves, and the AI draft kept next to it. */
   maxTextLength: 2000,
   maxDraftLength: 1200,
