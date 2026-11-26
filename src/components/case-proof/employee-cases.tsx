@@ -12,6 +12,8 @@ type Cases = {
   aiGenerated: boolean;
   /** Everyone the case is attached to (that the viewer may see): more than one means a group case. */
   employees?: { id: string; name: string }[];
+  /** The case's photos, in order; a case may have more than one. Absent/empty falls back to the legacy single-photo route. */
+  photos?: { id: string }[];
 }[];
 
 /**
@@ -31,7 +33,11 @@ export function EmployeeCases({ cases, t, locale }: { cases: Cases; t: Awaited<R
           {cases.map((row) => (
             <li key={row.id} className="flex items-start gap-3 rounded-lg border bg-card p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`/api/case-proof/${row.id}/photo`} alt={c.photoAlt} className="h-16 w-16 shrink-0 rounded-md border object-cover" />
+              <img
+                src={row.photos && row.photos.length > 0 ? `/api/case-proof/${row.id}/photos/${row.photos[0].id}` : `/api/case-proof/${row.id}/photo`}
+                alt={c.photoAlt}
+                className="h-16 w-16 shrink-0 rounded-md border object-cover"
+              />
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span>{dateFmt.format(row.createdAt)}</span>
