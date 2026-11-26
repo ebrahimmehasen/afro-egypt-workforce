@@ -106,7 +106,7 @@ export function ApplyForm({ jobs, fields }: { jobs: ApplyJobView[]; fields: Appl
       {jobs.length > 0 && (
         <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-sm" noValidate>
           {/* the trap: hidden from people, filled by bots. Must stay empty. */}
-          <div aria-hidden="true" style={{ position: "absolute", left: "-10000px", width: 1, height: 1, overflow: "hidden" }}>
+          <div aria-hidden="true" style={{ position: "absolute", insetInlineStart: 0, top: 0, width: 0, height: 0, overflow: "hidden", opacity: 0, pointerEvents: "none" }}>
             <label>
               {a.leaveEmpty}
               <input type="text" name={HONEYPOT_FIELD} tabIndex={-1} autoComplete="off" defaultValue="" />
