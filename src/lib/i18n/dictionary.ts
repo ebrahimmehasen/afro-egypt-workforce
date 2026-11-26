@@ -67,6 +67,7 @@ export interface Dictionary {
     shifts: string;
     attendance: string;
     leaves: string;
+    missions: string;
     overtime: string;
     deductions: string;
     payroll: string;
@@ -565,6 +566,41 @@ export interface Dictionary {
       submittedFromBalance: string;
       submittedPartlyFromPay: string;
     };
+  };
+  missions: {
+    title: string;
+    description: string;
+    addMission: string;
+    dialogTitle: string;
+    editTitle: string;
+    employee: string;
+    destination: string;
+    mode: string;
+    modeRange: string;
+    modeTimed: string;
+    from: string;
+    to: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    confirmedEnd: string;
+    confirmedEndHint: string;
+    durationMinutes: string;
+    reason: string;
+    submit: string;
+    submitted: string;
+    updated: string;
+    deleted: string;
+    colEmployee: string;
+    colDestination: string;
+    colWhen: string;
+    colActions: string;
+    noRecords: string;
+    deleteTitle: string;
+    deleteConfirm: string;
+    errLockedPeriod: string;
+    errInvalidTimes: string;
+    legacyNotice: string;
   };
   overtime: {
     /** a manual entry for an employee whose "له إضافي" is off */
@@ -1142,6 +1178,7 @@ export interface Dictionary {
       shifts: string;
       attendance: string;
       leaves: string;
+      missions: string;
       overtime: string;
       deductions: string;
       payroll: string;
@@ -1357,6 +1394,9 @@ export interface Dictionary {
     simulatePunch: string;
     correctAttendance: string;
     addManualAttendance: string;
+    addMission: string;
+    editMission: string;
+    deleteMission: string;
     deleteLeave: string;
     approveLeave: string;
     rejectLeave: string;
