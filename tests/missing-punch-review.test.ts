@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { overdueReturns } from "@/lib/overdue-return";
-import { canSeeMissingPunchReview, missingPunchReviewDays, type ReviewEmployee, type ReviewRow } from "@/lib/missing-punch-review";
+import { reviewReasonLabel } from "@/lib/review-reason-label";
+import { canSeeMissingPunchReview, missingPunchReviewDays, type ReviewEmployee, type ReviewReason, type ReviewRow } from "@/lib/missing-punch-review";
 import { lockedDayCheck } from "@/lib/attendance-deductions";
 import { FALLBACK_PAY_TYPES } from "@/lib/pay-defaults";
 import { rulesFor, scheduleFor, type PayContext } from "@/lib/pay-context";
@@ -269,5 +270,15 @@ describe("the bell alert and the review list share one predicate", () => {
       const listed = run([row({ actualOut: at(DAY, last) })], {}, () => inputs).some((d) => d.reason === "permission_no_return");
       expect(listed, name).toBe(alert);
     }
+  });
+});
+
+describe("the label of each review reason (attendance table and bell share it)", () => {
+  const reasons: ReviewReason[] = ["missing_punch", "odd_punches", "permission_unused", "permission_no_return"];
+  it.each([["ar", ar], ["en", en]] as const)("every reason has its own label in %s, and no-return is not worded as a missing exit", (_lang, dict) => {
+    const labels = reasons.map((r) => reviewReasonLabel(dict.notifications, r));
+    expect(new Set(labels).size).toBe(4);
+    expect(reviewReasonLabel(dict.notifications, "permission_no_return")).toBe(dict.notifications.punchReviewNoReturn);
+    expect(reviewReasonLabel(dict.notifications, "permission_no_return")).not.toBe(dict.notifications.punchReviewPermission);
   });
 });

@@ -21,6 +21,7 @@ import { MidDayExitsBadge } from "@/components/attendance/mid-day-exits-badge";
 import type { ClassifyContext } from "@/components/attendance/classify-exit-dialog";
 import { ReviewPunchDialog } from "@/components/attendance/review-punch-dialog";
 import type { ReviewReason } from "@/lib/missing-punch-review";
+import { reviewReasonLabel } from "@/lib/review-reason-label";
 
 export function DailyAttendanceTable({
   records,
@@ -148,7 +149,7 @@ export function DailyAttendanceTable({
                     {review[record.employeeId] && (
                       <div data-testid="needs-review" className="mt-1 flex flex-col items-start gap-1">
                         <span className="rounded border border-warning/60 bg-warning/10 px-1.5 py-0.5 text-xs font-medium">
-                          {review[record.employeeId] === "missing_punch" ? t.notifications.punchReviewMissing : review[record.employeeId] === "odd_punches" ? t.notifications.punchReviewOdd : t.notifications.punchReviewPermission}
+                          {reviewReasonLabel(t.notifications, review[record.employeeId])}
                         </span>
                         {canReview && review[record.employeeId] !== "missing_punch" && <ReviewPunchDialog employeeId={record.employeeId} date={record.date} employeeName={employee!.name} />}
                       </div>
