@@ -695,10 +695,14 @@ export interface Dictionary {
     recalcReviewTitle: string;
     recalcReviewDesc: string;
     recalcNoChanges: string;
-    recalcOld: string;
-    recalcNew: string;
     recalcConfirm: string;
     recalcCancel: string;
+    recalcReasonsTitle: string;
+    recalcReasonCreated: string;
+    recalcReasonEdited: string;
+    recalcReasonVoided: string;
+    recalcReasonGeneric: string;
+    recalcReasonBy: string;
     colEmployee: string;
     colBasic: string;
     colAllowances: string;

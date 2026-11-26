@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
-import { calculatePeriodRecords } from "@/lib/payroll-recalc";
+import { calculatePeriodRecords, previewRecalculation } from "@/lib/payroll-recalc";
 import { getDictionary } from "@/lib/i18n";
 
 /**
@@ -78,5 +78,50 @@ describe.skipIf(!ready)("calculatePeriodRecords", () => {
     const period = await prisma.payrollPeriod.create({ data: { label: LABEL, year: 2099, month: 4, status: "draft" } });
     expect(await calculatePeriodRecords(period.id, "test", t, { onlyIf: ["calculated"] })).toBe("skipped");
     expect(await prisma.payrollRecord.count({ where: { periodId: period.id } })).toBe(0);
+  });
+});
+
+describe.skipIf(!ready)("previewRecalculation", () => {
+  it("has nothing to report right after approval, with nothing changed since", async () => {
+    await cleanup();
+    const period = await prisma.payrollPeriod.create({ data: { label: LABEL, year: 2099, month: 7, status: "calculated" } });
+    expect(await calculatePeriodRecords(period.id, "test", t, { onlyIf: ["calculated"] })).toBe("done");
+    await prisma.payrollPeriod.update({ where: { id: period.id }, data: { status: "approved", approvedAt: new Date() } });
+
+    expect(await previewRecalculation(period.id)).toEqual([]);
+  });
+
+  it("explains a lower net salary with the deduction added after approval", async () => {
+    await cleanup();
+    const period = await prisma.payrollPeriod.create({ data: { label: LABEL, year: 2099, month: 5, status: "calculated" } });
+    expect(await calculatePeriodRecords(period.id, "test", t, { onlyIf: ["calculated"] })).toBe("done");
+    await prisma.payrollPeriod.update({ where: { id: period.id }, data: { status: "approved", approvedAt: new Date() } });
+
+    await new Promise((resolve) => setTimeout(resolve, 10)); // strictly after approvedAt
+    await prisma.deduction.create({ data: { employeeId, type: "penalty", amount: 77, date: new Date("2099-05-10T00:00:00Z"), reason: LABEL } });
+
+    const changes = await previewRecalculation(period.id);
+    const mine = changes.find((c) => c.employeeId === employeeId);
+    expect(mine).toBeDefined();
+    expect(mine!.newNetSalary).toBe(mine!.oldNetSalary - 77);
+    expect(mine!.reasons).toContainEqual(expect.objectContaining({ source: "deduction", action: "created", amount: 77 }));
+  });
+
+  it("explains a higher net salary with the deduction voided after approval", async () => {
+    await cleanup();
+    await prisma.deduction.create({ data: { employeeId, type: "penalty", amount: 55, date: new Date("2099-06-10T00:00:00Z"), reason: LABEL } });
+    const period = await prisma.payrollPeriod.create({ data: { label: LABEL, year: 2099, month: 6, status: "calculated" } });
+    expect(await calculatePeriodRecords(period.id, "test", t, { onlyIf: ["calculated"] })).toBe("done");
+    await prisma.payrollPeriod.update({ where: { id: period.id }, data: { status: "approved", approvedAt: new Date() } });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const voided = await prisma.deduction.findFirstOrThrow({ where: { employeeId, reason: LABEL } });
+    await prisma.deduction.update({ where: { id: voided.id }, data: { voidedAt: new Date(), voidedBy: "test" } });
+
+    const changes = await previewRecalculation(period.id);
+    const mine = changes.find((c) => c.employeeId === employeeId);
+    expect(mine).toBeDefined();
+    expect(mine!.newNetSalary).toBe(mine!.oldNetSalary + 55);
+    expect(mine!.reasons).toContainEqual(expect.objectContaining({ source: "deduction", action: "voided", amount: 55 }));
   });
 });

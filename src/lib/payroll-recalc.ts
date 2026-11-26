@@ -9,6 +9,7 @@ import { dayStr } from "@/lib/serialize";
 import { addDays } from "@/lib/today";
 import { getDictionary } from "@/lib/i18n";
 import type { Dictionary } from "@/lib/i18n/dictionary";
+import type { AllowanceType, DeductionType } from "@/lib/types";
 
 /** The pay month as a half-open date range for queries: from its start day in the month before, up to (not
  * including) that day in this one. The start day comes from the payroll settings. */
@@ -172,19 +173,89 @@ export async function recalculateOpenPayrollPeriods(): Promise<number> {
   return done;
 }
 
-export type RecalculationChange = { employeeId: string; employeeNumber: string; name: string; oldNetSalary: number; newNetSalary: number };
+export type RecalculationReason =
+  | { source: "deduction"; action: "created" | "edited" | "voided"; type: DeductionType; amount: number; oldAmount?: number; date: string; at: string; actorName?: string }
+  | { source: "overtime"; action: "created" | "voided"; kind: string; amount: number; date: string; at: string; actorName?: string }
+  | { source: "allowance"; action: "created"; type: AllowanceType; amount: number; date: string; at: string; actorName?: string }
+  | { source: "generic" };
+
+export type RecalculationChange = {
+  employeeId: string;
+  employeeNumber: string;
+  name: string;
+  oldNetSalary: number;
+  newNetSalary: number;
+  reasons: RecalculationReason[];
+};
+
+/** The one audit entry, if any, that clearly explains a row change at `at`: the only entry of a matching module
+ * within a few seconds of it. More than one candidate (or none) is not a clear match, so the name is left out
+ * rather than guessed. */
+async function findActorName(moduleCandidates: string[], at: Date): Promise<string | undefined> {
+  const toleranceMs = 3000;
+  const entries = await prisma.auditLogEntry.findMany({
+    where: { module: { in: moduleCandidates }, timestamp: { gte: new Date(at.getTime() - toleranceMs), lte: new Date(at.getTime() + toleranceMs) } },
+  });
+  return entries.length === 1 ? entries[0].userName : undefined;
+}
+
+/** Every deduction, overtime and allowance change for one employee, in this pay month, that happened after the
+ * period was approved — the real rows behind a changed net salary. */
+async function employeeReasons(employeeId: string, approvedAt: Date, from: Date, to: Date, period: { year: number; month: number }): Promise<RecalculationReason[]> {
+  const ar = getDictionary("ar");
+  const en = getDictionary("en");
+  const deductionModules = [ar.nav.deductions, en.nav.deductions];
+  const overtimeModules = [ar.nav.overtime, en.nav.overtime];
+
+  const [deductions, overtimes, allowances] = await Promise.all([
+    prisma.deduction.findMany({ where: { employeeId, date: { gte: from, lt: to } } }),
+    prisma.overtime.findMany({ where: { employeeId, date: { gte: from, lt: to } } }),
+    prisma.allowance.findMany({
+      where: { employeeId, OR: [{ monthly: true }, { monthly: false, effectiveYear: period.year, effectiveMonth: period.month }] },
+    }),
+  ]);
+
+  const reasons: RecalculationReason[] = [];
+  for (const d of deductions) {
+    if (d.voidedAt && d.voidedAt > approvedAt) {
+      reasons.push({ source: "deduction", action: "voided", type: d.type, amount: d.amount, date: dayStr(d.date), at: d.voidedAt.toISOString(), actorName: await findActorName(deductionModules, d.voidedAt) });
+    } else if (d.editedAt && d.editedAt > approvedAt) {
+      reasons.push({
+        source: "deduction", action: "edited", type: d.type, amount: d.amount, oldAmount: d.originalAmount ?? undefined,
+        date: dayStr(d.date), at: d.editedAt.toISOString(), actorName: await findActorName(deductionModules, d.editedAt),
+      });
+    } else if (d.createdAt > approvedAt) {
+      reasons.push({ source: "deduction", action: "created", type: d.type, amount: d.amount, date: dayStr(d.date), at: d.createdAt.toISOString(), actorName: await findActorName(deductionModules, d.createdAt) });
+    }
+  }
+  for (const o of overtimes) {
+    if (o.voidedAt && o.voidedAt > approvedAt) {
+      reasons.push({ source: "overtime", action: "voided", kind: o.kind, amount: o.amount, date: dayStr(o.date), at: o.voidedAt.toISOString(), actorName: await findActorName(overtimeModules, o.voidedAt) });
+    } else if (o.status === "approved" && !o.voidedAt && o.createdAt > approvedAt) {
+      reasons.push({ source: "overtime", action: "created", kind: o.kind, amount: o.amount, date: dayStr(o.date), at: o.createdAt.toISOString(), actorName: await findActorName(overtimeModules, o.createdAt) });
+    }
+  }
+  for (const a of allowances) {
+    if (a.createdAt > approvedAt) {
+      reasons.push({ source: "allowance", action: "created", type: a.type, amount: a.amount, date: dayStr(a.createdAt), at: a.createdAt.toISOString(), actorName: await findActorName(deductionModules, a.createdAt) });
+    }
+  }
+  return reasons;
+}
 
 /**
  * What recalculating this period would change, without writing anything — the net salary this period has on file
- * now vs. what it would become from today's attendance, allowances and deductions. Only employees whose figure
- * would actually change are returned. Used to show an approved period's admin the real impact before they
- * confirm a recalculation (closed periods never recalculate, so this is never called for one).
+ * now vs. what it would become from today's attendance, allowances and deductions, and the deduction / overtime /
+ * allowance rows (who, when, how much) behind each employee's change since the period was approved. Only
+ * employees whose figure would actually change are returned. Used to show an approved period's admin the real
+ * impact before they confirm a recalculation (closed periods never recalculate, so this is never called for one).
  */
 export async function previewRecalculation(periodId: string): Promise<RecalculationChange[]> {
   const period = await prisma.payrollPeriod.findUnique({ where: { id: periodId } });
   if (!period) return [];
 
   const ctx = await loadPayContext();
+  const { from, to } = payMonthRange(period.year, period.month, ctx.payPeriodStartDay);
   const [activeEmployees, existingRecords] = await Promise.all([
     prisma.employee.findMany({ where: { deletedAt: null, status: { in: ["active", "on_leave"] } } }),
     prisma.payrollRecord.findMany({ where: { periodId } }),
@@ -197,7 +268,11 @@ export async function previewRecalculation(periodId: string): Promise<Recalculat
     const existing = existingByEmployee.get(employee.id);
     const oldNetSalary = existing?.netSalary ?? 0;
     if (oldNetSalary !== result.netSalary) {
-      changes.push({ employeeId: employee.id, employeeNumber: employee.employeeNumber, name: employee.name, oldNetSalary, newNetSalary: result.netSalary });
+      const reasons = period.approvedAt ? await employeeReasons(employee.id, period.approvedAt, from, to, period) : [];
+      changes.push({
+        employeeId: employee.id, employeeNumber: employee.employeeNumber, name: employee.name, oldNetSalary, newNetSalary: result.netSalary,
+        reasons: reasons.length > 0 ? reasons : [{ source: "generic" }],
+      });
     }
   }
   return changes;
