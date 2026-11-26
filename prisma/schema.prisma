@@ -809,3 +809,103 @@ model WorkRequest {
   @@index([status])
   @@index([date])
 }
+
+// ---- Recruitment: people applying for a job at the factory (public form → HR). Additive only: nothing here is linked to
+// Employee, payroll or attendance; turning an applicant into an employee is a separate, later feature.
+
+enum ApplicationStatus {
+  new
+  reviewed
+  shortlisted
+  rejected
+  hired
+}
+
+/// A job the factory may take applications for. `open` decides whether /apply lists it and accepts applications; the salary
+/// range is optional and only ever shown publicly when `showSalary` is on.
+model JobOpening {
+  id           String           @id @default(cuid())
+  title        String
+  description  String?          @db.Text
+  open         Boolean          @default(true)
+  salaryMin    Float?
+  salaryMax    Float?
+  showSalary   Boolean          @default(false)
+  sortOrder    Int              @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  applications JobApplication[]
+
+  @@index([open, sortOrder])
+}
+
+model JobApplication {
+  id             String                @id @default(cuid())
+  jobOpeningId   String
+  jobOpening     JobOpening            @relation(fields: [jobOpeningId], references: [id])
+  fullName       String
+  phone          String
+  email          String?
+  nationalId     String?
+  birthDate      DateTime?             @db.Date
+  city           String?
+  education      String?
+  experience     String?               @db.Text
+  expectedSalary Float?
+  /// Answers to the custom questions HR added to the form: [{ key, labelAr, labelEn, value }]. A snapshot, so a later
+  /// relabelling or removal of a question never changes what the applicant was asked.
+  answers        Json?
+  status         ApplicationStatus     @default(new)
+  note           String?               @db.Text
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  documents      ApplicationDocument[]
+
+  @@index([jobOpeningId])
+  @@index([status, createdAt])
+}
+
+/// A certificate an applicant uploaded. `storageKey` is a random name relative to the private storage root
+/// (storage/uploads/applications), never a URL: the only way to read a file is the authenticated download route.
+model ApplicationDocument {
+  id            String         @id @default(cuid())
+  applicationId String
+  application   JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  /// The form field this file was uploaded under.
+  fieldKey      String?
+  fileName      String
+  storageKey    String
+  mimeType      String
+  size          Int
+  createdAt     DateTime       @default(now())
+
+  @@index([applicationId])
+}
+
+enum FormFieldType {
+  text
+  longtext
+  number
+  select
+  date
+  file
+}
+
+/// The public application form, as HR configured it. A default field with no row here uses its built-in default (see
+/// src/lib/recruitment/form-config.ts); a row overrides its label, order, required and visible flags. The core fields (job, full
+/// name, phone) are always shown and required whatever a row says. Custom questions exist only as rows.
+model FormField {
+  id        String        @id @default(cuid())
+  key       String        @unique
+  labelAr   String
+  labelEn   String
+  type      FormFieldType
+  /// select only: [{ value, ar, en }]
+  options   Json?
+  required  Boolean       @default(false)
+  visible   Boolean       @default(true)
+  sortOrder Int           @default(0)
+  builtin   Boolean       @default(false)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
