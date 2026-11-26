@@ -59,7 +59,7 @@ export async function applyAddReviewedPunches(input: ReviewPunchesInput, actorNa
   if (!parsed.success) return { error: parsed.error.issues.some((i) => i.path[0] === "reason") ? t.reviewPunch.errReason : t.validation.invalidData };
   const { employeeId, date, outTime, backTime, reason } = parsed.data;
 
-  const [ctx, periods] = await Promise.all([loadPayContext(), prisma.payrollPeriod.findMany({ where: { status: { in: ["approved", "closed"] } } })]);
+  const [ctx, periods] = await Promise.all([loadPayContext(), prisma.payrollPeriod.findMany({ where: { status: "closed" } })]);
   if (lockedDayCheck(periods, ctx)(date)) return { error: t.leaves.errLockedPeriod };
 
   const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });

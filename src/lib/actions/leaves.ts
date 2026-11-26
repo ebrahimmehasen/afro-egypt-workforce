@@ -41,8 +41,8 @@ const clock = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.
 
 /**
  * Checks a timed permission against the employee's day as it stands now — their working times, the day off and
- * holidays, the approved or closed pay months, and their other permissions that day (`against`: still standing
- * when filing, already approved when approving). Null when it may go ahead, else the message to show.
+ * holidays, the closed pay months, and their other permissions that day (`against`: still standing when filing,
+ * already approved when approving). Null when it may go ahead, else the message to show.
  */
 async function timedPermissionError(
   t: Dictionary,
@@ -54,7 +54,7 @@ async function timedPermissionError(
   const day = dayDate(p.date);
   const [ctx, periods, others] = await Promise.all([
     loadPayContext(),
-    prisma.payrollPeriod.findMany({ where: { status: { in: ["approved", "closed"] } } }),
+    prisma.payrollPeriod.findMany({ where: { status: "closed" } }),
     prisma.leave.findMany({
       where: { employeeId: p.employeeId, type: "permission", status: { in: against }, from: { lte: day }, to: { gte: day }, ...(p.excludeId ? { id: { not: p.excludeId } } : {}) },
     }),

@@ -164,7 +164,7 @@ export async function loadReviewDays(opts: {
 /** The days in a range that need review and that this user may see (inside their departments), outside approved or closed pay months. */
 export async function loadReviewForViewer(user: User, from: string, to: string, now: Date = new Date()): Promise<ReviewDay[]> {
   if (!canSeeMissingPunchReview(user)) return [];
-  const periods = await prisma.payrollPeriod.findMany({ where: { status: { in: ["approved", "closed"] } }, select: { year: true, month: true } });
+  const periods = await prisma.payrollPeriod.findMany({ where: { status: "closed" }, select: { year: true, month: true } });
   return loadReviewDays({
     scope: (employees) => viewerScope(user, employees),
     from,

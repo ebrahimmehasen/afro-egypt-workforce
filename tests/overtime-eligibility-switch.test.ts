@@ -152,7 +152,7 @@ describe.skipIf(!sampleDb)("switching له إضافي on an employee", () => {
     await prisma.employee.create({
       data: { id: EMP, employeeNumber: "ZZOTSW-001", name: "اختبار مفتاح الإضافي", departmentId: seed.departmentId, jobTitle: "x", hireDate: new Date("2024-01-01"), shiftId: seed.shiftId, basicSalary: 6000, overtimeEligible: true },
     });
-    await prisma.payrollPeriod.create({ data: { label: "اختبار مفتاح الإضافي", ...LOCKED, status: "approved" } });
+    await prisma.payrollPeriod.create({ data: { label: "اختبار مفتاح الإضافي", ...LOCKED, status: "closed" } });
   });
   beforeEach(() => {
     effects.calls.length = 0;

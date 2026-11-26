@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recordChangeAs } from "@/lib/audit";
-import { calculatePeriodRecords } from "@/lib/payroll-recalc";
+import { calculatePeriodRecords, previewRecalculation, RecalculationChange } from "@/lib/payroll-recalc";
 import { getSession } from "@/lib/auth";
 import { gate } from "@/lib/change-requests";
 import { getT } from "@/lib/i18n";
@@ -100,6 +100,17 @@ export async function applyCalculatePayroll(payload: CalculatePayrollPayload, ac
   revalidatePath("/workforce-cost");
   revalidatePath("/audit-log");
   return { success: true };
+}
+
+/**
+ * What recalculating this period would change, per employee's net salary — for an approved period only, so an
+ * admin can see the real impact before confirming (`calculatePayroll`) the recalculation. Closed periods, and
+ * periods not yet approved, have nothing to review here: they recalculate freely already.
+ */
+export async function previewPayrollRecalculation(periodId: string): Promise<RecalculationChange[]> {
+  const period = await prisma.payrollPeriod.findUnique({ where: { id: periodId } });
+  if (!period || period.status !== "approved") return [];
+  return previewRecalculation(periodId);
 }
 
 type PeriodIdPayload = { periodId: string };

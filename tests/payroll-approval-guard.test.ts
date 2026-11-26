@@ -34,7 +34,7 @@ try {
 const EMP = "ZZ-GRD-001";
 const ACTOR = "ZZ-guard-test";
 const YEAR = 2019;
-const MONTHS = { odd: 6, corrected: 7, locked: 8, clear: 9, status: 10, noReturn: 11 };
+const MONTHS = { odd: 6, corrected: 7, locked: 8, clear: 9, status: 10, noReturn: 11, approvedOpen: 12 };
 const admin = (): User => ({ id: "U-grd", name: ACTOR, email: "a@x", role: "admin", permissions: [] });
 
 let employeeShiftId = "";
@@ -73,8 +73,18 @@ async function makeDay(day: string, opts: { status?: "present" | "missing_punch"
     },
   });
 }
-const period = (month: number, status: "calculated" | "approved") =>
-  prisma.payrollPeriod.create({ data: { label: `guard-test-${month}`, year: YEAR, month, status, calculatedAt: new Date(), approvedAt: status === "approved" ? new Date() : null } });
+const period = (month: number, status: "calculated" | "approved" | "closed") =>
+  prisma.payrollPeriod.create({
+    data: {
+      label: `guard-test-${month}`,
+      year: YEAR,
+      month,
+      status,
+      calculatedAt: new Date(),
+      approvedAt: status === "approved" || status === "closed" ? new Date() : null,
+      closedAt: status === "closed" ? new Date() : null,
+    },
+  });
 const approve = (id: string) => applyApprovePayrollPeriod({ periodId: id }, ACTOR);
 const status = async (id: string) => (await prisma.payrollPeriod.findUniqueOrThrow({ where: { id } })).status;
 const logs = () => prisma.attendanceLog.findMany({ where: { employeeId: EMP }, orderBy: { timestamp: "asc" } });
@@ -214,13 +224,22 @@ describe.skipIf(!sampleDb)("entering reviewed punches", () => {
     return addReviewedPunches({}, f);
   };
 
-  it("is refused for a day in an approved period, and nothing is written", async () => {
+  it("is refused for a day in a closed period, and nothing is written", async () => {
     const day = await workingDay(MONTHS.locked);
     await makeDay(day, { punches: ["08:00", "12:00", "20:00"] });
-    await period(MONTHS.locked, "approved");
+    await period(MONTHS.locked, "closed");
     const before = await logs();
     expect(await applyAddReviewedPunches({ employeeId: EMP, date: day, backTime: "13:00", reason: "confirmed" }, ACTOR)).toEqual({ error: ar.leaves.errLockedPeriod });
     expect(await logs()).toEqual(before);
+  });
+
+  it("is accepted for a day in an approved but not yet closed period", async () => {
+    const day = await workingDay(MONTHS.approvedOpen);
+    await makeDay(day, { punches: ["08:00", "12:00", "20:00"] });
+    await period(MONTHS.approvedOpen, "approved");
+    const before = await logs();
+    expect(await applyAddReviewedPunches({ employeeId: EMP, date: day, backTime: "13:00", reason: "confirmed" }, ACTOR)).toMatchObject({ success: true });
+    expect(await logs()).not.toEqual(before);
   });
 
   it("is refused for HR outside the employee's departments, and for HR without the attendance right", async () => {

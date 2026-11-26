@@ -692,6 +692,13 @@ export interface Dictionary {
     recalculated: string;
     approvedMsg: string;
     closedMsg: string;
+    recalcReviewTitle: string;
+    recalcReviewDesc: string;
+    recalcNoChanges: string;
+    recalcOld: string;
+    recalcNew: string;
+    recalcConfirm: string;
+    recalcCancel: string;
     colEmployee: string;
     colBasic: string;
     colAllowances: string;
