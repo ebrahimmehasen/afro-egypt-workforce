@@ -3,6 +3,8 @@ import { HR_APPROVALS, canApprove, canReviewRequest, hasPermission, reviewsReque
 import { getT } from "@/lib/i18n";
 import { leaveTypeLabel } from "@/lib/i18n/labels";
 import { User } from "@/lib/types";
+import { canSeeMissingPunchReview, loadMissingPunchReview } from "@/lib/missing-punch-review";
+import { canSeeOverdueReturn, loadOverdueReturns } from "@/lib/overdue-return";
 
 export interface AppNotification {
   id: string;
@@ -59,6 +61,40 @@ export async function getNotifications(user: User): Promise<NotificationFeed> {
         at: l.createdAt.toISOString(),
         href: "/leaves",
         actionable: true,
+        tone: "info",
+      });
+    }
+  }
+
+  // a day a punch was forgotten on waits for a person to look at it (a list only: nothing is charged by guessing)
+  if (canSeeMissingPunchReview(user)) {
+    const days = await loadMissingPunchReview(user);
+    pendingCount += days.length;
+    const reasonLabel = { missing_punch: t.notifications.punchReviewMissing, odd_punches: t.notifications.punchReviewOdd, permission_unused: t.notifications.punchReviewPermission, permission_no_return: t.notifications.punchReviewNoReturn };
+    for (const d of days.slice(0, PER_KIND)) {
+      items.push({
+        id: `punch-review-${d.employeeId}-${d.date}`,
+        title: t.notifications.punchReview,
+        body: `${d.name} — ${d.date} — ${reasonLabel[d.reason]}`,
+        at: new Date(`${d.date}T12:00:00.000Z`).toISOString(),
+        href: `/attendance?date=${d.date}`,
+        actionable: true,
+        tone: "info",
+      });
+    }
+  }
+
+  // an approved timed permission has ended and the employee has not punched back in: informational, a separate group
+  // (never counted as pending work, never blocks anything)
+  if (canSeeOverdueReturn(user)) {
+    for (const o of (await loadOverdueReturns(user)).slice(0, PER_KIND)) {
+      items.push({
+        id: `overdue-return-${o.employeeId}-${o.date}`,
+        title: t.notifications.overdueReturn,
+        body: `${o.name} — ${t.notifications.overdueReturnUntil} ${o.permissionEnd}`,
+        at: o.exitAt.toISOString(),
+        href: `/attendance?date=${o.date}`,
+        actionable: false,
         tone: "info",
       });
     }

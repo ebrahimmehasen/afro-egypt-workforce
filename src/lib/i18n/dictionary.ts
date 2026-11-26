@@ -151,6 +151,13 @@ export interface Dictionary {
     workRequestPending: string;
     workRequestApproved: string;
     workRequestRejected: string;
+    punchReview: string;
+    punchReviewMissing: string;
+    punchReviewOdd: string;
+    punchReviewPermission: string;
+    punchReviewNoReturn: string;
+    overdueReturn: string;
+    overdueReturnUntil: string;
     hours: string;
   };
   dashboard: {
@@ -685,6 +692,17 @@ export interface Dictionary {
     recalculated: string;
     approvedMsg: string;
     closedMsg: string;
+    recalcReviewTitle: string;
+    recalcReviewDesc: string;
+    recalcNoChanges: string;
+    recalcConfirm: string;
+    recalcCancel: string;
+    recalcReasonsTitle: string;
+    recalcReasonCreated: string;
+    recalcReasonEdited: string;
+    recalcReasonVoided: string;
+    recalcReasonGeneric: string;
+    recalcReasonBy: string;
     colEmployee: string;
     colBasic: string;
     colAllowances: string;
@@ -712,6 +730,26 @@ export interface Dictionary {
     selectPeriod: string;
     year: string;
     month: string;
+  };
+  reviewPunch: {
+    action: string;
+    title: string;
+    button: string;
+    intro: string;
+    outLabel: string;
+    backLabel: string;
+    reasonLabel: string;
+    reasonHint: string;
+    submit: string;
+    done: string;
+    errNeedOne: string;
+    errBadTime: string;
+    errBackBeforeOut: string;
+    errOutsideDay: string;
+    errDuplicate: string;
+    errNoDay: string;
+    errReason: string;
+    approveBlocked: string;
   };
   leavePaper: {
     title: string;
@@ -1323,6 +1361,7 @@ export interface Dictionary {
     rejectLeave: string;
     classifyExit: string;
     annotateExit: string;
+    reviewPunches: string;
     approveOvertime: string;
     rejectOvertime: string;
     addDeduction: string;

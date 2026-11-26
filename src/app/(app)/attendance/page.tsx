@@ -20,6 +20,7 @@ import { exitWindow } from "@/lib/permission-duration";
 import { latestAnnotations } from "@/lib/exit-annotation";
 import type { ClassifyContext } from "@/components/attendance/classify-exit-dialog";
 import { prisma } from "@/lib/prisma";
+import { loadReviewForViewer, type ReviewReason } from "@/lib/missing-punch-review";
 
 export default async function AttendancePage({
   searchParams,
@@ -80,6 +81,11 @@ export default async function AttendancePage({
     }
   }
 
+  // the day's employees that need a punch review (who may approve leaves or attendance): a list, nothing is charged by it
+  const review: Record<string, ReviewReason> = {};
+  for (const d of await loadReviewForViewer(user, date, date)) review[d.employeeId] = d.reason;
+  const canReview = canApprove(user, "attendance");
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -114,6 +120,8 @@ export default async function AttendancePage({
             initialStatus={initialStatus}
             midDay={midDay}
             classify={classify}
+            review={review}
+            canReview={canReview}
           />
         </TabsContent>
         <TabsContent value="raw">

@@ -51,7 +51,7 @@ export async function applyAnnotateExit(input: AnnotateExitInput, actorName: str
   const { employeeId, date, type, out, back, reason } = parsed.data;
 
   // a day inside an approved or closed pay month is refused, like the permission: nothing about it is touched
-  const [ctx, periods] = await Promise.all([loadPayContext(), prisma.payrollPeriod.findMany({ where: { status: { in: ["approved", "closed"] } } })]);
+  const [ctx, periods] = await Promise.all([loadPayContext(), prisma.payrollPeriod.findMany({ where: { status: "closed" } })]);
   if (lockedDayCheck(periods, ctx)(date)) return { error: t.leaves.errLockedPeriod };
 
   const employee = await prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null } });

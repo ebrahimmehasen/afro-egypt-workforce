@@ -9,6 +9,12 @@
 /** Punches this close to the one before them are the same punch pressed twice: they count once. */
 export const DUPLICATE_PUNCH_MS = 2 * 60_000;
 
+/**
+ * The `source` an engine punch carries when HR entered it after reviewing a day (hr-review-punch.ts). On a day HR has
+ * corrected, only these middle punches are read; every other middle punch is still ignored there.
+ */
+export const HR_REVIEW_SOURCE = "hr_review";
+
 const MS_PER_MIN = 60_000;
 
 export interface DayPunch {
@@ -106,7 +112,11 @@ export interface MidDayInput {
   dayEnd: Date;
   permissions: TimedPermission[];
   graceMinutes: number;
-  /** Corrected by HR: their check-in and check-out stand, and the punches in between are not read. */
+  /**
+   * Corrected by HR: their check-in and check-out stand, and the device's punches in between are not read — unless HR
+   * has entered a punch after reviewing the day (source HR_REVIEW_SOURCE), in which case those and the device's middle
+   * punches inside the corrected in/out are read together.
+   */
   corrected?: boolean;
   /** For "out on permission" on a day still running. */
   now?: Date;
@@ -148,7 +158,21 @@ export function analyzeMidDay(input: MidDayInput): MidDayAnalysis {
   const empty: MidDayAnalysis = { intervals: [], missingPunch: false, finalExit: null, outOnPermission: false, totals: { permissionMinutes: 0, overrunCharged: 0, unauthorizedCharged: 0 } };
   if (!actualIn) return empty;
 
-  const punches = dedupePunches(input.punches);
+  // A corrected day with no punch HR entered after reviewing it reads no middle punch at all. Once HR has entered one, the
+  // device's middle punches are read with it (the middle filter below keeps them strictly inside the corrected in/out), so a
+  // reviewed return completes a device exit and a reviewed exit a device return. A device punch pressed right beside a
+  // reviewed one gives way to it. Every other day reads all punches.
+  const reviewedPunches = input.punches.filter((p) => p.source === HR_REVIEW_SOURCE);
+  const punches = dedupePunches(
+    !input.corrected
+      ? input.punches
+      : reviewedPunches.length === 0
+        ? []
+        : [
+            ...reviewedPunches,
+            ...input.punches.filter((p) => p.source !== HR_REVIEW_SOURCE && reviewedPunches.every((r) => Math.abs(p.at.getTime() - r.at.getTime()) >= DUPLICATE_PUNCH_MS)),
+          ],
+  );
   const permissions = [...input.permissions].filter((p) => p.durationMinutes > 0).sort((a, b) => a.start.getTime() - b.start.getTime());
   const used = new Set<string>();
 
@@ -159,7 +183,7 @@ export function analyzeMidDay(input: MidDayInput): MidDayAnalysis {
   // leaving for the day — so it closes the stretch out before it and there is no check-out yet.
   const running = Boolean(input.now && input.now < dayEnd);
   let lastOut: Date | null = actualOut;
-  if (actualOut && !input.corrected) {
+  if (actualOut && (!input.corrected || punches.length > 0)) {
     const inMs = actualIn.getTime();
     const outMs = actualOut.getTime();
     const middle = punches.filter(

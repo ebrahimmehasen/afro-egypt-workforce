@@ -19,6 +19,9 @@ import { translateLabel } from "@/lib/i18n/data-labels";
 import type { MidDayAnalysis } from "@/lib/mid-day-exits";
 import { MidDayExitsBadge } from "@/components/attendance/mid-day-exits-badge";
 import type { ClassifyContext } from "@/components/attendance/classify-exit-dialog";
+import { ReviewPunchDialog } from "@/components/attendance/review-punch-dialog";
+import type { ReviewReason } from "@/lib/missing-punch-review";
+import { reviewReasonLabel } from "@/lib/review-reason-label";
 
 export function DailyAttendanceTable({
   records,
@@ -28,6 +31,8 @@ export function DailyAttendanceTable({
   initialStatus = "all",
   midDay = {},
   classify,
+  review = {},
+  canReview = false,
 }: {
   records: DailyAttendance[];
   employees: Employee[];
@@ -37,6 +42,10 @@ export function DailyAttendanceTable({
   midDay?: Record<string, MidDayAnalysis>;
   /** record id → what the classify action needs for that day's exits; only given to who may approve leaves */
   classify?: Record<string, ClassifyContext>;
+  /** employee id → why that employee's day (the page's date) needs a punch review, for the days that do */
+  review?: Record<string, ReviewReason>;
+  /** whether the viewer may enter reviewed punches (the admin, or HR holding the attendance right) */
+  canReview?: boolean;
   /** Status filter to pre-select, e.g. from a dashboard KPI link (`?status=absent`). */
   initialStatus?: string;
 }) {
@@ -137,6 +146,14 @@ export function DailyAttendanceTable({
                       {!midDay[record.id]?.outOnPermission && <AttendanceStatusBadge status={record.status} />}
                       {midDay[record.id] && <MidDayExitsBadge analysis={midDay[record.id]} classify={classify?.[record.id]} />}
                     </div>
+                    {review[record.employeeId] && (
+                      <div data-testid="needs-review" className="mt-1 flex flex-col items-start gap-1">
+                        <span className="rounded border border-warning/60 bg-warning/10 px-1.5 py-0.5 text-xs font-medium">
+                          {reviewReasonLabel(t.notifications, review[record.employeeId])}
+                        </span>
+                        {canReview && review[record.employeeId] !== "missing_punch" && <ReviewPunchDialog employeeId={record.employeeId} date={record.date} employeeName={employee!.name} />}
+                      </div>
+                    )}
                   </TableCell>
                   {canCorrect && (
                     <TableCell className="text-end">
