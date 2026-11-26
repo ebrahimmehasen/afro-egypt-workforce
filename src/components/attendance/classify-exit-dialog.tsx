@@ -8,6 +8,7 @@ import { annotateExit } from "@/lib/actions/exit-annotations";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
 import { useT } from "@/components/providers/locale-provider";
 import { PermissionDurationPicker } from "@/components/leaves/permission-duration-picker";
+import { PunchReminder } from "@/components/leaves/punch-reminder";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -86,6 +87,7 @@ export function ClassifyExitDialog({
         <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           {format(m.classifyIntro, { out, back, minutes })}
         </p>
+        <PunchReminder />
         <div className="flex flex-col gap-1.5">
           <Label>{m.classifyKindLabel}</Label>
           <div className="flex flex-wrap gap-2">
