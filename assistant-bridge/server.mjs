@@ -6,6 +6,7 @@
 //   POST /ask-stream  the answer as it is written: one JSON event per line (delta, tool, done, error)
 //   POST /ask         the same question, answered once it is complete
 //   POST /describe-image  a short draft description of one photo (case proof): no tools, no app access
+//   POST /describe-images a short combined draft for a SET of photos (case proof, multi-photo): same, no tools, no app access
 //   GET  /health
 
 import crypto from "node:crypto";
@@ -16,8 +17,8 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
-  DESCRIBE_LIMITS, LIMITS, buildCliArgs, buildDescribeArgs, buildDescribeInput, buildDescribeSystemPrompt, buildMcpConfig, buildPrompt, buildSystemPrompt,
-  parseCliResult, readStreamLine, validateAsk, validateDescribe,
+  DESCRIBE_LIMITS, LIMITS, buildCliArgs, buildDescribeArgs, buildDescribeImagesInput, buildDescribeImagesSystemPrompt, buildDescribeInput, buildDescribeSystemPrompt,
+  buildMcpConfig, buildPrompt, buildSystemPrompt, parseCliResult, readStreamLine, validateAsk, validateDescribe, validateDescribeImages,
 } from "./bridge-core.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -276,21 +277,9 @@ export function createBridge(config) {
   }
 
 
-  /**
-   * POST /describe-image — a short draft description of one photo (case proof). Same secret, same limit on how many run at
-   * once, same CLI and sign-in as the assistant; but no tools and no app access at all, and only sizes are logged.
-   */
-  async function handleDescribe(req, res) {
-    if (!sameSecret(req.headers["x-bridge-secret"], config.secret)) return reply(res, 401, { ok: false, code: "auth", message: "Wrong secret." });
-    let body;
-    try {
-      body = JSON.parse(await readBody(req, DESCRIBE_LIMITS.body));
-    } catch {
-      return fail(res, "bad_request", "The body is not valid JSON, or is too large.");
-    }
-    const checked = validateDescribe(body);
-    if (!checked.ok) return fail(res, "bad_request", checked.message);
-
+  /** Runs the CLI for a describe call (one photo or a set) and replies. `args` and `input` are already built; only the
+   * logging label differs between /describe-image and /describe-images. */
+  async function runDescribeAndReply(res, args, input, logLabel) {
     const gone = new AbortController();
     res.on("close", () => {
       if (!res.writableEnded) gone.abort();
@@ -302,11 +291,10 @@ export function createBridge(config) {
     let outcome;
     try {
       let result = null;
-      const args = buildDescribeArgs({ systemPrompt: buildDescribeSystemPrompt(checked.value.context), model: config.model, budgetUsd: config.budgetUsd });
       const env = { ...process.env, DISABLE_AUTOUPDATER: "1" };
       delete env.ASSISTANT_BRIDGE_SECRET;
       if (config.configDir) env.CLAUDE_CONFIG_DIR = config.configDir;
-      const run = await streamCli(config, args, buildDescribeInput(checked.value), env, {
+      const run = await streamCli(config, args, input, env, {
         onLine: (line) => {
           const event = readStreamLine(line);
           if (event?.type === "result") result = event.parsed;
@@ -323,10 +311,47 @@ export function createBridge(config) {
     } finally {
       release();
     }
-    console.log(`${new Date().toISOString()} describe ok=${outcome.ok} ${outcome.ok ? "" : `code=${outcome.code}`} ms=${Date.now() - startedAt}`);
+    console.log(`${new Date().toISOString()} ${logLabel} ok=${outcome.ok} ${outcome.ok ? "" : `code=${outcome.code}`} ms=${Date.now() - startedAt}`);
     if (res.destroyed) return undefined;
     if (!outcome.ok) return fail(res, outcome.code, outcome.message);
     return reply(res, 200, { ok: true, answer: outcome.answer });
+  }
+
+  /**
+   * POST /describe-image — a short draft description of one photo (case proof). Same secret, same limit on how many run at
+   * once, same CLI and sign-in as the assistant; but no tools and no app access at all, and only sizes are logged.
+   */
+  async function handleDescribe(req, res) {
+    if (!sameSecret(req.headers["x-bridge-secret"], config.secret)) return reply(res, 401, { ok: false, code: "auth", message: "Wrong secret." });
+    let body;
+    try {
+      body = JSON.parse(await readBody(req, DESCRIBE_LIMITS.body));
+    } catch {
+      return fail(res, "bad_request", "The body is not valid JSON, or is too large.");
+    }
+    const checked = validateDescribe(body);
+    if (!checked.ok) return fail(res, "bad_request", checked.message);
+    const args = buildDescribeArgs({ systemPrompt: buildDescribeSystemPrompt(checked.value.context), model: config.model, budgetUsd: config.budgetUsd });
+    return runDescribeAndReply(res, args, buildDescribeInput(checked.value), "describe");
+  }
+
+  /**
+   * POST /describe-images — ONE combined draft (observation + conclusion) for a SET of photos of the same case (case
+   * proof, multi-photo). Same secret, same gate, same CLI and sign-in; a higher body limit (more images) with its own
+   * hard cap, and a cap on how many images one call may carry. Never one description per photo.
+   */
+  async function handleDescribeMany(req, res) {
+    if (!sameSecret(req.headers["x-bridge-secret"], config.secret)) return reply(res, 401, { ok: false, code: "auth", message: "Wrong secret." });
+    let body;
+    try {
+      body = JSON.parse(await readBody(req, DESCRIBE_LIMITS.bodyMany));
+    } catch {
+      return fail(res, "bad_request", "The body is not valid JSON, or is too large.");
+    }
+    const checked = validateDescribeImages(body);
+    if (!checked.ok) return fail(res, "bad_request", checked.message);
+    const args = buildDescribeArgs({ systemPrompt: buildDescribeImagesSystemPrompt(checked.value.context), model: config.model, budgetUsd: config.budgetUsd });
+    return runDescribeAndReply(res, args, buildDescribeImagesInput(checked.value), "describe-many");
   }
 
   return http.createServer(async (req, res) => {
@@ -335,6 +360,7 @@ export function createBridge(config) {
       if (req.method === "POST" && req.url === "/ask") return await handleAsk(req, res, false);
       if (req.method === "POST" && req.url === "/ask-stream") return await handleAsk(req, res, true);
       if (req.method === "POST" && req.url === "/describe-image") return await handleDescribe(req, res);
+      if (req.method === "POST" && req.url === "/describe-images") return await handleDescribeMany(req, res);
       return reply(res, 404, { ok: false, code: "bad_request", message: "Not found." });
     } catch (e) {
       console.error(`${new Date().toISOString()} error ${e instanceof Error ? e.message : e}`);

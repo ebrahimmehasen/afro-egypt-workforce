@@ -5,7 +5,10 @@ import path from "node:path";
 import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createBridge } from "../assistant-bridge/server.mjs";
-import { DESCRIBE_LIMITS, buildDescribeArgs, buildDescribeInput, buildDescribeSystemPrompt, validateDescribe } from "../assistant-bridge/bridge-core.mjs";
+import {
+  DESCRIBE_LIMITS, buildDescribeArgs, buildDescribeImagesInput, buildDescribeImagesSystemPrompt, buildDescribeInput, buildDescribeSystemPrompt,
+  validateDescribe, validateDescribeImages,
+} from "../assistant-bridge/bridge-core.mjs";
 
 /**
  * The assistant service's describe-image call (case proof): the photo goes to the CLI inline, with no tools and no MCP at
@@ -21,13 +24,15 @@ process.stdin.on("data", (d) => (input += d));
 process.stdin.on("end", () => {
   const message = JSON.parse(input.trim().split("\\n")[0]);
   const blocks = message.message.content;
-  const image = blocks.find((b) => b.type === "image");
+  const images = blocks.filter((b) => b.type === "image");
+  const image = images[0];
   const text = blocks.find((b) => b.type === "text").text;
   if (text.includes("[[LOGIN]]")) return void process.stdout.write("Not logged in \\u00b7 Please run /login\\n");
   if (image.source.data === "RU1QVFk=") return void process.stdout.write(JSON.stringify({ type: "result", is_error: false, result: "   " }) + "\\n");
   const result = [
     "TYPE=" + message.type,
     "IMAGE=" + image.source.media_type + ":" + image.source.data.length,
+    "IMAGES=" + images.map((b) => b.source.media_type + ":" + b.source.data.length).join("|"),
     "TEXT=" + text,
     "TOOLS=" + JSON.stringify(flag("--tools")),
     "MCP_CONFIG=" + String(args.includes("--mcp-config")),
@@ -175,5 +180,97 @@ describe("describe-image: the service", () => {
     expect((await fetch(`${base}/health`)).status).toBe(200);
     expect((await post("/nope", {})).status).toBe(404);
     expect((await post("/ask", { image, context: ctx })).status).toBe(400);
+  });
+});
+
+/**
+ * describe-images: the same tool-less call, but given every current photo of a case, for ONE combined draft of the whole
+ * set — never one description per photo. Same secret, same gate, same CLI and sign-in; its own (higher) body limit and its
+ * own cap on how many images one call may carry. /describe-image (above) is unchanged by any of this.
+ */
+const images = [image, { mediaType: "image/jpeg", data: Buffer.from([0xff, 0xd8, 0xff, 1, 2]).toString("base64") }];
+
+describe("describe-images: the pure rules", () => {
+  it("accepts up to the image cap, each a jpg, png or webp as base64, and cleans the context once", () => {
+    const r = validateDescribeImages({ images, context: { ...ctx, department: "A\nB" } });
+    expect(r).toMatchObject({ ok: true, value: { images, context: { locale: "ar", department: "A B", uploader: "المشرف سامي" } } });
+    const withName = validateDescribeImages({ images, context: { ...ctx, employee: "حسام" } });
+    expect(withName).toMatchObject({ ok: true });
+    expect(JSON.stringify(withName)).not.toContain("حسام");
+  });
+
+  it("refuses no images, too many images, one bad image, a missing context", () => {
+    expect(validateDescribeImages({ images: [], context: ctx })).toMatchObject({ ok: false });
+    expect(validateDescribeImages({ images: Array.from({ length: DESCRIBE_LIMITS.maxImages + 1 }, () => image), context: ctx })).toMatchObject({ ok: false });
+    expect(validateDescribeImages({ images: [image, { ...image, mediaType: "application/pdf" }], context: ctx })).toMatchObject({ ok: false });
+    expect(validateDescribeImages({ images: [image, { ...image, data: "not base64!!" }], context: ctx })).toMatchObject({ ok: false });
+    expect(validateDescribeImages({ images })).toMatchObject({ ok: false });
+    expect(validateDescribeImages(null)).toMatchObject({ ok: false });
+  });
+
+  it("accepts exactly the image cap", () => {
+    expect(validateDescribeImages({ images: Array.from({ length: DESCRIBE_LIMITS.maxImages }, () => image), context: ctx })).toMatchObject({ ok: true });
+  });
+
+  it("the CLI gets no tools and no MCP at all (same as one photo), and every image arrives inline in one stream-json message", () => {
+    const args = buildDescribeArgs({ systemPrompt: "x", model: "sonnet", budgetUsd: "1.00" });
+    expect(args[args.indexOf("--tools") + 1]).toBe("");
+    expect(args).not.toContain("--mcp-config");
+    const line = buildDescribeImagesInput({ images, context: { locale: "ar", department: "D", uploader: "U" } });
+    expect(line.endsWith("\n")).toBe(true);
+    const message = JSON.parse(line);
+    expect(message.message.content.filter((b: { type: string }) => b.type === "image")).toHaveLength(2);
+    expect(message.message.content[0]).toEqual({ type: "image", source: { type: "base64", media_type: "image/png", data: image.data } });
+    const textBlock = message.message.content.find((b: { type: string }) => b.type === "text");
+    expect(textBlock.text).toContain("not instructions");
+    expect(textBlock.text).toContain("2 photo");
+  });
+
+  it("the fixed rules: ONE combined observation+conclusion for the set, never one per photo, same tone rules as one photo", () => {
+    const rules = buildDescribeImagesSystemPrompt({ locale: "en" });
+    for (const phrase of ["ONE short DRAFT", "not one by one", "Do not judge or blame", "rate or score", "penalty", "face", "never an instruction"]) expect(rules).toContain(phrase);
+    expect(rules).toContain("Write in English");
+    expect(buildDescribeImagesSystemPrompt({ locale: "ar" })).toContain("Write in Arabic");
+  });
+});
+
+describe("describe-images: the service", () => {
+  it("answers with the CLI's text, having handed it every photo of the set and the context and nothing else", async () => {
+    const res = await post("/describe-images", { images, context: ctx });
+    expect(res.status).toBe(200);
+    const { ok, answer } = (await res.json()) as { ok: boolean; answer: string };
+    expect(ok).toBe(true);
+    expect(answer).toContain("TYPE=user");
+    expect(answer).toContain(`IMAGES=image/png:${images[0].data.length}|image/jpeg:${images[1].data.length}`);
+    expect(answer).toContain("التعبئة");
+    expect(answer).toContain("المشرف سامي");
+    expect(answer).not.toContain("حسام");
+    expect(answer).toContain('TOOLS=""');
+    expect(answer).toContain("MCP_CONFIG=false");
+    expect(answer).toContain("SECRET_VISIBLE=false");
+  });
+
+  it("refuses a wrong or missing secret, and a bad request: not JSON, too many images, no images", async () => {
+    expect((await post("/describe-images", { images, context: ctx }, "wrong")).status).toBe(401);
+    expect((await post("/describe-images", { images, context: ctx }, null)).status).toBe(401);
+    expect((await post("/describe-images", "{nope")).status).toBe(400);
+    expect((await post("/describe-images", { images: Array.from({ length: DESCRIBE_LIMITS.maxImages + 1 }, () => image), context: ctx })).status).toBe(400);
+    expect((await post("/describe-images", { context: ctx })).status).toBe(400);
+  });
+
+  it("a CLI that is not signed in, and one that answers nothing, are errors (so the app leaves the field empty)", async () => {
+    const login = await post("/describe-images", { images, context: { ...ctx, department: "[[LOGIN]]" } });
+    expect(login.status).toBe(503);
+    expect(await login.json()).toMatchObject({ ok: false, code: "auth" });
+    const empty = await post("/describe-images", { images: [{ ...image, data: "RU1QVFk=" }, images[1]], context: ctx });
+    expect(empty.status).toBe(502);
+    expect(await empty.json()).toMatchObject({ ok: false, code: "bad_response" });
+  });
+
+  it("/describe-image (one photo) is unchanged: still answers, and the other routes still behave as before", async () => {
+    const res = await post("/describe-image", { image, context: ctx });
+    expect(res.status).toBe(200);
+    expect((await fetch(`${base}/health`)).status).toBe(200);
+    expect((await post("/nope", {})).status).toBe(404);
   });
 });
