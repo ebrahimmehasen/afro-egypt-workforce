@@ -28,12 +28,12 @@ export const PERMISSION_DEFS = [
 export type PermissionKey = (typeof PERMISSION_DEFS)[number]["key"];
 export const PERMISSION_KEYS: PermissionKey[] = PERMISSION_DEFS.map((p) => p.key);
 
-// /users, /permissions and /change-requests are never grantable — admin only (HR approving leaves or deductions
-// also opens /change-requests, for those requests only — see allowedNavPaths). (/biometric-device is a
+// /users, /permissions, /change-requests and /evaluation are never grantable — admin only (HR approving leaves or
+// deductions also opens /change-requests, for those requests only — see allowedNavPaths). (/biometric-device is a
 // grantable page like the rest: it comes in through PERMISSION_DEFS.)
 const ADMIN_NAV = [
   "/dashboard", ...PERMISSION_DEFS.map((p) => p.path),
-  "/users", "/permissions", "/change-requests",
+  "/users", "/permissions", "/change-requests", "/evaluation",
 ];
 const EMPLOYEE_NAV = ["/dashboard", "/attendance", "/leaves", "/payroll"];
 

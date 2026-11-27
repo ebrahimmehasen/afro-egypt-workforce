@@ -81,6 +81,7 @@ export interface Dictionary {
     biometricDevice: string;
     settings: string;
     caseProof: string;
+    evaluation: string;
   };
   roles: {
     admin: string;
@@ -1590,6 +1591,99 @@ export interface Dictionary {
       generic: string;
     };
   };
+  evaluation: {
+    title: string;
+    subtitle: string;
+    noEffect: string;
+    back: string;
+    notSet: string;
+    none: string;
+    columns: {
+      employee: string;
+      department: string;
+      jobLevel: string;
+      latestRating: string;
+      caseCount: string;
+      severity: string;
+    };
+    filters: {
+      department: string;
+      jobLevel: string;
+      rating: string;
+      allDepartments: string;
+      allLevels: string;
+      allRatings: string;
+    };
+    emptyList: string;
+    detail: {
+      profileTitle: string;
+      certificatesTitle: string;
+      noCertificates: string;
+      previousExperienceTitle: string;
+      noExperienceDocuments: string;
+      experienceTextLabel: string;
+      noExperienceText: string;
+      jobLevelTitle: string;
+      levelHistoryTitle: string;
+      noLevelHistory: string;
+      evaluationsTitle: string;
+      noEvaluations: string;
+      caseHistoryTitle: string;
+      noCases: string;
+      estimatedLoss: string;
+      byLine: string;
+    };
+    setLevel: {
+      button: string;
+      title: string;
+      levelLabel: string;
+      reasonLabel: string;
+      reasonHint: string;
+      submit: string;
+      done: string;
+      errLevel: string;
+      errReason: string;
+      noLevelsYet: string;
+    };
+    addReview: {
+      button: string;
+      title: string;
+      periodLabelLabel: string;
+      periodLabelHint: string;
+      periodDateLabel: string;
+      ratingLabel: string;
+      commentLabel: string;
+      submit: string;
+      done: string;
+      errPeriodLabel: string;
+      errPeriodDate: string;
+      errRating: string;
+      noRatingsYet: string;
+    };
+    settings: {
+      jobLevelsTitle: string;
+      jobLevelsDesc: string;
+      addLevel: string;
+      editLevel: string;
+      deleteLevel: string;
+      deleteLevelConfirm: string;
+      levelNameLabel: string;
+      levelOrderLabel: string;
+      noLevels: string;
+      inUse: string;
+      scaleTitle: string;
+      scaleDesc: string;
+      addScaleItem: string;
+      editScaleItem: string;
+      deleteScaleItem: string;
+      deleteScaleItemConfirm: string;
+      scaleLabelLabel: string;
+      scaleOrderLabel: string;
+      noScaleItems: string;
+      saved: string;
+      deleted: string;
+    };
+  };
   auditActions: {
     createJob: string;
     editJob: string;
@@ -1671,6 +1765,14 @@ export interface Dictionary {
     pauseRealtimeSync: string;
     resumeRealtimeSync: string;
     system: string;
+    addJobLevel: string;
+    editJobLevel: string;
+    deleteJobLevel: string;
+    setEmployeeJobLevel: string;
+    addEvaluationScaleItem: string;
+    editEvaluationScaleItem: string;
+    deleteEvaluationScaleItem: string;
+    addEvaluationReview: string;
   };
   biometricDevice: {
     title: string;

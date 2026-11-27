@@ -12,6 +12,7 @@ export const ASSISTANT_LINK_ROOTS = [
   "deductions",
   "departments",
   "employees",
+  "evaluation",
   "leaves",
   "missions",
   "overtime",
