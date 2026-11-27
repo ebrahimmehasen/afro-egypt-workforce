@@ -160,6 +160,9 @@ export const en: Dictionary = {
     overdueReturn: "Permission ended, no return punch yet",
     overdueReturnUntil: "The permission ran until",
     hours: "h",
+    absenceCheck: "An absent day needs confirming",
+    absenceCheckNote: "This may also mean the person left the job entirely — check the employee's profile.",
+    absenceCheckProfileLink: "Employee profile",
   },
   dashboard: {
     welcome: "Welcome,",
@@ -783,6 +786,12 @@ export const en: Dictionary = {
     errNoDay: "Only a day with a recorded check-in and check-out can take reviewed punches (otherwise use the attendance correction)",
     errReason: "Write the source of the information",
     approveBlocked: "This period can't be approved: {count} day(s) still need a punch review. Resolve them from the bell or the attendance page by entering the punches, then approve.",
+  },
+  absenceReview: {
+    button: "Confirmed absent",
+    note: "Note (optional)",
+    noteHint: "e.g. called the employee, confirmed they were really absent",
+    done: "Review recorded",
   },
   leavePaper: {
     title: "Leave paper",
@@ -1653,6 +1662,7 @@ export const en: Dictionary = {
     classifyExit: "Classify exit as permission",
     annotateExit: "Record exit classification",
     reviewPunches: "Enter punches after review",
+    markAbsenceReviewed: "Confirm review of an absent day",
     rejectLeave: "Reject Leave",
     approveOvertime: "Approve Overtime",
     rejectOvertime: "Reject Overtime",

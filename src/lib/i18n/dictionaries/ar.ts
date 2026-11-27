@@ -160,6 +160,9 @@ export const ar: Dictionary = {
     overdueReturn: "إذن انتهى ولسه مفيش بصمة رجوع",
     overdueReturnUntil: "الإذن كان لحد",
     hours: "ساعة",
+    absenceCheck: "يوم غياب محتاج تأكيد",
+    absenceCheckNote: "ممكن يكون كمان ترك الشغل خالص — تقدر تتأكد من صفحة الموظف.",
+    absenceCheckProfileLink: "صفحة الموظف",
   },
   dashboard: {
     welcome: "أهلاً بك،",
@@ -783,6 +786,12 @@ export const ar: Dictionary = {
     errNoDay: "اليوم ده ليه دخول وخروج مسجّلين بس هو اللي ينفع تتسجل له بصمات مراجعة (غير كده استخدم تصحيح الحضور)",
     errReason: "اكتب مصدر المعلومة",
     approveBlocked: "مينفعش تعتمد الفترة دي: فيه {count} يوم لسه محتاج مراجعة بصمة. راجعهم من الجرس أو من صفحة الحضور، وسجّل البصمات، وبعدين اعتمد.",
+  },
+  absenceReview: {
+    button: "تم التأكد من الغياب",
+    note: "ملاحظة (اختياري)",
+    noteHint: "مثلاً: اتصلت بالموظف وأكّد إنه غايب فعلاً",
+    done: "تم تسجيل المراجعة",
   },
   leavePaper: {
     title: "ورقة إجازة",
@@ -1653,6 +1662,7 @@ export const ar: Dictionary = {
     classifyExit: "تصنيف خروج بإذن",
     annotateExit: "توثيق تصنيف خروج",
     reviewPunches: "تسجيل بصمات بعد المراجعة",
+    markAbsenceReviewed: "تأكيد مراجعة يوم غياب",
     rejectLeave: "رفض إجازة",
     approveOvertime: "اعتماد إضافي",
     rejectOvertime: "رفض إضافي",

@@ -161,6 +161,9 @@ export interface Dictionary {
     overdueReturn: string;
     overdueReturnUntil: string;
     hours: string;
+    absenceCheck: string;
+    absenceCheckNote: string;
+    absenceCheckProfileLink: string;
   };
   dashboard: {
     welcome: string;
@@ -788,6 +791,12 @@ export interface Dictionary {
     errNoDay: string;
     errReason: string;
     approveBlocked: string;
+  };
+  absenceReview: {
+    button: string;
+    note: string;
+    noteHint: string;
+    done: string;
   };
   leavePaper: {
     title: string;
@@ -1612,6 +1621,7 @@ export interface Dictionary {
     classifyExit: string;
     annotateExit: string;
     reviewPunches: string;
+    markAbsenceReviewed: string;
     approveOvertime: string;
     rejectOvertime: string;
     addDeduction: string;
