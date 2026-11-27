@@ -329,6 +329,7 @@ model Employee {
   @@index([workScheduleId])
   caseProofs CaseProof[]
   caseProofLinks CaseProofEmployee[]
+  absenceReviews AbsenceReview[]
 }
 
 /// A pay type (نوع الأجر) and every rule used to calculate its pay. Nothing about pay is fixed in code: each
@@ -527,6 +528,24 @@ model Mission {
 
   @@index([employeeId])
   @@index([from, to])
+}
+
+/// HR looked at an absent day ("is he really absent, or is it a fingerprint problem?") and is done with it — purely
+/// a silencer for the absence-check notification (src/lib/absence-check.ts). Changes NOTHING in attendance or pay:
+/// no DailyAttendance / Overtime / Deduction / PayrollRecord row is ever read or written through this table. If HR
+/// later edits the punches and the day stops being "absent", the notification and this row both become irrelevant
+/// on their own — nothing needs to delete this row for that to happen.
+model AbsenceReview {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  date         DateTime @db.Date
+  reviewedById String
+  note         String?  @db.Text
+  reviewedAt   DateTime @default(now())
+
+  @@unique([employeeId, date])
+  @@index([date])
 }
 
 model Overtime {
