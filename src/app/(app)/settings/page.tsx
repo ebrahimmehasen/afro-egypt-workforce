@@ -7,6 +7,7 @@ import { CompanySettingsForm } from "@/components/settings/settings-forms";
 import { Card, CardContent } from "@/components/ui/card";
 import { HolidaysCard } from "@/components/settings/holidays-card";
 import { GeneralPaySection, PayRulesSection, PayTypesSection, WorkSchedulesSection } from "@/components/settings/pay-settings";
+import { EvaluationScaleSection, JobLevelsSection } from "@/components/settings/evaluation-settings";
 import { prisma } from "@/lib/prisma";
 import { loadScheduleRows } from "@/lib/work-schedules";
 import { dayStr } from "@/lib/serialize";
@@ -29,6 +30,14 @@ export default async function SettingsPage() {
   ]);
   // Pay types, schedules and rules decide how everyone is paid: only the main admin changes them.
   const canManagePay = user.role === "admin";
+  // Job levels and the rating scale are evaluation-only (see /evaluation): same admin-only gate, loaded only for
+  // the admin so the data is never even fetched for anyone else.
+  const [jobLevels, scaleItems] = canManagePay
+    ? await Promise.all([
+        prisma.jobLevel.findMany({ where: { deletedAt: null }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], include: { _count: { select: { changes: true } } } }),
+        prisma.evaluationScaleItem.findMany({ where: { deletedAt: null }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], include: { _count: { select: { reviews: true } } } }),
+      ])
+    : [[], []];
   const payTypeRows = payTypes.map((p) => ({
     ...toPayTypeRules(p),
     active: p.active,
@@ -74,6 +83,12 @@ export default async function SettingsPage() {
         holidays={holidays.map((h) => ({ id: h.id, name: h.name, from: dayStr(h.from), to: dayStr(h.to) }))}
         today={today()}
       />
+      {canManagePay && (
+        <>
+          <JobLevelsSection levels={jobLevels.map((l) => ({ id: l.id, name: l.name, sortOrder: l.sortOrder, inUse: l._count.changes > 0 }))} />
+          <EvaluationScaleSection items={scaleItems.map((s) => ({ id: s.id, label: s.label, sortOrder: s.sortOrder, inUse: s._count.reviews > 0 }))} />
+        </>
+      )}
     </div>
   );
 }
