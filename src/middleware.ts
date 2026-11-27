@@ -1,10 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canAccess } from "@/lib/permissions";
 import { isPublicPath } from "@/lib/public-paths";
+import { isAllowedOnApplyHost, isApplyOnlyHost } from "@/lib/apply-host-gate";
 import { Role } from "@/lib/types";
 
 const SESSION_COOKIE = "afro_egypt_session";
 const ALWAYS_ALLOWED = ["/dashboard", "/payslip", "/leave-paper"];
+// The set the matcher below used to exclude outright. Kept here, verbatim, so a request on any OTHER host still
+// skips the gate exactly as before — this middleware never ran on these paths until the apply-only gate needed to.
+const MATCHER_EXCLUDED = (pathname: string) =>
+  pathname.startsWith("/api") || pathname.startsWith("/_next/static") || pathname.startsWith("/_next/image") || pathname.startsWith("/brand") || pathname === "/favicon.ico";
+
+const notFound = () => new NextResponse(null, { status: 404 });
+
+const SECURITY_HEADERS: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'",
+};
+
+function withApplyHostSecurityHeaders(res: NextResponse, pathname: string): NextResponse {
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) res.headers.set(key, value);
+  if (pathname === "/api/apply") res.headers.set("Cache-Control", "no-store");
+  return res;
+}
 
 /**
  * Reads role + permissions out of the signed session cookie WITHOUT verifying
@@ -28,6 +49,16 @@ function userFromCookie(raw: string): { role: Role; permissions: string[]; depar
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (isApplyOnlyHost(request.headers.get("host"))) {
+    if (!isAllowedOnApplyHost(request.method, pathname, request.headers)) return notFound();
+    return withApplyHostSecurityHeaders(NextResponse.next(), pathname);
+  }
+
+  // every other host: unchanged behaviour, including paths the matcher used to exclude before the gate above needed
+  // to see them too
+  if (MATCHER_EXCLUDED(pathname)) return NextResponse.next();
+
   const sessionRaw = request.cookies.get(SESSION_COOKIE)?.value;
   const hasSession = Boolean(sessionRaw);
 
@@ -58,5 +89,8 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|brand|favicon.ico).*)"],
+  // Used to exclude /api, /_next/static, /_next/image, /brand and favicon.ico outright. The apply-only host gate
+  // above must see those paths too (that is exactly what it exists to police), so the middleware now runs on
+  // everything and reproduces that same exclusion itself (MATCHER_EXCLUDED) for every host other than a gated one.
+  matcher: ["/(.*)"],
 };
