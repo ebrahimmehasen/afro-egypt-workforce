@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CasePhotos, CaseTextForm } from "@/components/case-proof/case-proof-flow";
+import { CASE_PROOF_SEVERITY_BADGE } from "@/lib/case-proof/config";
 
 export default async function CaseProofDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireAccess("/case-proof");
@@ -48,9 +49,23 @@ export default async function CaseProofDetailPage({ params }: { params: Promise<
             {row.aiGenerated && <Badge variant="outline" className="gap-1"><Sparkles className="h-3 w-3" />{c.aiBadgeSaved}</Badge>}
           </div>
           {canEditCaseProof(user, row.createdById) ? (
-            <CaseTextForm id={row.id} initial={row.finalText ?? row.aiDraft ?? ""} aiGenerated={row.status === "draft" && row.aiGenerated} />
+            <CaseTextForm
+              id={row.id}
+              initial={row.finalText ?? row.aiDraft ?? ""}
+              aiGenerated={row.status === "draft" && row.aiGenerated}
+              initialSeverity={row.severity}
+              initialLossPercent={row.estimatedLossPercent}
+            />
           ) : (
-            <p className="whitespace-pre-wrap text-sm">{row.finalText ?? c.noText}</p>
+            <>
+              <p className="whitespace-pre-wrap text-sm">{row.finalText ?? c.noText}</p>
+              <div className="flex flex-wrap items-center gap-3 text-sm" data-testid="case-severity-readonly">
+                <span className="text-muted-foreground">{c.severityLabel}:</span>
+                {row.severity ? <Badge variant={CASE_PROOF_SEVERITY_BADGE[row.severity]}>{c.severities[row.severity]}</Badge> : <span>{c.severityNotSet}</span>}
+                <span className="text-muted-foreground">{c.estimatedLossLabel}:</span>
+                <span>{row.estimatedLossPercent != null ? `${row.estimatedLossPercent}%` : c.estimatedLossNotSet}</span>
+              </div>
+            </>
           )}
         </div>
       </div>

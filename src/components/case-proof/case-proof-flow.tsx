@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "@/lib/i18n/format";
-import { CASE_PHOTO_ACCEPT_ATTR, CASE_PROOF_LIMITS as L } from "@/lib/case-proof/config";
+import { CASE_PHOTO_ACCEPT_ATTR, CASE_PROOF_LIMITS as L, CASE_PROOF_LOSS_PERCENT_MAX, CASE_PROOF_LOSS_PERCENT_MIN, CASE_PROOF_SEVERITIES, type CaseProofSeverity } from "@/lib/case-proof/config";
 
 export interface PickEmployee {
   id: string;
@@ -126,8 +126,27 @@ function SaveButton() {
   return <Button type="submit" disabled={pending}>{pending ? t.caseProof.saving : t.caseProof.save}</Button>;
 }
 
-/** The description of a case: the AI draft (clearly labelled) or an empty field, always editable, saved by the supervisor. */
-export function CaseTextForm({ id, initial, aiGenerated, onSaved, onDiscard }: { id: string; initial: string; aiGenerated: boolean; onSaved?: () => void; onDiscard?: () => void }) {
+const selectCls = "h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-auto";
+
+/** The description of a case: the AI draft (clearly labelled) or an empty field, always editable, saved by the supervisor.
+ * Severity and the estimated loss % are both optional, written only by the supervisor — the AI never fills them. */
+export function CaseTextForm({
+  id,
+  initial,
+  aiGenerated,
+  initialSeverity = null,
+  initialLossPercent = null,
+  onSaved,
+  onDiscard,
+}: {
+  id: string;
+  initial: string;
+  aiGenerated: boolean;
+  initialSeverity?: CaseProofSeverity | null;
+  initialLossPercent?: number | null;
+  onSaved?: () => void;
+  onDiscard?: () => void;
+}) {
   const t = useT();
   const c = t.caseProof;
   const [state, formAction] = useActionState(saveCaseProof, {});
@@ -142,6 +161,34 @@ export function CaseTextForm({ id, initial, aiGenerated, onSaved, onDiscard }: {
         )}
       </div>
       <Textarea id={`cp-text-${id}`} name="text" defaultValue={initial} rows={6} minLength={3} maxLength={L.maxTextLength} required placeholder={c.textHint} aria-invalid={state.fields?.includes("text")} />
+      <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`cp-severity-${id}`}>{c.severityLabel}</Label>
+          <select id={`cp-severity-${id}`} name="severity" defaultValue={initialSeverity ?? ""} className={selectCls} aria-invalid={state.fields?.includes("severity")} data-testid="severity-select">
+            <option value="">{c.severityNotSet}</option>
+            {CASE_PROOF_SEVERITIES.map((s) => (
+              <option key={s} value={s}>{c.severities[s]}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`cp-loss-${id}`}>{c.estimatedLossLabel}</Label>
+          <Input
+            id={`cp-loss-${id}`}
+            name="estimatedLossPercent"
+            type="number"
+            inputMode="numeric"
+            dir="ltr"
+            min={CASE_PROOF_LOSS_PERCENT_MIN}
+            max={CASE_PROOF_LOSS_PERCENT_MAX}
+            step={1}
+            defaultValue={initialLossPercent ?? ""}
+            placeholder={c.estimatedLossHint}
+            aria-invalid={state.fields?.includes("estimatedLossPercent")}
+            data-testid="loss-percent-input"
+          />
+        </div>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <SaveButton />
         {onDiscard && <Button type="button" variant="ghost" className="text-destructive" onClick={onDiscard}>{c.discard}</Button>}

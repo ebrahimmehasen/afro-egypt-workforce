@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CaseProofFlow } from "@/components/case-proof/case-proof-flow";
+import { CASE_PROOF_SEVERITY_BADGE } from "@/lib/case-proof/config";
 
 export default async function CaseProofPage() {
   const user = await requireAccess("/case-proof");
@@ -41,6 +42,7 @@ export default async function CaseProofPage() {
                 <TableHead>{c.columns.by}</TableHead>
                 <TableHead>{c.columns.date}</TableHead>
                 <TableHead>{c.columns.status}</TableHead>
+                <TableHead>{c.columns.severity}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -51,6 +53,9 @@ export default async function CaseProofPage() {
                   <TableCell>{row.createdByName}</TableCell>
                   <TableCell>{dateFmt.format(row.createdAt)}</TableCell>
                   <TableCell><Badge variant={row.status === "saved" ? "success" : "gold"}>{c.statuses[row.status]}</Badge></TableCell>
+                  <TableCell>
+                    {row.severity ? <Badge variant={CASE_PROOF_SEVERITY_BADGE[row.severity]}>{c.severities[row.severity]}</Badge> : <span className="text-xs text-muted-foreground">{c.severityNotSet}</span>}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
