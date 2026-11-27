@@ -9,7 +9,7 @@ import { allowedNavPaths, canAccess } from "@/lib/permissions";
 import { canUseCaseProof, canUseDepartment, caseProofDepartments } from "@/lib/case-proof/audience";
 import { checkCasePhoto } from "@/lib/case-proof/files";
 import { requestCaseDraft, requestCaseSetDraft } from "@/lib/case-proof/ai-draft";
-import { CASE_PROOF_LIMITS as L } from "@/lib/case-proof/config";
+import { CASE_PROOF_LIMITS as L, parseCaseProofLossPercent, parseCaseProofSeverity } from "@/lib/case-proof/config";
 import { NAV_ITEMS } from "@/lib/i18n/labels";
 import { EmployeeCases } from "@/components/case-proof/employee-cases";
 import type { User } from "@/lib/types";
@@ -363,5 +363,63 @@ describe("the migrations only add", () => {
     expect(model).toMatch(/employeeId\s+String\b/);
     expect(model).toMatch(/departmentId\s+String\b/);
     expect(model).toMatch(/links\s+CaseProofEmployee\[\]/);
+  });
+
+  it("the severity migration only adds two nullable columns to CaseProof, nothing else", () => {
+    const text = sql("20261128100000_case_proof_severity");
+    expect(text).toMatch(/ALTER TABLE `[Cc]ase[Pp]roof`/);
+    expect(text).toContain("ADD COLUMN `estimatedLossPercent` INTEGER NULL");
+    expect(text).toMatch(/ADD COLUMN `severity` ENUM\('small', 'medium', 'large'\) NULL/);
+    expect(text).not.toMatch(/\bDROP\b|\bDELETE\b|\bTRUNCATE\b|\bUPDATE\b|\bMODIFY\b|\bRENAME\b|\bNOT NULL\b/i);
+    const alters = text.match(/ALTER TABLE `[A-Za-z]+`/g) ?? [];
+    expect(alters.length).toBeGreaterThan(0);
+    expect(alters.every((a) => /`[Cc]ase[Pp]roof`/.test(a))).toBe(true);
+  });
+
+  it("the new fields are optional in the schema, so an old row that never set them stays valid", () => {
+    const schema = readFileSync(path.join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+    const model = schema.slice(schema.indexOf("model CaseProof {"), schema.indexOf("model CaseProofEmployee"));
+    expect(model).toMatch(/severity\s+CaseProofSeverity\?/);
+    expect(model).toMatch(/estimatedLossPercent\s+Int\?/);
+  });
+});
+
+describe("parseCaseProofSeverity", () => {
+  it("blank or missing means 'not set' (null), never a guess", () => {
+    expect(parseCaseProofSeverity(null)).toEqual({ ok: true, value: null });
+    expect(parseCaseProofSeverity(undefined)).toEqual({ ok: true, value: null });
+    expect(parseCaseProofSeverity("")).toEqual({ ok: true, value: null });
+    expect(parseCaseProofSeverity("   ")).toEqual({ ok: true, value: null });
+  });
+
+  it("accepts exactly small/medium/large", () => {
+    expect(parseCaseProofSeverity("small")).toEqual({ ok: true, value: "small" });
+    expect(parseCaseProofSeverity("medium")).toEqual({ ok: true, value: "medium" });
+    expect(parseCaseProofSeverity("large")).toEqual({ ok: true, value: "large" });
+  });
+
+  it("refuses anything else", () => {
+    for (const bad of ["Small", "SMALL", "huge", "0", "<script>"]) {
+      expect(parseCaseProofSeverity(bad), bad).toEqual({ ok: false });
+    }
+  });
+});
+
+describe("parseCaseProofLossPercent", () => {
+  it("blank or missing means 'not set' (null)", () => {
+    expect(parseCaseProofLossPercent(null)).toEqual({ ok: true, value: null });
+    expect(parseCaseProofLossPercent(undefined)).toEqual({ ok: true, value: null });
+    expect(parseCaseProofLossPercent("")).toEqual({ ok: true, value: null });
+    expect(parseCaseProofLossPercent("  ")).toEqual({ ok: true, value: null });
+  });
+
+  it("accepts whole numbers 0 through 100 inclusive", () => {
+    for (const n of [0, 1, 50, 99, 100]) expect(parseCaseProofLossPercent(String(n))).toEqual({ ok: true, value: n });
+  });
+
+  it("refuses out-of-range, negative, decimal and non-numeric values", () => {
+    for (const bad of ["101", "-1", "1.5", "50%", "abc", "1e2", "00050100"]) {
+      expect(parseCaseProofLossPercent(bad), bad).toEqual({ ok: false });
+    }
   });
 });

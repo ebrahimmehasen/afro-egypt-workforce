@@ -307,6 +307,94 @@ describe.skipIf(!hasDb)("saving, editing and the audit trail", () => {
   });
 });
 
+describe.skipIf(!hasDb)("severity and estimated loss %: optional, supervisor-only, never from the AI", () => {
+  it("both start unset (null) on a brand-new case — never guessed, even when the AI gave a draft", async () => {
+    aiImpl = async () => ({ ok: true, text: "AI: a broken shelf." });
+    const { id } = (await (await post(supA(), empA)).json()) as { id: string };
+    expect(await prisma.caseProof.findUnique({ where: { id } })).toMatchObject({ severity: null, estimatedLossPercent: null });
+  });
+
+  it("the supervisor sets both on save, and can clear them back to unset on a later edit", async () => {
+    const who = supA();
+    const { id } = (await (await post(who, empA)).json()) as { id: string };
+    session = who;
+    expect(await saveCaseProof({}, form({ id, text: "A broken shelf, three boxes damaged", severity: "large", estimatedLossPercent: "40" }))).toMatchObject({ success: true });
+    expect(await prisma.caseProof.findUnique({ where: { id } })).toMatchObject({ severity: "large", estimatedLossPercent: 40 });
+
+    // an edit that leaves them blank clears them back to "not set" — not a value that was never explicitly chosen
+    expect(await saveCaseProof({}, form({ id, text: "A broken shelf, three boxes damaged" }))).toMatchObject({ success: true });
+    expect(await prisma.caseProof.findUnique({ where: { id } })).toMatchObject({ severity: null, estimatedLossPercent: null });
+  });
+
+  it("refuses an invalid severity or an out-of-range/non-integer loss percent, and changes nothing", async () => {
+    const who = supA();
+    const { id } = (await (await post(who, empA)).json()) as { id: string };
+    session = who;
+    for (const [field, bad, errorKey] of [
+      ["severity", "catastrophic", "invalidSeverity"],
+      ["estimatedLossPercent", "101", "invalidLossPercent"],
+      ["estimatedLossPercent", "-5", "invalidLossPercent"],
+      ["estimatedLossPercent", "12.5", "invalidLossPercent"],
+    ] as const) {
+      expect(await saveCaseProof({}, form({ id, text: "Valid text", [field]: bad })), `${field}=${bad}`).toMatchObject({ error: ar.caseProof.errors[errorKey] });
+    }
+    expect(await prisma.caseProof.findUnique({ where: { id } })).toMatchObject({ status: "draft", finalText: null, severity: null, estimatedLossPercent: null });
+  });
+
+  it("accepts the boundary values 0 and 100", async () => {
+    const who = supA();
+    const a = (await (await post(who, empA)).json()) as { id: string };
+    session = who;
+    expect(await saveCaseProof({}, form({ id: a.id, text: "No visible loss", estimatedLossPercent: "0" }))).toMatchObject({ success: true });
+    expect((await prisma.caseProof.findUnique({ where: { id: a.id } }))!.estimatedLossPercent).toBe(0);
+
+    const b = (await (await post(who, empA)).json()) as { id: string };
+    session = who;
+    expect(await saveCaseProof({}, form({ id: b.id, text: "A total loss", estimatedLossPercent: "100" }))).toMatchObject({ success: true });
+    expect((await prisma.caseProof.findUnique({ where: { id: b.id } }))!.estimatedLossPercent).toBe(100);
+  });
+
+  it("follows the exact same edit rule as the case text: the owner and the admin may set them, a co-supervisor may not", async () => {
+    const owner = supA();
+    const { id } = (await (await post(owner, empA)).json()) as { id: string };
+    session = owner;
+    await saveCaseProof({}, form({ id, text: "Original text", severity: "small", estimatedLossPercent: "5" }));
+
+    const coSupervisor = supA();
+    session = coSupervisor;
+    expect(await saveCaseProof({}, form({ id, text: "Rewritten by a colleague", severity: "large", estimatedLossPercent: "90" }))).toMatchObject({ error: ar.validation.notAllowed });
+    expect(await prisma.caseProof.findUnique({ where: { id } })).toMatchObject({ severity: "small", estimatedLossPercent: 5 });
+
+    session = admin();
+    expect(await saveCaseProof({}, form({ id, text: "Edited by the manager", severity: "medium", estimatedLossPercent: "25" }))).toMatchObject({ success: true });
+    expect(await prisma.caseProof.findUnique({ where: { id } })).toMatchObject({ severity: "medium", estimatedLossPercent: 25 });
+  });
+
+  it("an old case (as if saved before this feature existed) stays null for both — never backfilled or guessed", async () => {
+    const who = supA();
+    const { id } = (await (await post(who, empA)).json()) as { id: string };
+    // simulate a pre-existing row saved the old way, bypassing the action entirely (no severity/loss ever written)
+    await prisma.caseProof.update({ where: { id }, data: { finalText: "Saved before severity existed", status: "saved" } });
+    const row = (await prisma.caseProof.findUnique({ where: { id } }))!;
+    expect(row).toMatchObject({ finalText: "Saved before severity existed", severity: null, estimatedLossPercent: null });
+
+    // the loader surfaces them as null too, not some other default
+    const loaded = await loadCaseProof(admin(), id);
+    expect(loaded).toMatchObject({ severity: null, estimatedLossPercent: null });
+  });
+
+  it("the AI draft path is unchanged: context, image count and the stored aiDraft/aiGenerated are the same regardless of severity", async () => {
+    aiImpl = async () => ({ ok: true, text: "AI: oil on the floor." });
+    const who = supA();
+    const res = await post(who, empA);
+    const body = (await res.json()) as { id: string; draft: string | null; aiAvailable: boolean };
+    expect(body).toMatchObject({ draft: "AI: oil on the floor.", aiAvailable: true });
+    expect(aiCalls.at(-1)).toMatchObject({ context: { department: `${TAG} A`, uploader: ACTOR, locale: "ar" } });
+    expect(JSON.stringify(aiCalls.at(-1))).not.toMatch(/severity|estimatedLoss/i);
+    expect(await prisma.caseProof.findUnique({ where: { id: body.id } })).toMatchObject({ aiDraft: "AI: oil on the floor.", aiGenerated: true, severity: null, estimatedLossPercent: null });
+  });
+});
+
 describe.skipIf(!hasDb)("seeing cases and photos", () => {
   let idA = "";
   let idB = "";
