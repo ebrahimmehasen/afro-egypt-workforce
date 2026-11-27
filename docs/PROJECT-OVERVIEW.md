@@ -807,6 +807,7 @@ npm run dev                   # http://localhost:3000
 | `ASSISTANT_BRIDGE_SECRET` | لأ | تفعيل المساعد: سر مشترك بين التطبيق وخدمة المساعد |
 | `ASSISTANT_BRIDGE_URL` / `ASSISTANT_TOOL_URL` | لأ | عنوان خدمة المساعد، وعنوان نداء الأدوات من الخدمة للتطبيق |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | للـseed الإنتاجي | أول أدمن |
+| `APPLY_ONLY_HOSTS` | لأ | قائمة Hostnames مفصولة بفاصلة، لو الطلب جاي بأي واحد منها الـmiddleware (`src/lib/apply-host-gate.ts`) بيسمح بصفحة `/apply` وAPI التقديم بس وبيرجّع 404 لأي حاجة تانية (مش redirect)، علشان الدومين ده يبان كإنه مش فيه نظام تاني خلفه. لو فاضي أو ملغي، البديل الافتراضي هو `jobs-afroegypt.404legend.space`. |
 
 ### 10.3 الـSeeds
 - `db:seed` (`seed-prod.ts`): 6 أقسام + 3 ورديات + الإعدادات + أدمن واحد، من غير موظفين.
