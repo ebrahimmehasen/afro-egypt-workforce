@@ -329,6 +329,8 @@ model Employee {
   @@index([workScheduleId])
   caseProofs CaseProof[]
   caseProofLinks CaseProofEmployee[]
+  levelChanges EmployeeLevelChange[]
+  evaluations  EvaluationReview[]
 }
 
 /// A pay type (نوع الأجر) and every rule used to calculate its pay. Nothing about pay is fixed in code: each
@@ -1030,4 +1032,76 @@ model CaseProofPhoto {
   /// Also what makes the migration's backfill (INSERT IGNORE) safe to run twice: a second run re-inserting the same
   /// case's position 0 is simply ignored, never duplicated.
   @@unique([caseProofId, position])
+}
+
+// ---------------------------------------------------------------------------
+// Employee evaluation ("تقييم الموظفين") — admin-only, read from independently of
+// payroll/attendance/deductions. Nothing here is read by, or writes to, any pay or
+// attendance table: it has zero effect on a calculation.
+// ---------------------------------------------------------------------------
+
+/// A job level an employee may be placed at (e.g. "Junior", "Senior") — the order decides display order only, not pay.
+/// No salary range is stored here on purpose: this list is never read by payroll.
+model JobLevel {
+  id        String    @id @default(cuid())
+  name      String
+  sortOrder Int       @default(0)
+  /// Soft-deleted: a level once assigned stays valid on every EmployeeLevelChange that used it.
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  changes EmployeeLevelChange[]
+
+  @@index([sortOrder])
+}
+
+/// One change of an employee's job level, with who did it, when and why. The employee's CURRENT level is simply the
+/// most recent row for that employee — nothing is overwritten, so the whole history stays readable.
+model EmployeeLevelChange {
+  id            String   @id @default(cuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id])
+  jobLevelId    String
+  jobLevel      JobLevel @relation(fields: [jobLevelId], references: [id])
+  reason        String   @db.Text
+  changedById   String
+  changedByName String
+  createdAt     DateTime @default(now())
+
+  @@index([employeeId, createdAt])
+}
+
+/// One rung of the rating scale a performance evaluation is scored on (e.g. "Needs improvement" .. "Excellent").
+/// Labels and order come entirely from Settings — nothing here is a hardcoded number or label in code.
+model EvaluationScaleItem {
+  id        String    @id @default(cuid())
+  label     String
+  sortOrder Int       @default(0)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  reviews EvaluationReview[]
+
+  @@index([sortOrder])
+}
+
+/// One performance evaluation entry for an employee: a period, a rating (one of the Settings scale items) and an
+/// optional comment, attributed to whoever wrote it. Never read by payroll — purely informational for a manager.
+model EvaluationReview {
+  id            String              @id @default(cuid())
+  employeeId    String
+  employee      Employee            @relation(fields: [employeeId], references: [id])
+  /// Free text naming the period (e.g. "Q3 2026"), alongside a real date used only for sorting/filtering.
+  periodLabel   String
+  periodDate    DateTime            @db.Date
+  scaleItemId   String
+  scaleItem     EvaluationScaleItem @relation(fields: [scaleItemId], references: [id])
+  comment       String?             @db.Text
+  createdById   String
+  createdByName String
+  createdAt     DateTime            @default(now())
+
+  @@index([employeeId, createdAt])
 }
