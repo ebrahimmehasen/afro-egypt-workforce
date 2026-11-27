@@ -6,9 +6,17 @@ import { RECRUITMENT_LIMITS as L } from "@/lib/recruitment/config";
 const perIp = new Map<string, number[]>();
 const global = new Map<string, number[]>();
 
-/** The visitor's address: Cloudflare's header when the request came through it, otherwise the first forwarded address. */
-export function clientIp(headers: Pick<Headers, "get">): string {
-  return headers.get("cf-connecting-ip")?.trim() || headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+/**
+ * The visitor's address: Cloudflare's header when the request came through it, otherwise the first forwarded
+ * address. On the apply-only gated host, `x-forwarded-for` is client-settable and must NOT be trusted — only
+ * Cloudflare's own header counts there, so a spoofed one just falls back to "unknown" (still one shared bucket,
+ * not a bypass).
+ */
+export function clientIp(headers: Pick<Headers, "get">, options?: { trustOnlyCloudflare?: boolean }): string {
+  const cf = headers.get("cf-connecting-ip")?.trim();
+  if (cf) return cf;
+  if (options?.trustOnlyCloudflare) return "unknown";
+  return headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 }
 
 /** True when this address may submit now (and the attempt is counted). */

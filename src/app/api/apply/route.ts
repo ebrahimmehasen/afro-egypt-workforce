@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isApplyOnlyHost } from "@/lib/apply-host-gate";
 import { HONEYPOT_FIELD, RECRUITMENT_LIMITS as L } from "@/lib/recruitment/config";
 import { clientIp } from "@/lib/recruitment/rate-limit";
 import { submitApplication, type SubmittedFile } from "@/lib/recruitment/submit";
@@ -34,7 +35,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const result = await submitApplication({ values, files, honeypot: String(form.get(HONEYPOT_FIELD) ?? ""), ip: clientIp(req.headers) });
+  const ip = clientIp(req.headers, { trustOnlyCloudflare: isApplyOnlyHost(req.headers.get("host")) });
+  const result = await submitApplication({ values, files, honeypot: String(form.get(HONEYPOT_FIELD) ?? ""), ip });
   if (!result.ok) return reply({ error: result.error, fields: result.fields }, result.status);
   return reply({ ok: true }, 200);
 }
