@@ -20,6 +20,7 @@ import type { MidDayAnalysis } from "@/lib/mid-day-exits";
 import { MidDayExitsBadge } from "@/components/attendance/mid-day-exits-badge";
 import type { ClassifyContext } from "@/components/attendance/classify-exit-dialog";
 import { ReviewPunchDialog } from "@/components/attendance/review-punch-dialog";
+import { AbsenceReviewButton } from "@/components/attendance/absence-review-button";
 import type { ReviewReason } from "@/lib/missing-punch-review";
 import { reviewReasonLabel } from "@/lib/review-reason-label";
 
@@ -33,6 +34,7 @@ export function DailyAttendanceTable({
   classify,
   review = {},
   canReview = false,
+  needsAbsenceCheck = {},
 }: {
   records: DailyAttendance[];
   employees: Employee[];
@@ -46,6 +48,8 @@ export function DailyAttendanceTable({
   review?: Record<string, ReviewReason>;
   /** whether the viewer may enter reviewed punches (the admin, or HR holding the attendance right) */
   canReview?: boolean;
+  /** employee id → this day is "absent" with no AbsenceReview row yet (so HR can confirm it's a real absence) */
+  needsAbsenceCheck?: Record<string, boolean>;
   /** Status filter to pre-select, e.g. from a dashboard KPI link (`?status=absent`). */
   initialStatus?: string;
 }) {
@@ -152,6 +156,12 @@ export function DailyAttendanceTable({
                           {reviewReasonLabel(t.notifications, review[record.employeeId])}
                         </span>
                         {canReview && review[record.employeeId] !== "missing_punch" && <ReviewPunchDialog employeeId={record.employeeId} date={record.date} employeeName={employee!.name} />}
+                      </div>
+                    )}
+                    {needsAbsenceCheck[record.employeeId] && (
+                      <div data-testid="needs-absence-check" className="mt-1 flex flex-col items-start gap-1">
+                        <span className="rounded border border-warning/60 bg-warning/10 px-1.5 py-0.5 text-xs font-medium">{t.notifications.absenceCheck}</span>
+                        {canReview && <AbsenceReviewButton employeeId={record.employeeId} date={record.date} />}
                       </div>
                     )}
                   </TableCell>

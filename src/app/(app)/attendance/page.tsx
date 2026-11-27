@@ -21,6 +21,7 @@ import { latestAnnotations } from "@/lib/exit-annotation";
 import type { ClassifyContext } from "@/components/attendance/classify-exit-dialog";
 import { prisma } from "@/lib/prisma";
 import { loadReviewForViewer, type ReviewReason } from "@/lib/missing-punch-review";
+import { canSeeAbsenceCheck, loadAbsenceCheckForRange } from "@/lib/absence-check";
 
 export default async function AttendancePage({
   searchParams,
@@ -86,6 +87,12 @@ export default async function AttendancePage({
   for (const d of await loadReviewForViewer(user, date, date)) review[d.employeeId] = d.reason;
   const canReview = canApprove(user, "attendance");
 
+  // this day's absences HR hasn't confirmed yet (is it real, or a fingerprint problem?) — a list only, see absence-check.ts
+  const needsAbsenceCheck: Record<string, boolean> = {};
+  if (canSeeAbsenceCheck(user)) {
+    for (const d of await loadAbsenceCheckForRange(user, date, date)) needsAbsenceCheck[d.employeeId] = true;
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -122,6 +129,7 @@ export default async function AttendancePage({
             classify={classify}
             review={review}
             canReview={canReview}
+            needsAbsenceCheck={needsAbsenceCheck}
           />
         </TabsContent>
         <TabsContent value="raw">
