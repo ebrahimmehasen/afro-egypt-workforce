@@ -954,6 +954,14 @@ enum CaseProofStatus {
   saved
 }
 
+/// How serious the supervisor judges the case to be. Optional, never guessed by the AI: null ("not set") on every case
+/// until a supervisor picks one, old rows included.
+enum CaseProofSeverity {
+  small
+  medium
+  large
+}
+
 model CaseProof {
   id           String          @id @default(cuid())
   employeeId   String
@@ -972,6 +980,10 @@ model CaseProof {
   aiGenerated  Boolean         @default(false)
   /// The description the supervisor wrote or approved: this is the record.
   finalText    String?         @db.Text
+  /// Both optional, written by the supervisor alone (never the AI): how serious the case looks, and the estimated loss
+  /// as a whole-number percent (0-100). Null ("not set") on every case until a supervisor sets them.
+  severity              CaseProofSeverity?
+  estimatedLossPercent  Int?
   status       CaseProofStatus @default(draft)
   savedAt      DateTime?
   createdAt    DateTime        @default(now())
