@@ -1533,6 +1533,16 @@ export interface Dictionary {
     removePhotoConfirm: string;
     textLabel: string;
     textHint: string;
+    severityLabel: string;
+    severityNotSet: string;
+    severities: {
+      small: string;
+      medium: string;
+      large: string;
+    };
+    estimatedLossLabel: string;
+    estimatedLossHint: string;
+    estimatedLossNotSet: string;
     save: string;
     saving: string;
     saved: string;
@@ -1548,6 +1558,7 @@ export interface Dictionary {
       by: string;
       date: string;
       status: string;
+      severity: string;
     };
     statuses: {
       draft: string;
@@ -1571,6 +1582,8 @@ export interface Dictionary {
       tooManyPhotos: string;
       minOnePhoto: string;
       textRequired: string;
+      invalidSeverity: string;
+      invalidLossPercent: string;
       rateLimited: string;
       notFound: string;
       locked: string;
