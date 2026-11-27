@@ -92,8 +92,8 @@ export function NotificationBell() {
         ) : (
           <ul className="max-h-96 divide-y divide-border overflow-y-auto">
             {feed.items.map((n) => (
-              <li key={n.id}>
-                <Link href={n.href} onClick={() => setOpen(false)} className="flex gap-3 px-4 py-3 hover:bg-muted">
+              <li key={n.id} className="hover:bg-muted">
+                <Link href={n.href} onClick={() => setOpen(false)} className="flex gap-3 px-4 py-3">
                   <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", toneDot[n.tone])} />
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span className="text-sm font-medium leading-snug">{n.title}</span>
@@ -101,6 +101,11 @@ export function NotificationBell() {
                     <span className="text-[11px] text-muted-foreground/80">{fmt(n.at)}</span>
                   </span>
                 </Link>
+                {n.secondaryHref && (
+                  <Link href={n.secondaryHref} onClick={() => setOpen(false)} className="block px-4 pb-3 ps-[26px] text-xs font-medium text-primary hover:underline">
+                    {n.secondaryLabel}
+                  </Link>
+                )}
               </li>
             ))}
           </ul>

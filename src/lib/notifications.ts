@@ -5,6 +5,7 @@ import { leaveTypeLabel } from "@/lib/i18n/labels";
 import { User } from "@/lib/types";
 import { canSeeMissingPunchReview, loadMissingPunchReview } from "@/lib/missing-punch-review";
 import { canSeeOverdueReturn, loadOverdueReturns } from "@/lib/overdue-return";
+import { canSeeAbsenceCheck, loadAbsenceCheckDays } from "@/lib/absence-check";
 
 export interface AppNotification {
   id: string;
@@ -16,6 +17,9 @@ export interface AppNotification {
   /** Waiting on this user to act — stays counted until they do. Otherwise it's an FYI that counts until seen. */
   actionable: boolean;
   tone: "info" | "success" | "danger";
+  /** A second, optional link shown alongside the first (e.g. straight to the employee's own profile page). */
+  secondaryHref?: string;
+  secondaryLabel?: string;
 }
 
 export interface NotificationFeed {
@@ -80,6 +84,26 @@ export async function getNotifications(user: User): Promise<NotificationFeed> {
         href: `/attendance?date=${d.date}`,
         actionable: true,
         tone: "info",
+      });
+    }
+  }
+
+  // an absent day with no approved leave/mission/excuse and not yet reviewed by HR ("is he really absent, or is it a
+  // fingerprint problem?"); it never changes the day, a deduction or anyone's employment — see absence-check.ts
+  if (canSeeAbsenceCheck(user)) {
+    const days = await loadAbsenceCheckDays(user);
+    pendingCount += days.length;
+    for (const d of days.slice(0, PER_KIND)) {
+      items.push({
+        id: `absence-check-${d.employeeId}-${d.date}`,
+        title: t.notifications.absenceCheck,
+        body: `${d.name} — ${d.date} — ${t.notifications.absenceCheckNote}`,
+        at: new Date(`${d.date}T12:00:00.000Z`).toISOString(),
+        href: `/attendance?date=${d.date}`,
+        actionable: true,
+        tone: "info",
+        secondaryHref: `/employees/${d.employeeId}`,
+        secondaryLabel: t.notifications.absenceCheckProfileLink,
       });
     }
   }
