@@ -11,7 +11,7 @@ import { getSession } from "@/lib/auth";
 import { ActionState } from "@/hooks/use-action-feedback";
 import { getT } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/locale";
-import { CASE_PROOF_LIMITS as L } from "@/lib/case-proof/config";
+import { CASE_PROOF_LIMITS as L, parseCaseProofLossPercent, parseCaseProofSeverity } from "@/lib/case-proof/config";
 import { canUseCaseProof } from "@/lib/case-proof/access";
 import { canEditCaseProof, loadCaseProof } from "@/lib/case-proof/data";
 import { CASE_PROOF_STORAGE_ROOT, checkCasePhoto } from "@/lib/case-proof/files";
@@ -44,6 +44,12 @@ export async function saveCaseProof(_prev: ActionState, formData: FormData): Pro
   const text = String(formData.get("text") ?? "").trim();
   if (text.length < 3 || text.length > L.maxTextLength) return { error: t.caseProof.errors.textRequired, fields: ["text"] };
 
+  // both optional, written by the supervisor alone — never by the AI, never guessed for an old case
+  const severity = parseCaseProofSeverity(formData.get("severity") as string | null);
+  if (!severity.ok) return { error: t.caseProof.errors.invalidSeverity, fields: ["severity"] };
+  const lossPercent = parseCaseProofLossPercent(formData.get("estimatedLossPercent") as string | null);
+  if (!lossPercent.ok) return { error: t.caseProof.errors.invalidLossPercent, fields: ["estimatedLossPercent"] };
+
   const row = await loadCaseProof(user, id);
   if (!row) return { error: t.caseProof.errors.notFound };
   if (!canEditCaseProof(user, row.createdById)) return { error: t.validation.notAllowed };
@@ -59,7 +65,11 @@ export async function saveCaseProof(_prev: ActionState, formData: FormData): Pro
       newValue: text,
       reason: namesOf(row.employees),
     },
-    (tx) => tx.caseProof.update({ where: { id }, data: { finalText: text, status: "saved", savedAt: row.savedAt ?? new Date() } }),
+    (tx) =>
+      tx.caseProof.update({
+        where: { id },
+        data: { finalText: text, status: "saved", savedAt: row.savedAt ?? new Date(), severity: severity.value, estimatedLossPercent: lossPercent.value },
+      }),
   );
   refresh(row.employees.map((e) => e.employeeNumber));
   return { success: true, message: t.caseProof.saved };
